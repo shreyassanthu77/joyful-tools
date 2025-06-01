@@ -1,6 +1,0 @@
-{
-  "tasks": {
-    "dev": "deno -A npm:vite"
-  },
-  "nodeModulesDir": "auto"
-}
