@@ -12,7 +12,6 @@ export function createQueue<T>(options: QueueOptions<T>) {
 	if (queues.has(channel)) {
 		throw new Error(`Queue with channel ${channel} already exists`);
 	}
-	queues.set(channel, { handler });
 
 	async function $enqueue(data: T, delay?: number) {
 		const id = nanoid(10);
@@ -23,12 +22,14 @@ export function createQueue<T>(options: QueueOptions<T>) {
 		};
 		await kv.enqueue(msg, { delay });
 	}
+	queues.set(channel, { handler, enqueue: $enqueue });
 
 	return $enqueue;
 }
 
 type Queue<T> = {
 	handler: (data: T) => Promise<void>;
+	enqueue: (data: T, delay?: number) => Promise<void>;
 };
 
 const MSG_TAG = "$$QUEUE_MSG$$";

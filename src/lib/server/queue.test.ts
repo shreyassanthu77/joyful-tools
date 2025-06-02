@@ -19,7 +19,9 @@ describe("queue", () => {
 			handler,
 		});
 		await enq("hello");
-		await expect.poll(() => handler).toHaveBeenCalledWith("hello");
+		await expect
+			.poll(() => handler, { interval: 2 })
+			.toHaveBeenCalledWith("hello");
 	});
 
 	test("delay", async () => {
@@ -30,10 +32,7 @@ describe("queue", () => {
 		});
 		await enq("hello", 10);
 		await expect
-			.poll(() => handler, {
-				interval: 10,
-				timeout: 15,
-			})
+			.poll(() => handler, { interval: 10, timeout: 15 })
 			.toHaveBeenCalledWith("hello");
 	});
 });
