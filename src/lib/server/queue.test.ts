@@ -59,4 +59,21 @@ describe("queue", () => {
 		expect(handler).toHaveBeenNthCalledWith(2, "hello");
 		expect(handler).toHaveBeenNthCalledWith(3, "hello");
 	});
+
+	test("deadletter", async () => {
+		const err = new Error("always fails");
+		const enq = createQueue<string>({
+			channel: "deadletter",
+			handler: () => {
+				throw err;
+			},
+			maxRetries: 1,
+		});
+		await enq("hello");
+		await wait(0);
+		const msgs = enq.getFailed();
+		const deadletters = await Array.fromAsync(msgs);
+		expect(deadletters).toHaveLength(1);
+		expect(deadletters[0]!.error).toBe(String(err));
+	});
 });

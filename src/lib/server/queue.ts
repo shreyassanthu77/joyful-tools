@@ -23,8 +23,25 @@ export function createQueue<T>(options: QueueOptions<T>) {
 			data,
 			attempt: 0,
 		};
-		await kv.enqueue(msg, { delay });
+		await kv.enqueue(msg, {
+			delay,
+		});
 	}
+
+	$enqueue.getFailed = async function* (): AsyncGenerator<
+		Payload<T>,
+		void,
+		unknown
+	> {
+		const msgs = kv.list<Payload<T>>({
+			prefix: ["queue_deadletter", channel],
+		});
+		for await (const msg of msgs) {
+			yield msg.value;
+		}
+		return;
+	};
+
 	queues.set(channel, { handler, maxRetries, retryDelay });
 
 	return $enqueue;
@@ -42,6 +59,7 @@ type Payload<T> = {
 	id: string;
 	data: T;
 	attempt: number;
+	error?: string;
 };
 
 function isPayload<T>(msg: unknown): msg is Payload<T> {
@@ -56,8 +74,12 @@ kv.listenQueue(async (msg: unknown) => {
 	try {
 		await queue.handler(msg.data);
 	} catch (err) {
-		if (msg.attempt >= queue.maxRetries) throw err;
 		msg.attempt++;
+		if (msg.attempt >= queue.maxRetries) {
+			msg.error = String(err);
+			await kv.set(["queue_deadletter", channel, msg.id], msg);
+			return;
+		}
 		await kv.enqueue(msg, { delay: queue.retryDelay });
 	}
 });
