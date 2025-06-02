@@ -76,4 +76,23 @@ describe("queue", () => {
 		expect(deadletters).toHaveLength(1);
 		expect(deadletters[0]!.error).toBe(String(err));
 	});
+
+	test("custom failure handler", async () => {
+		const err = new Error("always fails");
+		const func = vi.fn(async (_: string, __: unknown) => {});
+		const enq = createQueue<string>({
+			channel: "custom-failure-handler",
+			handler: () => {
+				throw err;
+			},
+			onFailure: async (data, error) => {
+				func(data, error);
+			},
+			maxRetries: 1,
+			retryDelay: 0,
+		});
+		await enq("hello");
+		await wait(0);
+		expect(func).toHaveBeenCalledWith("hello", err);
+	});
 });

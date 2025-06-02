@@ -5,12 +5,19 @@ const queues = new Map<string, Queue<any>>();
 export type QueueOptions<T> = {
 	channel: string;
 	handler: (data: T) => Promise<void>;
+	onFailure?: (data: T, error: unknown) => Promise<void>;
 	maxRetries?: number;
 	retryDelay?: number;
 };
 
 export function createQueue<T>(options: QueueOptions<T>) {
-	const { channel, handler, maxRetries = 3, retryDelay = 200 } = options;
+	const {
+		channel,
+		handler,
+		onFailure,
+		maxRetries = 3,
+		retryDelay = 200,
+	} = options;
 	if (queues.has(channel)) {
 		throw new Error(`Queue with channel ${channel} already exists`);
 	}
@@ -42,7 +49,7 @@ export function createQueue<T>(options: QueueOptions<T>) {
 		return;
 	};
 
-	queues.set(channel, { handler, maxRetries, retryDelay });
+	queues.set(channel, { handler, maxRetries, retryDelay, onFailure });
 
 	return $enqueue;
 }
@@ -51,6 +58,7 @@ type Queue<T> = {
 	maxRetries: number;
 	retryDelay: number;
 	handler: (data: T) => Promise<void>;
+	onFailure?: (data: T, error: unknown) => Promise<void>;
 };
 
 const MSG_TAG = "$$QUEUE_MSG$$";
@@ -76,6 +84,10 @@ kv.listenQueue(async (msg: unknown) => {
 	} catch (err) {
 		msg.attempt++;
 		if (msg.attempt >= queue.maxRetries) {
+			if (queue.onFailure) {
+				await queue.onFailure(msg.data, err);
+				return;
+			}
 			msg.error = String(err);
 			await kv.set(["queue_deadletter", channel, msg.id], msg);
 			return;
