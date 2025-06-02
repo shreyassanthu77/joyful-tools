@@ -1,7 +1,6 @@
 import { test, describe, expect, vi } from "vitest";
 import { openKv } from "@deno/kv";
 import { createQueue } from "./queue.ts";
-import { wait } from "../async.ts";
 
 vi.mock(import("./kv.ts"), async () => {
 	const tempKv = await openKv(undefined, {
@@ -44,17 +43,20 @@ describe("queue", () => {
 			.mockRejectedValueOnce(new Error("second call"));
 
 		const retries = 3;
-		const retryDelay = 20;
 		const enq = createQueue({
 			channel: "retry",
 			handler,
 			maxRetries: retries,
-			retryDelay: retryDelay,
+			retryDelay: 0,
 		});
 
 		await enq("hello");
-		await wait(retryDelay * retries + 3);
-		expect(handler).toHaveBeenCalledTimes(3);
+		await expect
+			.poll(() => handler, {
+				interval: 2,
+				timeout: 100,
+			})
+			.toHaveBeenCalledTimes(retries);
 		expect(handler).toHaveBeenNthCalledWith(1, "hello");
 		expect(handler).toHaveBeenNthCalledWith(2, "hello");
 		expect(handler).toHaveBeenNthCalledWith(3, "hello");
@@ -62,15 +64,19 @@ describe("queue", () => {
 
 	test("deadletter", async () => {
 		const err = new Error("always fails");
+		const handler = vi.fn(async (_: string) => {
+			throw err;
+		});
 		const enq = createQueue<string>({
 			channel: "deadletter",
-			handler: () => {
-				throw err;
-			},
+			handler,
 			maxRetries: 1,
+			retryDelay: 0,
 		});
 		await enq("hello");
-		await wait(0);
+		await expect
+			.poll(() => handler, { interval: 2, timeout: 100 })
+			.toHaveBeenCalledWith("hello");
 		const msgs = enq.getFailed();
 		const deadletters = await Array.fromAsync(msgs);
 		expect(deadletters).toHaveLength(1);
@@ -92,7 +98,8 @@ describe("queue", () => {
 			retryDelay: 0,
 		});
 		await enq("hello");
-		await wait(0);
-		expect(func).toHaveBeenCalledWith("hello", err);
+		await expect
+			.poll(() => func, { interval: 2, timeout: 100 })
+			.toHaveBeenCalledWith("hello", err);
 	});
 });
