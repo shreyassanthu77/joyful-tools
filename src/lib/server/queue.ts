@@ -5,10 +5,12 @@ const queues = new Map<string, Queue<any>>();
 export type QueueOptions<T> = {
 	channel: string;
 	handler: (data: T) => Promise<void>;
+	maxRetries?: number;
+	retryDelay?: number;
 };
 
 export function createQueue<T>(options: QueueOptions<T>) {
-	const { channel, handler } = options;
+	const { channel, handler, maxRetries = 3, retryDelay = 200 } = options;
 	if (queues.has(channel)) {
 		throw new Error(`Queue with channel ${channel} already exists`);
 	}
@@ -19,17 +21,19 @@ export function createQueue<T>(options: QueueOptions<T>) {
 			[MSG_TAG]: channel,
 			id,
 			data,
+			attempt: 0,
 		};
 		await kv.enqueue(msg, { delay });
 	}
-	queues.set(channel, { handler, enqueue: $enqueue });
+	queues.set(channel, { handler, maxRetries, retryDelay });
 
 	return $enqueue;
 }
 
 type Queue<T> = {
+	maxRetries: number;
+	retryDelay: number;
 	handler: (data: T) => Promise<void>;
-	enqueue: (data: T, delay?: number) => Promise<void>;
 };
 
 const MSG_TAG = "$$QUEUE_MSG$$";
@@ -37,6 +41,7 @@ type Payload<T> = {
 	[MSG_TAG]: string;
 	id: string;
 	data: T;
+	attempt: number;
 };
 
 function isPayload<T>(msg: unknown): msg is Payload<T> {
@@ -51,6 +56,8 @@ kv.listenQueue(async (msg: unknown) => {
 	try {
 		await queue.handler(msg.data);
 	} catch (err) {
-		// TODO: handle error
+		if (msg.attempt >= queue.maxRetries) throw err;
+		msg.attempt++;
+		await kv.enqueue(msg, { delay: queue.retryDelay });
 	}
 });

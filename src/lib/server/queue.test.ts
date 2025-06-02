@@ -1,6 +1,7 @@
 import { test, describe, expect, vi } from "vitest";
 import { openKv } from "@deno/kv";
 import { createQueue } from "./queue.ts";
+import { wait } from "../async.ts";
 
 vi.mock(import("./kv.ts"), async () => {
 	const tempKv = await openKv(undefined, {
@@ -34,5 +35,28 @@ describe("queue", () => {
 		await expect
 			.poll(() => handler, { interval: 10, timeout: 15 })
 			.toHaveBeenCalledWith("hello");
+	});
+
+	test("retry", async () => {
+		const handler = vi
+			.fn(async (_: string) => {})
+			.mockRejectedValueOnce(new Error("first call"))
+			.mockRejectedValueOnce(new Error("second call"));
+
+		const retries = 3;
+		const retryDelay = 20;
+		const enq = createQueue({
+			channel: "retry",
+			handler,
+			maxRetries: retries,
+			retryDelay: retryDelay,
+		});
+
+		await enq("hello");
+		await wait(retryDelay * retries + 3);
+		expect(handler).toHaveBeenCalledTimes(3);
+		expect(handler).toHaveBeenNthCalledWith(1, "hello");
+		expect(handler).toHaveBeenNthCalledWith(2, "hello");
+		expect(handler).toHaveBeenNthCalledWith(3, "hello");
 	});
 });
