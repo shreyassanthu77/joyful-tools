@@ -16,13 +16,13 @@ export interface CliContext<T> {
 	scriptName: string;
 	args: string[];
 	printHelp: (status?: number) => never;
-	data: T;
+	data: T extends void ? undefined : T;
 }
 
 let rl = readline.createInterface({ input: process.stdin, output: process.stdout });
 
 export async function cli<const T = void>(options: {
-	init: (cwd: string) => T | Promise<T>;
+	init?: (cwd: string) => T | Promise<T>;
 	description: string;
 	commands: Record<
 		string,
@@ -30,7 +30,7 @@ export async function cli<const T = void>(options: {
 	>;
 }) {
 	const [programName, scriptName, ...args] = process.argv;
-	const data = await options.init(cwd);
+	const data = await options.init?.(cwd);
 	const programCmd = `${basename(programName)} ${relative(cwd, scriptName)}`;
 	let paddingCount = 0;
 	for (const cmd in options.commands) {
@@ -56,7 +56,7 @@ ${Object.entries(options.commands)
 		programName,
 		scriptName,
 		args,
-		data,
+		data: data as T extends void ? undefined : T,
 		printHelp,
 	};
 	if (args.length === 0 || args[0] === "help") {
