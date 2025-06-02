@@ -1,4 +1,4 @@
-import { cli, prompt, type CliContextOf, exec, exit, log } from "./shared.ts";
+import { cli, prompt, type CliContextOf, exec, exit, log } from "./cli.ts";
 import { join, basename } from "node:path";
 import { existsSync, writeFileSync, readFileSync } from "node:fs";
 
