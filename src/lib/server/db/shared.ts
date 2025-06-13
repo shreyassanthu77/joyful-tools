@@ -9,17 +9,16 @@ export const id = (name?: string) =>
 		.defaultRandom()
 		.primaryKey();
 
-export const timestamps = {
-	createdAt: timestamp().defaultNow().notNull(),
-	updatedAt: timestamp()
-		.defaultNow()
-		.$onUpdate(() => new Date())
-		.notNull(),
-} as const;
-
-export const defaults = {
-	...timestamps,
-	id: id(),
-} as const;
+export function withDefaults<T extends Record<string, any>>(obj: T) {
+	return {
+		id: id(),
+		...obj,
+		createdAt: timestamp().defaultNow().notNull(),
+		updatedAt: timestamp()
+			.defaultNow()
+			.$onUpdate(() => new Date())
+			.notNull(),
+	};
+}
 
 export const table = pgTable;

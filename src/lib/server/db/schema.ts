@@ -1,4 +1,2 @@
-import { table, defaults } from "./shared";
-export const users = table("users", ()=>({
-        ...defaults
-    }));
+import { table, withDefaults } from "./shared";
+export * from "./auth-schema.ts";

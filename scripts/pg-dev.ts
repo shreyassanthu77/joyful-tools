@@ -11,7 +11,10 @@ cli({
 		stop: [stop, "Stop the PostgreSQL server if running"],
 		tail: [tail, "Tail the PostgreSQL server logs"],
 		rm: [rm, "Remove the PostgreSQL server container but not the data volume"],
-		clean: [clean, "Remove the PostgreSQL server container and the data volume"],
+		clean: [
+			clean,
+			"Remove the PostgreSQL server container and the data volume",
+		],
 	},
 });
 
@@ -21,6 +24,7 @@ async function init(cwd: string) {
 	let config = {
 		port: "5432",
 		dbname: `${sanitizeDbname(basename(cwd))}-postgres`,
+		user: "postgres",
 		version: "latest",
 		password: "postgres",
 	};
@@ -29,6 +33,7 @@ async function init(cwd: string) {
 	const envFilePath = join(cwd, ".env.local");
 	let foundConfigOptions = {
 		port: false,
+		user: false,
 		dbname: false,
 		version: false,
 		password: false,
@@ -68,10 +73,18 @@ async function init(cwd: string) {
 				config.password = value;
 				foundConfigOptions.password = true;
 				break;
+			case "POSTGRES_USER":
+				config.user = value;
+				foundConfigOptions.user = true;
+				break;
 		}
 	}
 
-	if (!foundConfigOptions.port || !foundConfigOptions.dbname || !foundConfigOptions.version) {
+	if (
+		!foundConfigOptions.port ||
+		!foundConfigOptions.dbname ||
+		!foundConfigOptions.version
+	) {
 		envLocalFileContents += `
 ############################
 # PostgreSQL configuration
@@ -81,20 +94,29 @@ async function init(cwd: string) {
 
 	if (!foundConfigOptions.port) {
 		while (true) {
-			const port = await prompt(`Enter port for PostgreSQL server [${config.port}]: `, config.port);
+			const port = await prompt(
+				`Enter port for PostgreSQL server [${config.port}]: `,
+				config.port,
+			);
 			if (!port.match(/^[0-9]{1,5}$/)) {
-				log.error("Error: Invalid port number. Port must be a number between 1 and 65535.");
+				log.error(
+					"Error: Invalid port number. Port must be a number between 1 and 65535.",
+				);
 				continue;
 			}
 			let parsedPort: number;
 			try {
 				parsedPort = parseInt(port);
 			} catch (e) {
-				log.error("Error: Invalid port number. Port must be a number between 1 and 65535.");
+				log.error(
+					"Error: Invalid port number. Port must be a number between 1 and 65535.",
+				);
 				continue;
 			}
 			if (parsedPort < 1 || parsedPort > 65535) {
-				log.error("Error: Invalid port number. Port must be a number between 1 and 65535.");
+				log.error(
+					"Error: Invalid port number. Port must be a number between 1 and 65535.",
+				);
 				continue;
 			}
 			config.port = parsedPort.toString();
@@ -103,7 +125,10 @@ async function init(cwd: string) {
 		envLocalFileContents += `\nPOSTGRES_PORT=${config.port}`;
 	}
 	if (!foundConfigOptions.dbname) {
-		config.dbname = await prompt(`Enter database name [${config.dbname}]: `, config.dbname);
+		config.dbname = await prompt(
+			`Enter database name [${config.dbname}]: `,
+			config.dbname,
+		);
 		envLocalFileContents += `\nPOSTGRES_DBNAME=${config.dbname}`;
 	}
 	if (!foundConfigOptions.version) {
@@ -119,6 +144,13 @@ async function init(cwd: string) {
 			config.password,
 		);
 		envLocalFileContents += `\nPOSTGRES_PASSWORD=${config.password}`;
+	}
+	if (!foundConfigOptions.user) {
+		config.user = await prompt(
+			`Enter postgres user [${config.user}]: `,
+			config.user,
+		);
+		envLocalFileContents += `\nPOSTGRES_USER=${config.user}`;
 	}
 	if (envLocalFileContents.length > envLocalFileContentsLen) {
 		log.info("Saving configuration to .env.local");
@@ -146,14 +178,21 @@ function state({
 	}
 }
 
-function run({ programCmd, data: { config, volumeName } }: CliContextOf<typeof init>) {
+function run({
+	programCmd,
+	data: { config, volumeName },
+}: CliContextOf<typeof init>) {
 	const containerInfo = getContainerInfo(config.dbname);
 	if (containerInfo && containerInfo.State === "running") {
-		log.error(`Error: A container named '${config.dbname}' is already running.`);
+		log.error(
+			`Error: A container named '${config.dbname}' is already running.`,
+		);
 		log.error(`You can stop it with: ${programCmd} stop`);
 		process.exit(1);
 	} else if (containerInfo) {
-		log.warn(`Warning: A stopped container named '${config.dbname}' exists. Removing it...`);
+		log.warn(
+			`Warning: A stopped container named '${config.dbname}' exists. Removing it...`,
+		);
 		exec("docker", ["rm", config.dbname], "ignore");
 	}
 	log.info(`Starting PostgreSQL server...`);
@@ -167,7 +206,7 @@ function run({ programCmd, data: { config, volumeName } }: CliContextOf<typeof i
 		"-e",
 		`POSTGRES_DB=${config.dbname}`,
 		"-e",
-		"POSTGRES_USER=postgres",
+		`POSTGRES_USER=${config.user}`,
 		"-p",
 		`${config.port}:5432`,
 		"-v",
@@ -199,10 +238,14 @@ function rm(ctx: CliContextOf<typeof init>) {
 	const containerInfo = getContainerInfo(config.dbname);
 	if (containerInfo) {
 		if (containerInfo.State === "running") {
-			log.warn(`Warning: Container '${config.dbname}' is running. Stopping it first...`);
+			log.warn(
+				`Warning: Container '${config.dbname}' is running. Stopping it first...`,
+			);
 			stop(ctx);
 		}
-		log.info(`Removing container '${config.dbname}' (data volume is preserved)...`);
+		log.info(
+			`Removing container '${config.dbname}' (data volume is preserved)...`,
+		);
 		exec("docker", ["rm", config.dbname], "ignore");
 	} else {
 		log.error(`Error: Container '${config.dbname}' does not exist.`);
@@ -221,7 +264,9 @@ function clean(ctx: CliContextOf<typeof init>) {
 function tail({ programCmd, data: { config } }: CliContextOf<typeof init>) {
 	const containerInfo = getContainerInfo(config.dbname);
 	if (containerInfo) {
-		log.info(`Tailing logs for container '${config.dbname}' (Ctrl+C to stop)...`);
+		log.info(
+			`Tailing logs for container '${config.dbname}' (Ctrl+C to stop)...`,
+		);
 		exec("docker", ["logs", "-f", config.dbname], "inherit");
 	} else {
 		log.error(`Error: Container '${config.dbname}' does not exist.`);
