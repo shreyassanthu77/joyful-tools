@@ -1,4 +1,4 @@
-# @joy/kv
+# @joyful/kv
 
 A simple, type-safe key-value store abstraction for Node and Deno with multiple driver support.
 
@@ -15,9 +15,9 @@ A simple, type-safe key-value store abstraction for Node and Deno with multiple 
 ## Installation
 
 ```typescript
-import { createKv } from "@joy/kv";
-import { createMemoryDriver } from "@joy/kv/memory";
-import { createDenoDriver } from "@joy/kv/deno-kv";
+import { createKv } from "@joyful/kv";
+import { createMemoryDriver } from "@joyful/kv/memory";
+import { createDenoDriver } from "@joyful/kv/deno-kv";
 ```
 
 ## Usage
@@ -25,8 +25,8 @@ import { createDenoDriver } from "@joy/kv/deno-kv";
 ### Basic Usage
 
 ```typescript
-import { createKv } from "@joy/kv";
-import { createMemoryDriver } from "@joy/kv/memory";
+import { createKv } from "@joyful/kv";
+import { createMemoryDriver } from "@joyful/kv/memory";
 
 // Create a KV store with memory driver
 const kv = createKv({
@@ -56,8 +56,8 @@ await kv.clear();
 ### Using Deno KV Driver
 
 ```typescript
-import { createKv } from "@joy/kv";
-import { createDenoDriver } from "@joy/kv/deno-kv";
+import { createKv } from "@joyful/kv";
+import { createDenoDriver } from "@joyful/kv/deno-kv";
 
 const denoKv = await Deno.openKv();
 const kv = createKv({
@@ -130,13 +130,13 @@ Creates a new KV store instance.
 
 #### Memory Driver
 ```typescript
-import { createMemoryDriver } from "@joy/kv/memory";
+import { createMemoryDriver } from "@joyful/kv/memory";
 const driver = createMemoryDriver();
 ```
 
 #### Deno KV Driver
 ```typescript
-import { createDenoDriver } from "@joy/kv/deno-kv";
+import { createDenoDriver } from "@joyful/kv/deno-kv";
 const driver = createDenoDriver({ 
   kv: await Deno.openKv(),
   prefix?: "custom_prefix"
