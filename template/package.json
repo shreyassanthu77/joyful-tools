@@ -39,6 +39,7 @@
     "vitest": "^3.1.4"
   },
   "dependencies": {
+    "@joyful/kv": "npm:@jsr/joyful__kv",
     "better-auth": "^1.2.8",
     "drizzle-orm": "^0.40.0",
     "postgres": "^3.4.5"

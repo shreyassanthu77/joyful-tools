@@ -4,6 +4,7 @@
     "": {
       "name": "-joyful",
       "dependencies": {
+        "@joyful/kv": "npm:@jsr/joyful__kv",
         "better-auth": "^1.2.8",
         "drizzle-orm": "^0.40.0",
         "postgres": "^3.4.5",
@@ -114,6 +115,16 @@
 
     "@clack/prompts": ["@clack/prompts@0.10.1", "", { "dependencies": { "@clack/core": "0.4.2", "picocolors": "^1.0.0", "sisteransi": "^1.0.5" } }, "sha512-Q0T02vx8ZM9XSv9/Yde0jTmmBQufZhPJfYAg2XrrrxWWaZgq1rr8nU8Hv710BQ1dhoP8rtY7YUdpGej2Qza/cw=="],
 
+    "@deno/kv": ["@deno/kv@0.10.0", "", { "optionalDependencies": { "@deno/kv-darwin-arm64": "0.10.0", "@deno/kv-darwin-x64": "0.10.0", "@deno/kv-linux-x64-gnu": "0.10.0", "@deno/kv-win32-x64-msvc": "0.10.0" } }, "sha512-fbQFYsWvTbyjj6QhXOXFzb3AaMuStOTgUQvgoHf0bJ2s8csklV4V5NkGvi/aNH3uqmduYw+LULz9pPerpiwNfA=="],
+
+    "@deno/kv-darwin-arm64": ["@deno/kv-darwin-arm64@0.10.0", "", { "os": "darwin", "cpu": "arm64" }, "sha512-A3ZlAtDwustZDPG7F2quF0PLn18qagGdRP7BynaRdyMvbQRZFKODg2MBjtRJIoaDnbodbprnyxFNwIKKHTEgXg=="],
+
+    "@deno/kv-darwin-x64": ["@deno/kv-darwin-x64@0.10.0", "", { "os": "darwin", "cpu": "x64" }, "sha512-olIc2rVGat+CdVc4sAoCnaCht3072+Y87rNA3RVDlHSdCf/lCA/72rKHkhLnr2N0NDaZuObgez0q5dlnG81Hvg=="],
+
+    "@deno/kv-linux-x64-gnu": ["@deno/kv-linux-x64-gnu@0.10.0", "", { "os": "linux", "cpu": "x64" }, "sha512-WruhVdvLQmy/IbawcRQlqvqd7ieUbZnKU/0Cxy0y4LXwPQ9SBHeUG6U0YI6+4gN+q26GXBnifEQv6e6ocqS9Qg=="],
+
+    "@deno/kv-win32-x64-msvc": ["@deno/kv-win32-x64-msvc@0.10.0", "", { "os": "win32", "cpu": "x64" }, "sha512-7l9rlxS7KERpnRSXGoot+zXBeaDt4Dt+LShTva+XwuYqQstnxTuo0xLNzt36+nYHtMeVGCxZUzwQFCNp8686Sw=="],
+
     "@drizzle-team/brocli": ["@drizzle-team/brocli@0.10.2", "", {}, "sha512-z33Il7l5dKjUgGULTqBsQBQwckHh5AbIuxhdsIxDDiZAzBOrZO6q9ogcWC65kU382AfynTfgNumVcNIjuIua6w=="],
 
     "@esbuild-kit/core-utils": ["@esbuild-kit/core-utils@3.3.2", "", { "dependencies": { "esbuild": "~0.18.20", "source-map-support": "^0.5.21" } }, "sha512-sPRAnw9CdSsRmEtnsl2WXWdyquogVpB3yZ3dgwJfe8zrOzTsV7cJvmwrKVa+0ma5BoiGJ+BoqkMvawbayKUsqQ=="],
@@ -173,6 +184,8 @@
     "@hexagon/base64": ["@hexagon/base64@1.1.28", "", {}, "sha512-lhqDEAvWixy3bZ+UOYbPwUbBkwBq5C1LAJ/xPC8Oi+lL54oyakv/npbA0aU2hgCsx/1NUd4IBvV03+aUBWxerw=="],
 
     "@isaacs/fs-minipass": ["@isaacs/fs-minipass@4.0.1", "", { "dependencies": { "minipass": "^7.0.4" } }, "sha512-wgm9Ehl2jpeqP3zw/7mo3kRHFp5MEDhqAdwy1fTGkHAwnkGOVsgpvQhL8B5n1qlb01jV3n/bI0ZfZp5lWA1k4w=="],
+
+    "@joyful/kv": ["@jsr/joyful__kv@0.0.3", "https://npm.jsr.io/~/11/@jsr/joyful__kv/0.0.3.tgz", { "dependencies": { "@deno/kv": "0.10.0" } }, "sha512-sfFDLgleoqE8NNscfUhotykEeqS8WAw62YovCMsz6IvXBxqwtQ3+sfx81XG61ZfGV7ZnF0Q/r/7kSN6BxcpArA=="],
 
     "@jridgewell/gen-mapping": ["@jridgewell/gen-mapping@0.3.8", "", { "dependencies": { "@jridgewell/set-array": "^1.2.1", "@jridgewell/sourcemap-codec": "^1.4.10", "@jridgewell/trace-mapping": "^0.3.24" } }, "sha512-imAbBGkb+ebQyxKgzv5Hu2nmROxoDOXHh80evxdoXNOrvAnVx7zimzc1Oo5h9RlfV4vPXaE2iM5pOFbvOCClWA=="],
 
