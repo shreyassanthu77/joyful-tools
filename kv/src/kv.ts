@@ -69,7 +69,7 @@ class Kv<Driver = unknown, Value = string> {
    * @param namespace The namespace to use.
    * @returns A new Kv instance with the specified namespace.
    */
-  fork(namespace: string) {
+  fork(namespace: string): Kv<Driver, Value> {
     return new Kv(this.inner, `${this.#prefix}:${namespace}`);
   }
 
