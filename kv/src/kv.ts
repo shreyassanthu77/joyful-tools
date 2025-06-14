@@ -52,21 +52,23 @@ export type KvResult<T, E = unknown> =
       error: E;
     };
 
+type Value<Driver extends KvDriver<unknown>> =
+  Driver extends KvDriver<infer V> ? V : never;
+
 /**
  * A key-value store.
  * This class provides a simple interface for interacting with a key-value store.
  *
  * @template Driver The type of the internal driver that is being used.
- * @template Value The type of the value to be stored. Defaults to `string`.
  */
-class Kv<Driver = unknown, Value = string> {
+class Kv<Driver extends KvDriver<unknown>> {
   /**
    * The internal driver adapter.
    */
-  inner: KvDriver<Value, Driver>;
+  inner: Driver;
   #prefix: string;
 
-  constructor(kvDriver: KvDriver<Value, Driver>, prefix: string = "kv") {
+  constructor(kvDriver: Driver, prefix: string = "kv") {
     this.inner = kvDriver;
     this.#prefix = prefix;
   }
@@ -79,7 +81,7 @@ class Kv<Driver = unknown, Value = string> {
    * @param namespace The namespace to use.
    * @returns A new Kv instance with the specified namespace.
    */
-  fork(namespace: string): Kv<Driver, Value> {
+  fork(namespace: string): Kv<Driver> {
     return new Kv(this.inner, `${this.#prefix}:${namespace}`);
   }
 
@@ -89,10 +91,10 @@ class Kv<Driver = unknown, Value = string> {
    * @param key The key to get the value for.
    * @returns A promise that resolves to `KvResult` containing the value or an error.
    */
-  async get(key: string): Promise<KvResult<Value | null>> {
+  async get(key: string): Promise<KvResult<Value<Driver> | null>> {
     key = `${this.#prefix}:${key}`;
     try {
-      const value = await this.inner.get(key);
+      const value = (await this.inner.get(key)) as Value<Driver>;
       return { ok: true, value };
     } catch (e) {
       return { ok: false, error: e };
@@ -108,7 +110,7 @@ class Kv<Driver = unknown, Value = string> {
    */
   async set(
     key: string,
-    value: Value,
+    value: Value<Driver>,
     ttlSeconds?: number,
   ): Promise<KvResult<void>> {
     key = `${this.#prefix}:${key}`;
@@ -156,11 +158,11 @@ export type { Kv };
  * @template Driver The type of the internal driver that is being used.
  * @template Value The type of the value to be stored. Defaults to `string`.
  */
-export interface KvOptions<Driver = unknown, Value = string> {
+export interface KvOptions<Driver extends KvDriver> {
   /**
    * The driver to use for interacting with the key-value store.
    */
-  driver: KvDriver<Value, Driver>;
+  driver: Driver;
   /**
    * The prefix to use for the key-value store.
    */
@@ -175,8 +177,8 @@ export interface KvOptions<Driver = unknown, Value = string> {
  * @param options The options for creating the Kv instance.
  * @returns A new Kv instance.
  */
-export function createKv<Driver = unknown, Value = string>(
-  options: KvOptions<Driver, Value>,
-): Kv<Driver, Value> {
+export function createKv<Driver extends KvDriver>(
+  options: KvOptions<Driver>,
+): Kv<Driver> {
   return new Kv(options.driver, options.prefix);
 }

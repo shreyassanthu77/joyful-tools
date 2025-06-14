@@ -4,7 +4,7 @@ class MemoryDriver implements KvDriver<string, never> {
   _driver: never = undefined as never;
   #data: Map<string, { value: string; expiresAt: number | null }> = new Map();
 
-  get(key: string): string | Promise<string | null> | null {
+  get(key: string): string | null {
     const value = this.#data.get(key);
     if (value && (!value.expiresAt || value.expiresAt > Date.now())) {
       return value.value;

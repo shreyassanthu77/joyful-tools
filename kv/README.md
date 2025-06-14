@@ -93,21 +93,6 @@ await cacheKv.set("session", "cached_data");
 await kv.set("temp_token", "xyz789", 60);
 ```
 
-### Custom Value Types
-
-```typescript
-interface User {
-  id: string;
-  name: string;
-}
-
-const userKv = createKv<unknown, User>({
-  driver: createMemoryDriver(),
-});
-
-await userKv.set("user:123", { id: "123", name: "John" });
-```
-
 ## API Reference
 
 ### `createKv(options)`
@@ -143,12 +128,20 @@ const driver = createDenoDriver({
 });
 ```
 
-## Error Handling
-
-All operations return a `KvResult<T>` which is either:
+#### Deno KV Driver (Node.js)
+uses [@deno/kv@0.10.0](https://www.npmjs.com/package/@deno/kv) from npm.
 
 ```typescript
-{ ok: true, value: T } | { ok: false, error: unknown }
+import { createDenoDriver, openKv } from "@joyful/kv/deno-kv-node";
+const driver = createDenoDriver({ kv: await openKv(), prefix: "custom_prefix" });
+```
+
+## Error Handling
+
+All operations return a `KvResult<T, E>` which is either:
+
+```typescript
+{ ok: true, value: T } | { ok: false, error: E }
 ```
 
 ```typescript
@@ -156,7 +149,7 @@ const result = await kv.get("key");
 if (result.ok) {
   console.log("Value:", result.value);
 } else {
-  console.error("Error:", result.error);
+  throw result.error; // TODO: handle error
 }
 ```
 

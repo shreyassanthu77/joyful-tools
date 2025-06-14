@@ -23,6 +23,9 @@ export interface DenoDriverOptions {
  */
 export function createDenoDriver(
   options: DenoDriverOptions,
-): KvDriver<string, Deno.Kv> {
-  return createDenoDriverCore(options as DenoDriverOptionsCore);
+): KvDriver<string, Kv> {
+  return createDenoDriverCore(options as DenoDriverOptionsCore) as KvDriver<
+    string,
+    Kv
+  >;
 }
