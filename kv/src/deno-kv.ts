@@ -38,11 +38,23 @@ class DenoDriver implements KvDriver<string, Deno.Kv> {
   }
 }
 
+/**
+ * Options for creating a Deno KV driver.
+ */
 export interface DenoDriverOptions {
+  /** The Deno KV instance to use. */
   kv: Deno.Kv;
+  /** The prefix to use for all keys. */
   prefix?: string;
 }
 
-export function createDenoDriver(options: DenoDriverOptions): KvDriver<string> {
+/**
+ * Creates a new Deno KV driver.
+ * @param options The options for creating the driver.
+ * @returns A new Deno KV driver.
+ */
+export function createDenoDriver(
+  options: DenoDriverOptions,
+): KvDriver<string, Deno.Kv> {
   return new DenoDriver(options.kv, options.prefix);
 }

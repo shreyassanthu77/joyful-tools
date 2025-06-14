@@ -31,6 +31,10 @@ class MemoryDriver implements KvDriver<string, never> {
   }
 }
 
-export function createMemoryDriver(): MemoryDriver {
+/**
+ * Creates a new memory driver. This driver stores data in a simple javascript Map.
+ * @returns A new memory driver.
+ */
+export function createMemoryDriver(): KvDriver<string, never> {
   return new MemoryDriver();
 }

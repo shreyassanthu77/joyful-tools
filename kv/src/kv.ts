@@ -1,3 +1,9 @@
+/**
+ * @module @joyful/kv
+ * A simple, type-safe key-value store abstraction for Node and Deno with multiple driver support.
+ * This module provides a simple interface for interacting with a key-value store.
+ */
+
 type PromiseOr<T> = T | Promise<T>;
 
 /**
@@ -34,11 +40,15 @@ export interface KvDriver<Value = string, Driver = unknown> {
  */
 export type KvResult<T, E = unknown> =
   | {
+      /** Whether the operation was successful. */
       ok: true;
+      /** The value returned by the operation. */
       value: T;
     }
   | {
+      /** Whether the operation was successful. */
       ok: false;
+      /** The error returned by the operation. */
       error: E;
     };
 
