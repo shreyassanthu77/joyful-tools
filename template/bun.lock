@@ -9,6 +9,7 @@
         "postgres": "^3.4.5",
       },
       "devDependencies": {
+        "@better-auth/cli": "https://pkg.pr.new/better-auth/better-auth/@better-auth/cli@2997",
         "@sveltejs/adapter-auto": "^6.0.0",
         "@sveltejs/kit": "^2.16.0",
         "@sveltejs/vite-plugin-svelte": "^5.0.0",
@@ -16,7 +17,6 @@
         "@tailwindcss/vite": "^4.0.0",
         "@types/node": "^22",
         "drizzle-kit": "^0.30.2",
-        "@better-auth/cli": "https://pkg.pr.new/better-auth/better-auth/@better-auth/cli@2997",
         "prettier": "^3.4.2",
         "prettier-plugin-svelte": "^3.3.3",
         "prettier-plugin-tailwindcss": "^0.6.11",
