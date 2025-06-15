@@ -44,5 +44,25 @@ export function testDriver<Driver extends KvDriver<unknown>>(
         assertEquals(value, null);
       }
     });
+
+    if (driver.clear) {
+      await t.step("clear", async () => {
+        for (let i = 0; i < 10; i++) {
+          await driver.set(`key${i}`, `value${i}`);
+        }
+        for (let i = 0; i < 10; i++) {
+          await driver.set(`other${i}`, `value${i}`);
+        }
+        await driver.clear!("key");
+        for (let i = 0; i < 10; i++) {
+          const value = await driver.get(`key${i}`);
+          assertEquals(value, null);
+        }
+        for (let i = 0; i < 10; i++) {
+          const value = await driver.get(`other${i}`);
+          assertEquals(value, `value${i}`);
+        }
+      });
+    }
   });
 }

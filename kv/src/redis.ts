@@ -38,9 +38,6 @@ class RedisDriver implements KvDriver<string, redis.RedisClient> {
   async delete(key: string): Promise<void> {
     await this._driver.sendCommand(["DEL", key]);
   }
-  clear(prefix: string): Promise<void> {
-    throw new Error("Method not implemented.");
-  }
 }
 
 export interface RedisDriverOptions {

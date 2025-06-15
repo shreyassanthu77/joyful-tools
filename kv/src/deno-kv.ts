@@ -41,9 +41,12 @@ class DenoDriver implements KvDriver<string, Deno.Kv> {
     const tx = this._driver.atomic();
     for await (const entry of this._driver.list({
       prefix: [this.#prefix],
-      start: [prefix],
+      start: [this.#prefix, prefix],
     })) {
-      tx.delete(entry.key);
+      const key = entry.key?.[1];
+      if (typeof key === "string" && key.startsWith(prefix)) {
+        tx.delete(entry.key);
+      }
     }
     const res = await tx.commit();
     if (!res.ok) {

@@ -27,7 +27,7 @@ export interface KvDriver<Value = string, Driver = unknown> {
   /** Delete the value associated with the given key. */
   delete(key: string): PromiseOr<void>;
   /** Clear all values with the given prefix. */
-  clear(prefix: string): PromiseOr<void>;
+  clear?: (prefix: string) => PromiseOr<void>;
   /** The internal driver adapter (if any). */
   _driver: Driver;
 }
@@ -141,6 +141,9 @@ class Kv<Driver extends KvDriver<unknown>> {
    * Clears all values set in the current namespace.
    */
   async clear(): Promise<KvResult<void>> {
+    if (!this.inner.clear) {
+      throw new Error("Driver does not support clearing");
+    }
     try {
       await this.inner.clear(this.#prefix);
       return { ok: true, value: undefined };
