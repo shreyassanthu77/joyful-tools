@@ -51,5 +51,16 @@
         "@deno/kv-win32-x64-msvc"
       ]
     }
+  },
+  "workspace": {
+    "members": {
+      "kv": {
+        "packageJson": {
+          "dependencies": [
+            "npm:@deno/kv@0.10"
+          ]
+        }
+      }
+    }
   }
 }

@@ -3,7 +3,7 @@ import {
   createDenoDriver as createDenoDriverCore,
   type DenoDriverOptions as DenoDriverOptionsCore,
 } from "./deno-kv.ts";
-import { openKv, type Kv } from "npm:@deno/kv@0.10.0";
+import { openKv, type Kv } from "@deno/kv";
 
 export { openKv };
 

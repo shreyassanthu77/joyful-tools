@@ -1,9 +1,8 @@
 name: Publish
 on:
   push:
-    paths-ignore:
-      - "template/**"
-      - ".vscode/**"
+    paths:
+      - "packages/**"
     branches:
       - main
 
@@ -19,4 +18,5 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Publish package
+        working-directory: packages/
         run: npx jsr publish
