@@ -128,13 +128,6 @@ const driver = createDenoDriver({
 });
 ```
 
-#### Deno KV Driver (Node.js)
-uses [@deno/kv@0.10.0](https://www.npmjs.com/package/@deno/kv) from npm.
-
-```typescript
-import { createDenoDriver, openKv } from "@joyful/kv/deno-kv-node";
-const driver = createDenoDriver({ kv: await openKv(), prefix: "custom_prefix" });
-```
 
 ## Error Handling
 

@@ -1,8 +1,8 @@
-import type { KvDriver } from "./kv.ts";
+import type { KvDriver } from "@joyful/kv";
 import {
   createDenoDriver as createDenoDriverCore,
   type DenoDriverOptions as DenoDriverOptionsCore,
-} from "./deno-kv.ts";
+} from "@joyful/kv/deno-kv";
 import { openKv, type Kv } from "@deno/kv";
 
 export { openKv };

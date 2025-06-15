@@ -5,7 +5,8 @@
     "jsr:@iuioiua/redis@1.1.9": "1.1.9",
     "jsr:@std/assert@*": "1.0.13",
     "jsr:@std/internal@^1.0.6": "1.0.8",
-    "npm:@deno/kv@*": "0.10.0"
+    "npm:@deno/kv@*": "0.10.0",
+    "npm:@deno/kv@0.10": "0.10.0"
   },
   "jsr": {
     "@iuioiua/redis@1.1.9": {
@@ -60,6 +61,11 @@
             "npm:@deno/kv@0.10"
           ]
         }
+      },
+      "kv-node-denokv": {
+        "dependencies": [
+          "npm:@deno/kv@0.10"
+        ]
       }
     }
   }
