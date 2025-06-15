@@ -9,14 +9,28 @@ class DenoDriver implements KvDriver<string, Deno.Kv> {
     this.#prefix = prefix;
   }
   async get(key: string): Promise<string | null> {
-    const res = await this._driver.get<string>([this.#prefix, key]);
-    return res.value;
+    const res = await this._driver.get<{
+      value: string;
+      expiresAt: number | null;
+    }>([this.#prefix, key]);
+    if (!res.value) return null;
+    const { value, expiresAt } = res.value;
+    if (value && (!expiresAt || expiresAt > Date.now())) {
+      return value;
+    }
+    // deletion will be taken care of by deno kv
+    return null;
   }
 
   async set(key: string, value: string, ttlSeconds?: number): Promise<void> {
-    await this._driver.set([this.#prefix, key], value, {
-      expireIn: ttlSeconds ? ttlSeconds * 1000 : undefined,
-    });
+    const expiresAt = ttlSeconds ? Date.now() + ttlSeconds * 1000 : null;
+    await this._driver.set(
+      [this.#prefix, key],
+      { value, expiresAt },
+      {
+        expireIn: ttlSeconds ? ttlSeconds * 1000 : undefined,
+      },
+    );
   }
 
   async delete(key: string): Promise<void> {
