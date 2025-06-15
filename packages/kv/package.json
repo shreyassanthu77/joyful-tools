@@ -1,0 +1,13 @@
+{
+  "devDependencies": {
+    "@deno/kv": "^0.10.0"
+  },
+  "peerDependencies": {
+    "@deno/kv": "^0.10.0"
+  },
+  "peerDependenciesMeta": {
+    "@deno/kv": {
+      "optional": true
+    }
+  }
+}
