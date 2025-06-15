@@ -1,8 +1,9 @@
 name: Publish
 on:
   push:
-    paths:
-      - "!template/**"
+    paths-ignore:
+      - "template/**"
+      - ".vscode/**"
     branches:
       - main
 
