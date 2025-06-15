@@ -1,4 +1,4 @@
-import * as redis from "jsr:@iuioiua/redis";
+import * as redis from "jsr:@iuioiua/redis@1.1.9";
 import type { KvDriver } from "./kv.ts";
 
 class RedisDriver implements KvDriver<string, redis.RedisClient> {
