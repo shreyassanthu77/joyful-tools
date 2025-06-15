@@ -1,5 +1,5 @@
-import * as redis from "jsr:@iuioiua/redis@1.1.9";
-import type { KvDriver } from "./kv.ts";
+import * as redis from "@iuioiua/redis";
+import type { KvDriver } from "@joyful/kv";
 
 class RedisDriver implements KvDriver<string, redis.RedisClient> {
   _driver: redis.RedisClient;
@@ -40,11 +40,29 @@ class RedisDriver implements KvDriver<string, redis.RedisClient> {
   }
 }
 
+/**
+ * Options for creating a Redis driver.
+ */
 export interface RedisDriverOptions {
+  /**
+   * The hostname of the Redis server.
+   * @default "127.0.0.1"
+   */
   hostname?: string;
+  /**
+   * The port of the Redis server.
+   * @default 6379
+   */
   port?: number;
 }
 
+/**
+ * Creates a new Redis driver.
+ * @param options The options for creating the driver.
+ * @returns A new Redis driver.
+ *
+ * > [!NOTE] `createRedisDriver` currently only works in Deno and only supports basic tcp transport. More options will be added in the future.
+ */
 export async function createRedisDriver(
   options: RedisDriverOptions = {},
 ): Promise<KvDriver<string, redis.RedisClient>> {

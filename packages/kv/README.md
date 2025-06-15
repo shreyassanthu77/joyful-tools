@@ -111,7 +111,7 @@ Creates a new KV store instance.
 - `clear()`: Clear all values in the current namespace
 - `fork(namespace: string)`: Create a new KV instance with a sub-namespace
 
-### Drivers
+### Built-in Drivers
 
 #### Memory Driver
 ```typescript
@@ -127,6 +127,14 @@ const driver = createDenoDriver({
   prefix?: "custom_prefix"
 });
 ```
+
+#### Other Drivers
+Some other drivers that are split into separate package so you can only install the driver you need.
+
+| Driver | Description |
+| --- | --- |
+| [`@joyful/kv-node-denokv`](https://jsr.io/@joyful/kv-node-denokv) | A deno kv driver that uses [@deno/kv](https://www.npmjs.com/package/@deno/kv). |
+| [`@joyful/kv-mini-redis`](https://jsr.io/@joyful/kv-mini-redis) | A small Redis/Valkey driver based on [@iuioiua/redis](https://jsr.io/@iuioiua/redis). |
 
 
 ## Error Handling

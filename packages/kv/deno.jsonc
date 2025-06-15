@@ -1,12 +1,11 @@
 {
   "name": "@joyful/kv",
-  "version": "0.0.8",
+  "version": "0.0.9",
   "license": "MIT",
   "imports": {},
   "exports": {
     ".": "./src/kv.ts",
     "./memory": "./src/memory.ts",
-    "./deno-kv": "./src/deno-kv.ts",
-    "./redis": "./src/redis.ts"
+    "./deno-kv": "./src/deno-kv.ts"
   }
 }
