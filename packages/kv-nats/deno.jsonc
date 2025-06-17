@@ -1,6 +1,6 @@
 {
   "name": "@joyful/kv-nats",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "license": "MIT",
   "imports": {
     "@nats-io/kv": "jsr:@nats-io/kv@3.0.2"

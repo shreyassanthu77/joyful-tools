@@ -15,8 +15,6 @@ const kv = createKv({
 });
 ```
 
-> [!NOTE] `createRedisDriver` currently only works in Deno and only supports basic tcp transport. More options will be added in the future.
-
 - Check out the [main package](https://jsr.io/@joyful/kv) for more usage examples.
 
 ## License
