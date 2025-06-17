@@ -1,0 +1,11 @@
+{
+  "name": "@joyful/kv-nats",
+  "version": "0.0.1",
+  "license": "MIT",
+  "imports": {
+    "@nats-io/kv": "jsr:@nats-io/kv@3.0.2"
+  },
+  "exports": {
+    ".": "./mod.ts"
+  }
+}

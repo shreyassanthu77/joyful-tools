@@ -3,14 +3,63 @@
   "specifiers": {
     "jsr:@iuioiua/redis@*": "1.1.9",
     "jsr:@iuioiua/redis@1.1.9": "1.1.9",
+    "jsr:@nats-io/jetstream@3.0.2": "3.0.2",
+    "jsr:@nats-io/kv@*": "3.0.2",
+    "jsr:@nats-io/kv@3.0.2": "3.0.2",
+    "jsr:@nats-io/nats-core@3.0.2": "3.0.2",
+    "jsr:@nats-io/nkeys@2.0.3": "2.0.3",
+    "jsr:@nats-io/nuid@2.0.3": "2.0.3",
+    "jsr:@nats-io/transport-deno@*": "3.0.2",
     "jsr:@std/assert@*": "1.0.13",
+    "jsr:@std/bytes@^1.0.5": "1.0.5",
     "jsr:@std/internal@^1.0.6": "1.0.8",
+    "jsr:@std/io@0.225.2": "0.225.2",
     "npm:@deno/kv@*": "0.10.0",
-    "npm:@deno/kv@0.10": "0.10.0"
+    "npm:@deno/kv@0.10": "0.10.0",
+    "npm:@nats-io/kv@*": "3.0.2",
+    "npm:@nats-io/nats-core@*": "3.0.2",
+    "npm:@nats-io/transport-node@*": "3.0.2",
+    "npm:tweetnacl@1.0.3": "1.0.3"
   },
   "jsr": {
     "@iuioiua/redis@1.1.9": {
       "integrity": "167d9031d0b8cf050d63756cf6b2d59872d9095784b2dff2b8a40adcf744c1e4"
+    },
+    "@nats-io/jetstream@3.0.2": {
+      "integrity": "3d9b56c4eda252fe1575c7f68b0fc8071f2a3cedfd85ddadf9db3f7b40fbc857",
+      "dependencies": [
+        "jsr:@nats-io/nats-core@3.0.2"
+      ]
+    },
+    "@nats-io/kv@3.0.2": {
+      "integrity": "cab4673cb8d37392bd67251be9083090bb10808a915ef2d4c209893c3cfeff66",
+      "dependencies": [
+        "jsr:@nats-io/jetstream",
+        "jsr:@nats-io/nats-core@3.0.2"
+      ]
+    },
+    "@nats-io/nats-core@3.0.2": {
+      "integrity": "e38944d564ea50d5c50f2d8d47f16cead1872d16b12e76ece64933d87a65176b",
+      "dependencies": [
+        "jsr:@nats-io/nkeys",
+        "jsr:@nats-io/nuid"
+      ]
+    },
+    "@nats-io/nkeys@2.0.3": {
+      "integrity": "e92c96eea32b559f2e0f32555b49376942d66c07e59efff9180dbf29e516fbd8",
+      "dependencies": [
+        "npm:tweetnacl"
+      ]
+    },
+    "@nats-io/nuid@2.0.3": {
+      "integrity": "c1069446e43dfa4f5e599c398a1bfc1be0c8dab1c839b6d2b9c3617cc1998306"
+    },
+    "@nats-io/transport-deno@3.0.2": {
+      "integrity": "04064eeb974d713170c0885ede13fba11dbee01bfa21ad134a9f76af63909454",
+      "dependencies": [
+        "jsr:@nats-io/nats-core@3.0.2",
+        "jsr:@std/io"
+      ]
     },
     "@std/assert@1.0.13": {
       "integrity": "ae0d31e41919b12c656c742b22522c32fb26ed0cba32975cb0de2a273cb68b29",
@@ -18,8 +67,17 @@
         "jsr:@std/internal"
       ]
     },
+    "@std/bytes@1.0.5": {
+      "integrity": "4465dd739d7963d964c809202ebea6d5c6b8e3829ef25c6a224290fbb8a1021e"
+    },
     "@std/internal@1.0.8": {
       "integrity": "fc66e846d8d38a47cffd274d80d2ca3f0de71040f855783724bb6b87f60891f5"
+    },
+    "@std/io@0.225.2": {
+      "integrity": "3c740cd4ee4c082e6cfc86458f47e2ab7cb353dc6234d5e9b1f91a2de5f4d6c7",
+      "dependencies": [
+        "jsr:@std/bytes"
+      ]
     }
   },
   "npm": {
@@ -51,6 +109,46 @@
         "@deno/kv-linux-x64-gnu",
         "@deno/kv-win32-x64-msvc"
       ]
+    },
+    "@nats-io/jetstream@3.0.2": {
+      "integrity": "sha512-dR789x1xhMyEukXILPWDo6ODW53nHpBD9LnsnnywA+pTkwYFydEkYdyhv9HzFc6s6Nfrb2TpibrT4znijlg2dg==",
+      "dependencies": [
+        "@nats-io/nats-core"
+      ]
+    },
+    "@nats-io/kv@3.0.2": {
+      "integrity": "sha512-/4YvVlgmS6HEtukJE66kelJOHovB411GFo8kTUnUr6FYwws9eNMhsOwvBC4HEZXy9m8VjlA0t4nPPoH66bj2lg==",
+      "dependencies": [
+        "@nats-io/jetstream",
+        "@nats-io/nats-core"
+      ]
+    },
+    "@nats-io/nats-core@3.0.2": {
+      "integrity": "sha512-gACbRIhY3yQTO+5C4E1LY/qO2e5EhGUBeDsnPDT8Hd3qY9mfhNtluY6R7d7WX7/JMGsXRPbYdSLSADr/ECSy3w==",
+      "dependencies": [
+        "@nats-io/nkeys",
+        "@nats-io/nuid"
+      ]
+    },
+    "@nats-io/nkeys@2.0.3": {
+      "integrity": "sha512-JVt56GuE6Z89KUkI4TXUbSI9fmIfAmk6PMPknijmuL72GcD+UgIomTcRWiNvvJKxA01sBbmIPStqJs5cMRBC3A==",
+      "dependencies": [
+        "tweetnacl"
+      ]
+    },
+    "@nats-io/nuid@2.0.3": {
+      "integrity": "sha512-TpA3HEBna/qMVudy+3HZr5M3mo/L1JPofpVT4t0HkFGkz2Cn9wrlrQC8tvR8Md5Oa9//GtGG26eN0qEWF5Vqew=="
+    },
+    "@nats-io/transport-node@3.0.2": {
+      "integrity": "sha512-hPuep/ObVepjAM1dFy+XhqMlIzga3bQpbgQiOWM5AxwNZ9CF7GHAtfaxG7WY6+t057tBW8axC0nBL71Q8chQBQ==",
+      "dependencies": [
+        "@nats-io/nats-core",
+        "@nats-io/nkeys",
+        "@nats-io/nuid"
+      ]
+    },
+    "tweetnacl@1.0.3": {
+      "integrity": "sha512-6rt+RN7aOi1nGMyC4Xa5DdYiukl2UWCbcJft7YhxReBGQD7OAM8Pbxw6YMo4r2diNEA8FEmu32YOn9rhaiE5yw=="
     }
   },
   "workspace": {
@@ -58,6 +156,11 @@
       "kv-mini-redis": {
         "dependencies": [
           "jsr:@iuioiua/redis@1.1.9"
+        ]
+      },
+      "kv-nats": {
+        "dependencies": [
+          "jsr:@nats-io/kv@3.0.2"
         ]
       },
       "kv-node-denokv": {

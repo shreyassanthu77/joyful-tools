@@ -135,7 +135,7 @@ Some other drivers that are split into separate package so you can only install 
 | --- | --- |
 | [`@joyful/kv-node-denokv`](https://jsr.io/@joyful/kv-node-denokv) | A deno kv driver that uses [@deno/kv](https://www.npmjs.com/package/@deno/kv). |
 | [`@joyful/kv-mini-redis`](https://jsr.io/@joyful/kv-mini-redis) | A small Redis/Valkey driver based on [@iuioiua/redis](https://jsr.io/@iuioiua/redis). |
-
+| [`@joyful/kv-nats`](https://jsr.io/@joyful/kv-nats) | A NATS KV driver that uses [jsr:@nats-io/kv](https://jsr.io/@nats-io/kv). |
 
 ## Error Handling
 

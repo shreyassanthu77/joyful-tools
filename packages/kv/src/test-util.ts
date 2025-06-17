@@ -3,9 +3,15 @@ import { assertEquals } from "jsr:@std/assert";
 
 export function testDriver<Driver extends KvDriver<unknown>>(
   name: string,
-  driver: Driver,
+  driverFactory: Driver | (() => Driver | Promise<Driver>),
+  onComplete?: (driver: Driver) => void | Promise<void>,
 ) {
   Deno.test(`Driver: ${name}`, async (t) => {
+    const driver =
+      typeof driverFactory === "function"
+        ? await driverFactory()
+        : driverFactory;
+
     await t.step("set", async () => {
       for (let i = 0; i < 10; i++) {
         await driver.set(`key${i}`, `value${i}`);
@@ -64,5 +70,6 @@ export function testDriver<Driver extends KvDriver<unknown>>(
         }
       });
     }
+    await onComplete?.(driver);
   });
 }
