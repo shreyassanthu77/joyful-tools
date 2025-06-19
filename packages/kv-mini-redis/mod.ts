@@ -119,37 +119,39 @@ export async function createRedisDriver(
  *
  * Configures the Redis connection using a `RedisConnectionOptions` object.
  *
- * @param options The Redis connection options:
+ * @param options Optional. The Redis connection options:
  *   - `hostname`: The hostname of the Redis server. Defaults to `"127.0.0.1"`.
  *   - `port`: The port of the Redis server. Defaults to `6379`.
  *   - `tls`: Whether to use TLS for the connection. Defaults to `false`.
  *   - `password`: The password for Redis authentication. No default.
  *   - `db`: The database number to select after connecting. No default.
+ * If `options` is not provided, the driver attempts to connect to the default
+ * Redis instance (i.e., "127.0.0.1" on port 6379).
  * @returns A promise that resolves to a new KvDriver instance.
  * @remarks This function supports connections in both Deno and Node.js environments.
  */
 export async function createRedisDriver(
-  options: RedisConnectionOptions,
+  options?: RedisConnectionOptions,
 ): Promise<KvDriver<string, RedisClient>>;
 // Implementation for createRedisDriver overloads.
 // This signature should not be called directly if using TypeScript; use one of the overloads above.
 export async function createRedisDriver(
-  options: string | RedisConnectionOptions,
+  optionsOrUrl?: string | RedisConnectionOptions,
 ): Promise<KvDriver<string, RedisClient>> {
-  let currentHostname: string;
-  let currentPort: number;
-  let currentUseTls: boolean;
-  let currentPassword: string | undefined;
-  let currentDb: number | undefined;
+  let currentHostname: string = "127.0.0.1";
+  let currentPort: number = 6379;
+  let currentUseTls: boolean = false;
+  let currentPassword: string | undefined = undefined;
+  let currentDb: number | undefined = undefined;
 
-  if (typeof options === "string") {
-    const url = new URL(options);
+  if (typeof optionsOrUrl === "string") {
+    const url = new URL(optionsOrUrl);
     if (url.protocol !== "redis:" && url.protocol !== "rediss:") {
       throw new Error(`Invalid Redis URL scheme: ${url.protocol}`);
     }
 
-    currentHostname = url.hostname || "127.0.0.1";
-    currentPort = url.port ? parseInt(url.port, 10) : 6379;
+    currentHostname = url.hostname || "127.0.0.1"; // Default here is if URL has no hostname
+    currentPort = url.port ? parseInt(url.port, 10) : 6379; // Default here is if URL has no port
     currentPassword = url.password || undefined;
 
     if (url.pathname && url.pathname !== "/") {
@@ -159,13 +161,14 @@ export async function createRedisDriver(
       }
     }
     currentUseTls = url.protocol === "rediss:";
-  } else {
-    currentHostname = options.hostname ?? "127.0.0.1";
-    currentPort = options.port ?? 6379;
-    currentUseTls = options.tls === true;
-    currentPassword = options.password;
-    currentDb = options.db;
+  } else if (optionsOrUrl) { // It's RedisConnectionOptions
+    currentHostname = optionsOrUrl.hostname ?? currentHostname; // Use initial default if property is null/undefined
+    currentPort = optionsOrUrl.port ?? currentPort;
+    currentUseTls = optionsOrUrl.tls ?? currentUseTls; // Use initial default (false) if property is null/undefined
+    currentPassword = optionsOrUrl.password;
+    currentDb = optionsOrUrl.db;
   }
+  // If optionsOrUrl is undefined, the initial defaults (127.0.0.1:6379, no TLS) are used.
 
   let stream: ConstructorParameters<typeof redis.RedisClient>[0];
   let conn: Conn;

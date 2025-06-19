@@ -3,31 +3,32 @@ import { delay } from "jsr:@std/async";
 import { createRedisDriver, type RedisConnectionOptions } from "./mod.ts";
 
 async function isRedisAvailable(
-  config: string | RedisConnectionOptions = {},
+  configArg?: string | RedisConnectionOptions, // Made explicitly optional
 ): Promise<boolean> {
   try {
     let driver;
-    if (typeof config === 'string') {
-      driver = await createRedisDriver(config); // Matches string overload
-    } else {
-      // config is RedisConnectionOptions or {}
-      // If config is an empty object {}, provide default hostname and port
-      const effectiveOptions = Object.keys(config).length === 0
-                               ? { hostname: REDIS_HOST, port: REDIS_PORT }
-                               : config;
-      driver = await createRedisDriver(effectiveOptions); // Matches RedisConnectionOptions overload
+    if (configArg === undefined) {
+      driver = await createRedisDriver();
+    } else if (typeof configArg === "string") {
+      driver = await createRedisDriver(configArg);
+    } else { // configArg is RedisConnectionOptions
+      // If configArg is an empty object {}, use default host/port.
+      const optionsToUse = Object.keys(configArg).length === 0
+        ? { hostname: REDIS_HOST, port: REDIS_PORT }
+        : configArg;
+      driver = await createRedisDriver(optionsToUse);
     }
-    await driver.get("ping");
+    await driver.get("ping_availability_check");
     driver._driver.close();
     return true;
   } catch (e) {
     if (e instanceof Error) {
       console.warn(
-        `Redis not available for options: ${JSON.stringify(config)}. Error: ${e.message}`,
+        `Redis not available for options: ${JSON.stringify(configArg)}. Error: ${e.message}`,
       );
     } else {
       console.warn(
-        `Redis not available for options: ${JSON.stringify(config)}. Error: ${String(e)}`,
+        `Redis not available for options: ${JSON.stringify(configArg)}. Error: ${String(e)}`,
       );
     }
     return false;
@@ -68,7 +69,7 @@ Deno.test({
   fn: async (t) => {
     await t.step("connect with URL string", async () => {
       const driver = await createRedisDriver(REDIS_URL);
-      await driver.get("ping"); // Check connection
+      await driver.get("ping_url_test");
       driver._driver.close();
     });
 
@@ -77,7 +78,7 @@ Deno.test({
         hostname: REDIS_HOST,
         port: REDIS_PORT,
       });
-      await driver.get("ping"); // Check connection
+      await driver.get("ping_options_test");
       driver._driver.close();
     });
 
@@ -93,7 +94,7 @@ Deno.test({
           db: runDbSelectionTests ? 1 : undefined, // Use DB 1 if available for testing
           tls: false,
         });
-        await driver.get("ping");
+        await driver.get("ping_all_params_test");
         // If db selection was tested, try setting a key to confirm context
         if (runDbSelectionTests) {
           await driver.set("api-test-db1", "val");
@@ -119,7 +120,7 @@ Deno.test({
       // This step makes it explicit for API testing.
       // It relies on REDIS_HOST and REDIS_PORT (127.0.0.1:6379) being available.
       const driver = await createRedisDriver({});
-      await driver.get("ping");
+      await driver.get("ping_empty_options_test");
       driver._driver.close();
     });
 
@@ -128,7 +129,7 @@ Deno.test({
       ignore: !runTlsTests,
       fn: async () => {
         const driver = await createRedisDriver(TEST_REDIS_TLS_URL!);
-        await driver.get("ping");
+        await driver.get("ping_rediss_url_test");
         driver._driver.close();
       },
     });
@@ -142,9 +143,25 @@ Deno.test({
           port: TEST_REDIS_TLS_PORT!,
           tls: true,
         });
-        await driver.get("ping");
+        await driver.get("ping_tls_option_test");
         driver._driver.close();
       },
+    });
+
+    await t.step("connect with no arguments (defaults)", async () => {
+      // This test relies on runIntegrationTests for the general Redis availability at default location
+      let driver;
+      try {
+        driver = await createRedisDriver(); // Call with no arguments
+        await driver.get("ping_test_no_args");
+        // If it doesn't throw, the connection is assumed successful
+      } catch (e) {
+        throw new Error(
+          `createRedisDriver() with no arguments failed: ${e instanceof Error ? e.message : String(e)}`,
+        );
+      } finally {
+        driver?._driver.close();
+      }
     });
   },
 });
