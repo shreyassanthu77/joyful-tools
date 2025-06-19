@@ -1,12 +1,13 @@
 import { assertEquals, assertRejects } from "jsr:@std/assert";
 import { delay } from "jsr:@std/async";
-import { createRedisDriver, type RedisDriverOptions } from "./mod.ts";
+import { createRedisDriver, type RedisConnectionOptions } from "./mod.ts";
 
 async function isRedisAvailable(
-  options: RedisDriverOptions = {},
+  options: string | RedisConnectionOptions = {},
 ): Promise<boolean> {
   try {
-    const driver = await createRedisDriver(options);
+    // To satisfy the type for an empty call, provide a default object.
+    const driver = await createRedisDriver(typeof options === 'string' ? options : Object.keys(options).length === 0 ? { hostname: REDIS_HOST, port: REDIS_PORT } : options);
     await driver.get("ping");
     driver._driver.close();
     return true;
@@ -37,161 +38,113 @@ const runPasswordAuthTests =
 const REDIS_PASSWORD = Deno.env.get("TEST_REDIS_PASSWORD") || "mypassword";
 const runDbSelectionTests = runIntegrationTests;
 
+const TEST_REDIS_TLS_URL = Deno.env.get("TEST_REDIS_TLS_URL"); // e.g., rediss://my-tls-redis:6379
+const TEST_REDIS_TLS_HOST = Deno.env.get("TEST_REDIS_TLS_HOST"); // e.g., my-tls-redis
+const TEST_REDIS_TLS_PORT = Deno.env.get("TEST_REDIS_TLS_PORT")
+  ? parseInt(Deno.env.get("TEST_REDIS_TLS_PORT")!, 10)
+  : undefined;
+
+const runTlsTests =
+  runIntegrationTests &&
+  !!TEST_REDIS_TLS_URL &&
+  !!TEST_REDIS_TLS_HOST &&
+  !!TEST_REDIS_TLS_PORT &&
+  await isRedisAvailable(TEST_REDIS_TLS_URL);
+
 // --- Test Suite ---
 
-// Variable to capture parameters for unit tests
-let connectParams: any = null;
-
-// Mock for URL/Option parsing tests
-const mockParseOptionsAndSetConnectParams = (
-  options: RedisDriverOptions = {},
-) => {
-  let S_hostname = "127.0.0.1";
-  let S_port = 6379;
-  let S_password = undefined;
-  let S_db = undefined;
-  let S_tls = false;
-
-  if (options.url) {
-    const url = new URL(options.url);
-    S_hostname = url.hostname || "127.0.0.1";
-    S_port = url.port ? parseInt(url.port, 10) : 6379; // Default port if missing
-    S_password = url.password || undefined;
-    if (url.pathname && url.pathname !== "/") {
-      const dbNumFromUrl = parseInt(url.pathname.substring(1), 10);
-      if (!isNaN(dbNumFromUrl)) {
-        S_db = dbNumFromUrl;
-      }
-    } else if (url.pathname === "/") {
-      // Default to DB 0 if path is just "/"
-      S_db = 0;
-    }
-    if (url.protocol === "rediss:") {
-      S_tls = true;
-    }
-  }
-
-  // Apply explicit options: these override URL-derived values or set initial values if no URL.
-  S_hostname = options.hostname !== undefined ? options.hostname : S_hostname;
-  S_port = options.port !== undefined ? options.port : S_port;
-  S_password = options.password !== undefined ? options.password : S_password;
-  S_db = options.db !== undefined ? options.db : S_db;
-  S_tls = options.tls !== undefined ? options.tls : S_tls;
-
-  connectParams = {
-    hostname: S_hostname,
-    port: S_port,
-    password: S_password,
-    db: S_db,
-    tls: S_tls,
-  };
-};
-
-Deno.test("URL Parsing: Basic URLs", async (t) => {
-  await t.step("redis://localhost", () => {
-    mockParseOptionsAndSetConnectParams({ url: "redis://localhost" });
-    assertEquals(connectParams.hostname, "localhost");
-    assertEquals(connectParams.port, 6379);
-    assertEquals(connectParams.tls, false);
-    assertEquals(connectParams.db, undefined); // No path, so db undefined
-  });
-
-  await t.step("redis://localhost:6380", () => {
-    mockParseOptionsAndSetConnectParams({ url: "redis://localhost:6380" });
-    assertEquals(connectParams.hostname, "localhost");
-    assertEquals(connectParams.port, 6380);
-  });
-
-  await t.step("redis://user:pass@localhost:6379", () => {
-    mockParseOptionsAndSetConnectParams({
-      url: "redis://user:pass@localhost:6379",
+Deno.test({
+  name: "createRedisDriver API tests",
+  ignore: !runIntegrationTests,
+  fn: async (t) => {
+    await t.step("connect with URL string", async () => {
+      const driver = await createRedisDriver(REDIS_URL);
+      await driver.get("ping"); // Check connection
+      driver._driver.close();
     });
-    assertEquals(connectParams.password, "pass");
-    assertEquals(connectParams.hostname, "localhost");
-    assertEquals(connectParams.port, 6379);
-  });
 
-  await t.step("redis://:password@myhost/", () => {
-    mockParseOptionsAndSetConnectParams({
-      url: "redis://:somepassword@myhost/",
+    await t.step("connect with options object (hostname, port)", async () => {
+      const driver = await createRedisDriver({
+        hostname: REDIS_HOST,
+        port: REDIS_PORT,
+      });
+      await driver.get("ping"); // Check connection
+      driver._driver.close();
     });
-    assertEquals(connectParams.password, "somepassword");
-    assertEquals(connectParams.hostname, "myhost");
-    assertEquals(connectParams.port, 6379);
-    assertEquals(connectParams.db, 0);
-  });
 
-  await t.step("rediss://localhost", () => {
-    mockParseOptionsAndSetConnectParams({ url: "rediss://localhost" });
-    assertEquals(connectParams.tls, true);
-    assertEquals(connectParams.hostname, "localhost");
-    assertEquals(connectParams.port, 6379);
-  });
+    await t.step(
+      "connect with options object (all params - no TLS)",
+      async () => {
+        // This test uses existing REDIS_PASSWORD and a selectable DB
+        // It assumes the main Redis instance (REDIS_URL) can handle this.
+        const driver = await createRedisDriver({
+          hostname: REDIS_HOST,
+          port: REDIS_PORT,
+          password: runPasswordAuthTests ? REDIS_PASSWORD : undefined, // Use password if available for testing
+          db: runDbSelectionTests ? 1 : undefined, // Use DB 1 if available for testing
+          tls: false,
+        });
+        await driver.get("ping");
+        // If db selection was tested, try setting a key to confirm context
+        if (runDbSelectionTests) {
+          await driver.set("api-test-db1", "val");
+          // Ideally, check this key isn't in DB0, but that's more involved here.
+          await driver.delete("api-test-db1");
+        }
+        driver._driver.close();
+      },
+    );
 
-  await t.step("redis://localhost/2", () => {
-    mockParseOptionsAndSetConnectParams({ url: "redis://localhost/2" });
-    assertEquals(connectParams.db, 2);
-    assertEquals(connectParams.hostname, "localhost");
-    assertEquals(connectParams.port, 6379);
-  });
-});
-
-Deno.test("Option Precedence", async (t) => {
-  await t.step("port override", () => {
-    mockParseOptionsAndSetConnectParams({
-      url: "redis://localhost:6379",
-      port: 6380,
+    await t.step("throws error for invalid URL scheme", async () => {
+      await assertRejects(
+        async () => {
+          await createRedisDriver("http://localhost:6379");
+        },
+        Error,
+        "Invalid Redis URL scheme: http:",
+      );
     });
-    assertEquals(connectParams.port, 6380);
-  });
 
-  await t.step("password override", () => {
-    mockParseOptionsAndSetConnectParams({
-      url: "redis://user:pass@host",
-      password: "newpass",
+    await t.step("connect with empty options (defaults)", async () => {
+      // isRedisAvailable already tests createRedisDriver({}) implicitly by its default param
+      // This step makes it explicit for API testing.
+      // It relies on REDIS_HOST and REDIS_PORT (127.0.0.1:6379) being available.
+      const driver = await createRedisDriver({});
+      await driver.get("ping");
+      driver._driver.close();
     });
-    assertEquals(connectParams.password, "newpass");
-  });
 
-  await t.step("db override", () => {
-    mockParseOptionsAndSetConnectParams({ url: "redis://host/1", db: 2 });
-    assertEquals(connectParams.db, 2);
-  });
-
-  await t.step("tls override (redis:// to tls:true)", () => {
-    mockParseOptionsAndSetConnectParams({ url: "redis://host", tls: true });
-    assertEquals(connectParams.tls, true);
-  });
-
-  await t.step("tls override (rediss:// to tls:false)", () => {
-    mockParseOptionsAndSetConnectParams({ url: "rediss://host", tls: false });
-    assertEquals(connectParams.tls, false);
-  });
-
-  await t.step("hostname and port, no URL", () => {
-    mockParseOptionsAndSetConnectParams({ hostname: "testhost", port: 1234 });
-    assertEquals(connectParams.hostname, "testhost");
-    assertEquals(connectParams.port, 1234);
-    assertEquals(connectParams.tls, false);
-  });
-
-  await t.step("hostname, port, tls, no URL", () => {
-    mockParseOptionsAndSetConnectParams({
-      hostname: "tlsHost",
-      port: 5678,
-      tls: true,
+    await t.step({
+      name: "connect with rediss:// URL (TLS)",
+      ignore: !runTlsTests,
+      fn: async () => {
+        const driver = await createRedisDriver(TEST_REDIS_TLS_URL!);
+        await driver.get("ping");
+        driver._driver.close();
+      },
     });
-    assertEquals(connectParams.hostname, "tlsHost");
-    assertEquals(connectParams.port, 5678);
-    assertEquals(connectParams.tls, true);
-  });
+
+    await t.step({
+      name: "connect with tls:true option (TLS)",
+      ignore: !runTlsTests,
+      fn: async () => {
+        const driver = await createRedisDriver({
+          hostname: TEST_REDIS_TLS_HOST!,
+          port: TEST_REDIS_TLS_PORT!,
+          tls: true,
+        });
+        await driver.get("ping");
+        driver._driver.close();
+      },
+    });
+  },
 });
 
 Deno.test({
   name: "Basic KV Operations (Integration)",
   ignore: !runIntegrationTests,
   fn: async (t) => {
-    const driver = await createRedisDriver({ url: REDIS_URL });
+    const driver = await createRedisDriver(REDIS_URL);
     const testKey = "test:basic:key";
     const testValue = `val-${Date.now()}`;
 
@@ -227,9 +180,9 @@ Deno.test({
   name: "Password Authentication (Integration)",
   ignore: !runPasswordAuthTests,
   fn: async (t) => {
-    const driverWithUrl = await createRedisDriver({
-      url: `redis://:${REDIS_PASSWORD}@${REDIS_HOST}:${REDIS_PORT}`,
-    });
+    const driverWithUrl = await createRedisDriver(
+      `redis://:${REDIS_PASSWORD}@${REDIS_HOST}:${REDIS_PORT}`,
+    );
     const driverWithOption = await createRedisDriver({
       hostname: REDIS_HOST,
       port: REDIS_PORT,
@@ -275,25 +228,21 @@ Deno.test({
     const keyInDb2 = "test:db2:key";
     const value = "dbValue";
 
-    const driverDb1_url = await createRedisDriver({
-      url: `${REDIS_URL}/${db1}`,
-    });
+    const driverDb1_url = await createRedisDriver(`${REDIS_URL}/${db1}`);
     const driverDb1_opt = await createRedisDriver({
       hostname: REDIS_HOST,
       port: REDIS_PORT,
       db: db1,
     });
 
-    const driverDb2_url = await createRedisDriver({
-      url: `${REDIS_URL}/${db2}`,
-    });
+    const driverDb2_url = await createRedisDriver(`${REDIS_URL}/${db2}`);
     const driverDb2_opt = await createRedisDriver({
       hostname: REDIS_HOST,
       port: REDIS_PORT,
       db: db2,
     });
 
-    const driverDefaultDb = await createRedisDriver({ url: REDIS_URL });
+    const driverDefaultDb = await createRedisDriver(REDIS_URL);
 
     await t.step("set in DB1 (via URL), check isolation", async () => {
       await driverDb1_url.set(keyInDb1, value);
@@ -344,4 +293,5 @@ console.log(`Running tests:
   - Integration tests: ${runIntegrationTests ? "Enabled" : "Disabled (Redis not detected or connection failed)"}
   - Password auth tests: ${runPasswordAuthTests ? "Enabled" : "Disabled (TEST_REDIS_PASSWORD not set or Redis unavailable)"}
   - DB selection tests: ${runDbSelectionTests ? "Enabled" : "Disabled (Redis unavailable)"}
+  - TLS tests: ${runTlsTests ? "Enabled" : "Disabled (TEST_REDIS_TLS_URL, TEST_REDIS_TLS_HOST, or TEST_REDIS_TLS_PORT not set, or TLS Redis unavailable)"}
 `);
