@@ -1,13 +1,14 @@
 # @joyful/kv-mini-redis
 
 A minimal Redis/Valkey driver for [@joyful/kv](https://jsr.io/@joyful/kv) that uses [@iuioiua/redis](https://jsr.io/@iuioiua/redis) for the underlying Redis protocol implementation.
+Redis is a popular open-source, in-memory data structure store, used as a database, cache, and message broker. Valkey is a community-driven fork of Redis.
 
-This driver allows you to easily connect your Kv-compliant application to a Redis data store.
+This driver allows you to easily connect your Kv-compliant application to a Redis or Valkey data store.
 
 ## Features
 
 - **Cross-Runtime Compatibility**: Works in both Deno and Node.js environments.
-  - For Node.js, version 18.0.0 or later is recommended to ensure availability of native stream adaptation features (`Readable.toWeb`, `Writable.toWeb`).
+  - For Node.js environments, version 18.0.0 or later is **required** due to the use of native stream adaptation features (`Readable.toWeb`, `Writable.toWeb`). Deno environments do not have this specific version constraint.
 - **Flexible Connection Options**:
     - Connect using a Redis URL string (e.g., `redis://user:pass@host:port/db`).
     - Supports `redis://` (plain TCP) and `rediss://` (TLS) URL schemes.
@@ -17,29 +18,72 @@ This driver allows you to easily connect your Kv-compliant application to a Redi
 - **Database Selection**: Connect to a specific Redis database using the URL path or the `db` option.
 - **Option Precedence**: Explicitly provided options (like `port` or `password`) will override values parsed from a connection URL if both are supplied.
 
-## Usage
+## Installation
 
-First, ensure you have `@joyful/kv` and `@joyful/kv-mini-redis` installed or imported.
+`@joyful/kv-mini-redis` is hosted on [JSR](https://jsr.io/@joyful/kv-mini-redis). You will also typically need `@joyful/kv`.
 
-```typescript
-import { createKv } from "@joyful/kv";
-import { createRedisDriver, RedisDriverOptions } from "@joyful/kv-mini-redis";
-// For Node.js, you might import like this if using ESM:
-// import { createKv } from "@joyful/kv/index.js";
-// import { createRedisDriver } from "@joyful/kv-mini-redis/index.js";
+**For Deno:**
+Add the packages to your `deno.json(c)` configuration file:
+```bash
+deno add @joyful/kv @joyful/kv-mini-redis
 ```
+Then, you can import them in your Deno project:
+```typescript
+import { createKv } from "jsr:@joyful/kv";
+import { createRedisDriver, RedisConnectionOptions } from "jsr:@joyful/kv-mini-redis";
+```
+
+**For Node.js (and Bun):**
+You can use the following commands to add JSR packages to your project:
+
+*   **Using `npx` (recommended for npm/yarn users):**
+    ```bash
+    npx jsr add @joyful/kv @joyful/kv-mini-redis
+    ```
+*   **Using `pnpm` (version 10.8 or later):**
+    ```bash
+    pnpm install jsr:@joyful/kv jsr:@joyful/kv-mini-redis
+    ```
+*   **Using `pnpm` (older than 10.8):**
+    ```bash
+    pnpm dlx jsr add @joyful/kv @joyful/kv-mini-redis
+    ```
+*   **Using `bun`:**
+    ```bash
+    bunx jsr add @joyful/kv @joyful/kv-mini-redis
+    ```
+
+After installation, you can import the packages in your Node.js/Bun project:
+```typescript
+import { createKv } from "@joyful/kv"; // Or "jsr:@joyful/kv"
+import { createRedisDriver, RedisConnectionOptions } from "@joyful/kv-mini-redis"; // Or "jsr:@joyful/kv-mini-redis"
+```
+**Note:** For Node.js environments, ensure your `package.json` includes `"type": "module"` for ES module support, or use dynamic imports if you are in a CommonJS project. Refer to the [JSR documentation](https://jsr.io/docs/consuming-packages/with-node) for detailed Node.js compatibility and setup.
+
+## Usage
 
 Here are various ways to configure the Redis driver:
 
 **1. Using Default Options (connects to `redis://127.0.0.1:6379`)**
 
 ```typescript
-const driver = await createRedisDriver();
+const driver = await createRedisDriver(); // Connects to redis://127.0.0.1:6379 by default
 const kv = createKv({ driver });
 
 // Basic operations
-await kv.set(["users", "alice"], { name: "Alice" });
-console.log(await kv.get(["users", "alice"]));
+const setResult = await kv.set("user:alice", "Alice Name");
+if (setResult.ok) {
+  console.log("Alice's name set successfully.");
+} else {
+  console.error("Failed to set Alice's name:", setResult.error);
+}
+
+const getResult = await kv.get("user:alice");
+if (getResult.ok) {
+  console.log("Retrieved user:", getResult.value); // "Alice Name"
+} else {
+  console.error("Failed to get user:alice:", getResult.error);
+}
 ```
 
 **2. Using a Redis URL**
@@ -58,7 +102,9 @@ const driver3 = await createRedisDriver({ url: "rediss://my-secure-redis-host:63
 const driver4 = await createRedisDriver({ url: "redis://localhost/2" });
 
 const kvWithUrl = createKv({ driver: driver1 });
-// ... use kvWithUrl
+// Now use kvWithUrl for operations, e.g.:
+// const setResultUrl = await kvWithUrl.set("foo", "bar");
+// if (setResultUrl.ok) { console.log(await kvWithUrl.get("foo")); }
 ```
 
 **3. Using Individual Options**
@@ -85,7 +131,9 @@ const driverOpts3 = await createRedisDriver({
 });
 
 const kvWithOptions = createKv({ driver: driverOpts1 });
-// ... use kvWithOptions
+// Now use kvWithOptions for operations, e.g.:
+// const setResultOpts = await kvWithOptions.set("anotherKey", "anotherValue");
+// if (setResultOpts.ok) { console.log(await kvWithOptions.get("anotherKey")); }
 ```
 
 **4. Overriding URL Parts with Explicit Options**
@@ -112,7 +160,7 @@ const driverMixed3 = await createRedisDriver({
 });
 ```
 
-Refer to the `RedisDriverOptions` documentation in `mod.ts` for a full list of options and their descriptions.
+For a full list of connection options and their descriptions, refer to the `RedisConnectionOptions` type definition in the `mod.ts` file of this package.
 
 - Check out the [main package @joyful/kv](https://jsr.io/@joyful/kv) for more usage examples of the Kv interface.
 
