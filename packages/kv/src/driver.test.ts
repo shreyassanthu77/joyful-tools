@@ -25,6 +25,7 @@ testDriver(
     createNatsDriver({
       conn: await natsDenoConnect({}),
     }),
+  // @ts-ignore ..
   (d) => d._driver.js.nc.close(),
 );
 
@@ -34,5 +35,6 @@ testDriver(
     createNatsDriver({
       conn: await natsNodeConnect({}),
     }),
+  // @ts-ignore ..
   (d) => d._driver.js.nc.close(),
 );
