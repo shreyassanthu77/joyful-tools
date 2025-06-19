@@ -1,17 +1,38 @@
 import * as redis from "@iuioiua/redis";
 import type { KvDriver } from "@joyful/kv";
-import { connect as connectNetSocket } from "node:net";
-import { connect as connectTlsSocket } from "node:tls";
-import type { Socket as NetSocket } from "node:net";
-import type { TLSSocket as TlsSocket } from "node:tls";
+import { connect as connectNetSocket, Socket as NetSocket } from "node:net";
+import { connect as connectTlsSocket, TLSSocket as TlsSocket } from "node:tls";
 import { Readable, Writable } from "node:stream";
-import type { ReadableStream as WebReadableStream, WritableStream as WebWritableStream } from "node:stream/web";
 
+type Conn = Deno.TcpConn | Deno.TlsConn | NetSocket | TlsSocket;
+class RedisClient extends redis.RedisClient {
+  #connection: Conn;
+  constructor(
+    stream: ConstructorParameters<typeof redis.RedisClient>[0],
+    conn: Conn,
+  ) {
+    super(stream);
+    this.#connection = conn;
+  }
 
-class RedisDriver implements KvDriver<string, redis.RedisClient> {
-  _driver: redis.RedisClient;
+  close() {
+    try {
+      const conn = this.#connection;
+      if (conn instanceof NetSocket || conn instanceof TlsSocket) {
+        conn.destroy();
+      } else {
+        conn.close();
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  }
+}
 
-  constructor(redisClient: redis.RedisClient) {
+class RedisDriver implements KvDriver<string, RedisClient> {
+  _driver: RedisClient;
+
+  constructor(redisClient: RedisClient) {
     this._driver = redisClient;
   }
 
@@ -110,13 +131,12 @@ export interface RedisDriverOptions {
  */
 export async function createRedisDriver(
   options: RedisDriverOptions = {},
-): Promise<KvDriver<string, redis.RedisClient>> {
-  let { hostname, port, tls, password, db } = options;
+): Promise<KvDriver<string, RedisClient>> {
+  const { hostname, port, tls, password, db } = options;
 
-  // Start with defaults
   let currentHostname = "127.0.0.1";
   let currentPort = 6379;
-  let currentUseTls = tls === true; // Explicitly false if undefined
+  let currentUseTls = tls === true;
   let currentPassword = password;
   let currentDb = db;
 
@@ -126,7 +146,6 @@ export async function createRedisDriver(
       throw new Error(`Invalid Redis URL scheme: ${url.protocol}`);
     }
 
-    // URL provides base values, overridden by explicit options if they exist
     currentHostname = (hostname ?? url.hostname) || "127.0.0.1";
     currentPort = port ?? (url.port ? parseInt(url.port, 10) : 6379);
     currentPassword = (password ?? url.password) || undefined;
@@ -139,46 +158,56 @@ export async function createRedisDriver(
     }
 
     if (url.protocol === "rediss:") {
-      currentUseTls = true; // URL scheme dictates TLS
+      currentUseTls = true;
     }
-    // Explicit tls option overrides URL scheme if provided
     if (tls !== undefined) {
       currentUseTls = tls;
     }
   } else {
-    // No URL, use explicit options or defaults
     currentHostname = hostname ?? "127.0.0.1";
     currentPort = port ?? 6379;
-    // currentUseTls, currentPassword, currentDb already set from options destructuring or defaults
   }
 
-
-  // Runtime check for Deno or Node.js
-  let clientConnection: { readable: WebReadableStream<Uint8Array>; writable: WebWritableStream<Uint8Array> } | Deno.Conn;
+  let stream: ConstructorParameters<typeof redis.RedisClient>[0];
+  let conn: Conn;
 
   if ("Deno" in globalThis) {
     if (currentUseTls) {
-      clientConnection = await Deno.connectTls({ hostname: currentHostname, port: currentPort });
+      conn = await Deno.connectTls({
+        hostname: currentHostname,
+        port: currentPort,
+      });
+      stream = conn;
     } else {
-      clientConnection = await Deno.connect({ hostname: currentHostname, port: currentPort, transport: "tcp" });
+      conn = await Deno.connect({
+        hostname: currentHostname,
+        port: currentPort,
+        transport: "tcp",
+      });
+      stream = conn;
     }
-  } else if (globalThis.process?.versions?.node) { // Check for Node.js environment
+  } else {
     let nodeSocket: NetSocket | TlsSocket;
     if (currentUseTls) {
-      nodeSocket = connectTlsSocket({ host: currentHostname, port: currentPort, servername: currentHostname });
+      nodeSocket = connectTlsSocket({
+        host: currentHostname,
+        port: currentPort,
+        servername: currentHostname,
+      });
     } else {
-      nodeSocket = connectNetSocket({ host: currentHostname, port: currentPort });
+      nodeSocket = connectNetSocket({
+        host: currentHostname,
+        port: currentPort,
+      });
     }
-    // Adapt Node.js Duplex socket to Web Streams
-    const readable = Readable.toWeb(nodeSocket as Readable) as WebReadableStream<Uint8Array>;
-    const writable = Writable.toWeb(nodeSocket as Writable) as WebWritableStream<Uint8Array>;
-    clientConnection = { readable, writable };
-  } else {
-    // Fallback or error if neither Deno nor Node.js recognized
-    throw new Error("Unsupported runtime: This module supports Deno and Node.js.");
+
+    const readable = Readable.toWeb(nodeSocket) as ReadableStream<Uint8Array>;
+    const writable = Writable.toWeb(nodeSocket) as WritableStream<Uint8Array>;
+    stream = { readable, writable };
+    conn = nodeSocket;
   }
 
-  const client = new redis.RedisClient(clientConnection as any); // Cast might still be needed
+  const client = new RedisClient(stream, conn);
 
   if (currentPassword) {
     await client.sendCommand(["AUTH", currentPassword]);

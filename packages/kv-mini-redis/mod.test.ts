@@ -1,23 +1,24 @@
-import {
-  assertEquals,
-  assertRejects,
-  assertThrows,
-} from "https://deno.land/std@0.224.0/assert/mod.ts";
-import { delay } from "https://deno.land/std@0.224.0/async/delay.ts";
-import type { KvDriver } from "jsr:@joyful/kv"; // Import directly from source
-import { createRedisDriver, RedisDriverOptions } from "./mod.ts";
+import { assertEquals, assertRejects } from "jsr:@std/assert";
+import { delay } from "jsr:@std/async";
+import { createRedisDriver, type RedisDriverOptions } from "./mod.ts";
 
-// --- Helper to check if Redis is available ---
-async function isRedisAvailable(options: RedisDriverOptions = {}): Promise<boolean> {
+async function isRedisAvailable(
+  options: RedisDriverOptions = {},
+): Promise<boolean> {
   try {
     const driver = await createRedisDriver(options);
     await driver.get("ping");
+    driver._driver.close();
     return true;
   } catch (e) {
     if (e instanceof Error) {
-      console.warn(`Redis not available for options: ${JSON.stringify(options)}. Error: ${e.message}`);
+      console.warn(
+        `Redis not available for options: ${JSON.stringify(options)}. Error: ${e.message}`,
+      );
     } else {
-      console.warn(`Redis not available for options: ${JSON.stringify(options)}. Error: ${String(e)}`);
+      console.warn(
+        `Redis not available for options: ${JSON.stringify(options)}. Error: ${String(e)}`,
+      );
     }
     return false;
   }
@@ -27,8 +28,12 @@ const REDIS_HOST = "127.0.0.1";
 const REDIS_PORT = 6379;
 const REDIS_URL = `redis://${REDIS_HOST}:${REDIS_PORT}`;
 
-const runIntegrationTests = await isRedisAvailable({ hostname: REDIS_HOST, port: REDIS_PORT });
-const runPasswordAuthTests = runIntegrationTests && !!Deno.env.get("TEST_REDIS_PASSWORD");
+const runIntegrationTests = await isRedisAvailable({
+  hostname: REDIS_HOST,
+  port: REDIS_PORT,
+});
+const runPasswordAuthTests =
+  runIntegrationTests && !!Deno.env.get("TEST_REDIS_PASSWORD");
 const REDIS_PASSWORD = Deno.env.get("TEST_REDIS_PASSWORD") || "mypassword";
 const runDbSelectionTests = runIntegrationTests;
 
@@ -38,7 +43,9 @@ const runDbSelectionTests = runIntegrationTests;
 let connectParams: any = null;
 
 // Mock for URL/Option parsing tests
-const mockParseOptionsAndSetConnectParams = (options: RedisDriverOptions = {}) => {
+const mockParseOptionsAndSetConnectParams = (
+  options: RedisDriverOptions = {},
+) => {
   let S_hostname = "127.0.0.1";
   let S_port = 6379;
   let S_password = undefined;
@@ -55,7 +62,8 @@ const mockParseOptionsAndSetConnectParams = (options: RedisDriverOptions = {}) =
       if (!isNaN(dbNumFromUrl)) {
         S_db = dbNumFromUrl;
       }
-    } else if (url.pathname === "/") { // Default to DB 0 if path is just "/"
+    } else if (url.pathname === "/") {
+      // Default to DB 0 if path is just "/"
       S_db = 0;
     }
     if (url.protocol === "rediss:") {
@@ -79,7 +87,6 @@ const mockParseOptionsAndSetConnectParams = (options: RedisDriverOptions = {}) =
   };
 };
 
-
 Deno.test("URL Parsing: Basic URLs", async (t) => {
   await t.step("redis://localhost", () => {
     mockParseOptionsAndSetConnectParams({ url: "redis://localhost" });
@@ -96,14 +103,18 @@ Deno.test("URL Parsing: Basic URLs", async (t) => {
   });
 
   await t.step("redis://user:pass@localhost:6379", () => {
-    mockParseOptionsAndSetConnectParams({ url: "redis://user:pass@localhost:6379" });
+    mockParseOptionsAndSetConnectParams({
+      url: "redis://user:pass@localhost:6379",
+    });
     assertEquals(connectParams.password, "pass");
     assertEquals(connectParams.hostname, "localhost");
     assertEquals(connectParams.port, 6379);
   });
 
   await t.step("redis://:password@myhost/", () => {
-    mockParseOptionsAndSetConnectParams({ url: "redis://:somepassword@myhost/" });
+    mockParseOptionsAndSetConnectParams({
+      url: "redis://:somepassword@myhost/",
+    });
     assertEquals(connectParams.password, "somepassword");
     assertEquals(connectParams.hostname, "myhost");
     assertEquals(connectParams.port, 6379);
@@ -127,12 +138,18 @@ Deno.test("URL Parsing: Basic URLs", async (t) => {
 
 Deno.test("Option Precedence", async (t) => {
   await t.step("port override", () => {
-    mockParseOptionsAndSetConnectParams({ url: "redis://localhost:6379", port: 6380 });
+    mockParseOptionsAndSetConnectParams({
+      url: "redis://localhost:6379",
+      port: 6380,
+    });
     assertEquals(connectParams.port, 6380);
   });
 
   await t.step("password override", () => {
-    mockParseOptionsAndSetConnectParams({ url: "redis://user:pass@host", password: "newpass" });
+    mockParseOptionsAndSetConnectParams({
+      url: "redis://user:pass@host",
+      password: "newpass",
+    });
     assertEquals(connectParams.password, "newpass");
   });
 
@@ -159,13 +176,16 @@ Deno.test("Option Precedence", async (t) => {
   });
 
   await t.step("hostname, port, tls, no URL", () => {
-    mockParseOptionsAndSetConnectParams({ hostname: "tlsHost", port: 5678, tls: true });
+    mockParseOptionsAndSetConnectParams({
+      hostname: "tlsHost",
+      port: 5678,
+      tls: true,
+    });
     assertEquals(connectParams.hostname, "tlsHost");
     assertEquals(connectParams.port, 5678);
     assertEquals(connectParams.tls, true);
   });
 });
-
 
 Deno.test({
   name: "Basic KV Operations (Integration)",
@@ -199,6 +219,7 @@ Deno.test({
     });
 
     await driver.delete(testKey);
+    driver._driver.close();
   },
 });
 
@@ -230,17 +251,17 @@ Deno.test({
       await driverWithOption.delete(testKey);
     });
 
-    await assertRejects(
-      async () => {
-        const badDriver = await createRedisDriver({
-          hostname: REDIS_HOST,
-          port: REDIS_PORT,
-          password: "wrongpassword",
-        });
-        await badDriver.get("foo");
-      },
-      Error,
-    );
+    await assertRejects(async () => {
+      const badDriver = await createRedisDriver({
+        hostname: REDIS_HOST,
+        port: REDIS_PORT,
+        password: "wrongpassword",
+      });
+      await badDriver.get("foo");
+    }, Error);
+
+    driverWithOption._driver.close();
+    driverWithUrl._driver.close();
   },
 });
 
@@ -254,27 +275,55 @@ Deno.test({
     const keyInDb2 = "test:db2:key";
     const value = "dbValue";
 
-    const driverDb1_url = await createRedisDriver({ url: `${REDIS_URL}/${db1}` });
-    const driverDb1_opt = await createRedisDriver({ hostname: REDIS_HOST, port: REDIS_PORT, db: db1 });
+    const driverDb1_url = await createRedisDriver({
+      url: `${REDIS_URL}/${db1}`,
+    });
+    const driverDb1_opt = await createRedisDriver({
+      hostname: REDIS_HOST,
+      port: REDIS_PORT,
+      db: db1,
+    });
 
-    const driverDb2_url = await createRedisDriver({ url: `${REDIS_URL}/${db2}` });
-    const driverDb2_opt = await createRedisDriver({ hostname: REDIS_HOST, port: REDIS_PORT, db: db2 });
+    const driverDb2_url = await createRedisDriver({
+      url: `${REDIS_URL}/${db2}`,
+    });
+    const driverDb2_opt = await createRedisDriver({
+      hostname: REDIS_HOST,
+      port: REDIS_PORT,
+      db: db2,
+    });
 
     const driverDefaultDb = await createRedisDriver({ url: REDIS_URL });
 
     await t.step("set in DB1 (via URL), check isolation", async () => {
       await driverDb1_url.set(keyInDb1, value);
       assertEquals(await driverDb1_url.get(keyInDb1), value);
-      assertEquals(await driverDefaultDb.get(keyInDb1), null, "Key should not be in DB0");
-      assertEquals(await driverDb2_url.get(keyInDb1), null, "Key should not be in DB2");
+      assertEquals(
+        await driverDefaultDb.get(keyInDb1),
+        null,
+        "Key should not be in DB0",
+      );
+      assertEquals(
+        await driverDb2_url.get(keyInDb1),
+        null,
+        "Key should not be in DB2",
+      );
       await driverDb1_url.delete(keyInDb1);
     });
 
     await t.step("set in DB2 (via option), check isolation", async () => {
       await driverDb2_opt.set(keyInDb2, value);
       assertEquals(await driverDb2_opt.get(keyInDb2), value);
-      assertEquals(await driverDefaultDb.get(keyInDb2), null, "Key should not be in DB0");
-      assertEquals(await driverDb1_opt.get(keyInDb2), null, "Key should not be in DB1"); // Corrected typo here
+      assertEquals(
+        await driverDefaultDb.get(keyInDb2),
+        null,
+        "Key should not be in DB0",
+      );
+      assertEquals(
+        await driverDb1_opt.get(keyInDb2),
+        null,
+        "Key should not be in DB1",
+      ); // Corrected typo here
       await driverDb2_opt.delete(keyInDb2);
     });
 
@@ -282,14 +331,12 @@ Deno.test({
     await driverDb1_opt.delete(keyInDb1);
     await driverDb2_url.delete(keyInDb2);
     await driverDb2_opt.delete(keyInDb2);
-  },
-});
 
-Deno.test({
-  name: "TLS Connection (Integration) - Placeholder",
-  ignore: true,
-  fn: async () => {
-    throw new Error("TLS tests not implemented/configured yet.");
+    driverDb1_url._driver.close();
+    driverDb1_opt._driver.close();
+    driverDb2_url._driver.close();
+    driverDb2_opt._driver.close();
+    driverDefaultDb._driver.close();
   },
 });
 
