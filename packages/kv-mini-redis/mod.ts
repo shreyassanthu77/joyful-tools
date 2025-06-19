@@ -1,12 +1,10 @@
 import * as redis from "@iuioiua/redis";
 import type { KvDriver } from "@joyful/kv";
+import { connect as connectNetSocket } from "node:net";
+import { connect as connectTlsSocket } from "node:tls";
+import type { Socket as NetSocket } from "node:net";
+import type { TLSSocket as TlsSocket } from "node:tls";
 
-// Node.js module type placeholders
-type NodeNetConnect = typeof import("node:net").connect;
-type NodeTlsConnect = typeof import("node:tls").connect;
-
-let connectNet: NodeNetConnect | undefined;
-let connectTlsNode: NodeTlsConnect | undefined;
 
 class RedisDriver implements KvDriver<string, redis.RedisClient> {
   _driver: redis.RedisClient;
@@ -111,16 +109,6 @@ export interface RedisDriverOptions {
 export async function createRedisDriver(
   options: RedisDriverOptions = {},
 ): Promise<KvDriver<string, redis.RedisClient>> {
-  // Ensure Node.js modules are loaded if in Node.js environment
-  if (globalThis.process?.versions?.node) {
-    if (!connectNet) {
-      connectNet = (await import("node:net")).connect;
-    }
-    if (!connectTlsNode) {
-      connectTlsNode = (await import("node:tls")).connect;
-    }
-  }
-
   let { hostname, port, tls, password, db } = options;
 
   // Start with defaults
@@ -164,7 +152,7 @@ export async function createRedisDriver(
 
 
   // Runtime check for Deno or Node.js
-  let connection: Deno.Conn | ReturnType<NodeNetConnect>;
+  let connection: Deno.Conn | NetSocket | TlsSocket;
 
   if ("Deno" in globalThis) {
     if (currentUseTls) {
@@ -172,17 +160,19 @@ export async function createRedisDriver(
     } else {
       connection = await Deno.connect({ hostname: currentHostname, port: currentPort, transport: "tcp" });
     }
-  } else if (globalThis.process?.versions?.node && connectNet && connectTlsNode) {
+  } else if (globalThis.process?.versions?.node) { // Check for Node.js environment
+    // Node.js specific imports (connectNetSocket, connectTlsSocket) are now static
     if (currentUseTls) {
-      connection = connectTlsNode({ host: currentHostname, port: currentPort, servername: currentHostname });
+      connection = connectTlsSocket({ host: currentHostname, port: currentPort, servername: currentHostname });
     } else {
-      connection = connectNet({ host: currentHostname, port: currentPort });
+      connection = connectNetSocket({ host: currentHostname, port: currentPort });
     }
   } else {
-    throw new Error("Unsupported runtime: Only Deno and Node.js are supported, or Node.js modules failed to load.");
+    // Fallback or error if neither Deno nor Node.js recognized
+    throw new Error("Unsupported runtime: This module supports Deno and Node.js.");
   }
 
-  const client = new redis.RedisClient(connection as any); // Cast needed due to type union and library/stream compatibility
+  const client = new redis.RedisClient(connection as any); // Cast might still be needed due to library expectations
 
   if (currentPassword) {
     await client.sendCommand(["AUTH", currentPassword]);
