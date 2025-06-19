@@ -98,6 +98,23 @@ export interface RedisConnectionOptions {
 }
 
 /**
+ * Creates a new Redis driver using a URL string.
+ * @param url The Redis connection URL (e.g., `redis://username:password@host:port/db`).
+ * @returns A promise that resolves to a new KvDriver instance.
+ */
+export async function createRedisDriver(
+  url: string,
+): Promise<KvDriver<string, RedisClient>>;
+/**
+ * Creates a new Redis driver using connection options.
+ * @param options The Redis connection options. See {@link RedisConnectionOptions}.
+ *                 `hostname` defaults to "127.0.0.1" and `port` to 6379 if not provided.
+ * @returns A promise that resolves to a new KvDriver instance.
+ */
+export async function createRedisDriver(
+  options: RedisConnectionOptions,
+): Promise<KvDriver<string, RedisClient>>;
+/**
  * Creates a new Redis driver.
  * @param options The options for creating the driver. This can be a URL string
  * (e.g., `redis://username:password@host:port/db`) or a {@link RedisConnectionOptions} object.
@@ -106,6 +123,7 @@ export interface RedisConnectionOptions {
  * @returns A promise that resolves to a new KvDriver instance configured for Redis.
  *
  * This function supports connections to Redis in both Deno and Node.js environments.
+ * This is the implementation signature and should not be called directly if using TypeScript.
  */
 export async function createRedisDriver(
   options: string | RedisConnectionOptions,

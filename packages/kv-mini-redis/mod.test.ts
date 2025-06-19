@@ -3,22 +3,31 @@ import { delay } from "jsr:@std/async";
 import { createRedisDriver, type RedisConnectionOptions } from "./mod.ts";
 
 async function isRedisAvailable(
-  options: string | RedisConnectionOptions = {},
+  config: string | RedisConnectionOptions = {},
 ): Promise<boolean> {
   try {
-    // To satisfy the type for an empty call, provide a default object.
-    const driver = await createRedisDriver(typeof options === 'string' ? options : Object.keys(options).length === 0 ? { hostname: REDIS_HOST, port: REDIS_PORT } : options);
+    let driver;
+    if (typeof config === 'string') {
+      driver = await createRedisDriver(config); // Matches string overload
+    } else {
+      // config is RedisConnectionOptions or {}
+      // If config is an empty object {}, provide default hostname and port
+      const effectiveOptions = Object.keys(config).length === 0
+                               ? { hostname: REDIS_HOST, port: REDIS_PORT }
+                               : config;
+      driver = await createRedisDriver(effectiveOptions); // Matches RedisConnectionOptions overload
+    }
     await driver.get("ping");
     driver._driver.close();
     return true;
   } catch (e) {
     if (e instanceof Error) {
       console.warn(
-        `Redis not available for options: ${JSON.stringify(options)}. Error: ${e.message}`,
+        `Redis not available for options: ${JSON.stringify(config)}. Error: ${e.message}`,
       );
     } else {
       console.warn(
-        `Redis not available for options: ${JSON.stringify(options)}. Error: ${String(e)}`,
+        `Redis not available for options: ${JSON.stringify(config)}. Error: ${String(e)}`,
       );
     }
     return false;
