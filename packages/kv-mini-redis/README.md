@@ -7,6 +7,7 @@ This driver allows you to easily connect your Kv-compliant application to a Redi
 ## Features
 
 - **Cross-Runtime Compatibility**: Works in both Deno and Node.js environments.
+  - For Node.js, version 18.0.0 or later is recommended to ensure availability of native stream adaptation features (`Readable.toWeb`, `Writable.toWeb`).
 - **Flexible Connection Options**:
     - Connect using a Redis URL string (e.g., `redis://user:pass@host:port/db`).
     - Supports `redis://` (plain TCP) and `rediss://` (TLS) URL schemes.

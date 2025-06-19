@@ -4,6 +4,8 @@ import { connect as connectNetSocket } from "node:net";
 import { connect as connectTlsSocket } from "node:tls";
 import type { Socket as NetSocket } from "node:net";
 import type { TLSSocket as TlsSocket } from "node:tls";
+import { Readable, Writable } from "node:stream";
+import type { ReadableStream as WebReadableStream, WritableStream as WebWritableStream } from "node:stream/web";
 
 
 class RedisDriver implements KvDriver<string, redis.RedisClient> {
@@ -152,27 +154,31 @@ export async function createRedisDriver(
 
 
   // Runtime check for Deno or Node.js
-  let connection: Deno.Conn | NetSocket | TlsSocket;
+  let clientConnection: { readable: WebReadableStream<Uint8Array>; writable: WebWritableStream<Uint8Array> } | Deno.Conn;
 
   if ("Deno" in globalThis) {
     if (currentUseTls) {
-      connection = await Deno.connectTls({ hostname: currentHostname, port: currentPort });
+      clientConnection = await Deno.connectTls({ hostname: currentHostname, port: currentPort });
     } else {
-      connection = await Deno.connect({ hostname: currentHostname, port: currentPort, transport: "tcp" });
+      clientConnection = await Deno.connect({ hostname: currentHostname, port: currentPort, transport: "tcp" });
     }
   } else if (globalThis.process?.versions?.node) { // Check for Node.js environment
-    // Node.js specific imports (connectNetSocket, connectTlsSocket) are now static
+    let nodeSocket: NetSocket | TlsSocket;
     if (currentUseTls) {
-      connection = connectTlsSocket({ host: currentHostname, port: currentPort, servername: currentHostname });
+      nodeSocket = connectTlsSocket({ host: currentHostname, port: currentPort, servername: currentHostname });
     } else {
-      connection = connectNetSocket({ host: currentHostname, port: currentPort });
+      nodeSocket = connectNetSocket({ host: currentHostname, port: currentPort });
     }
+    // Adapt Node.js Duplex socket to Web Streams
+    const readable = Readable.toWeb(nodeSocket as Readable) as WebReadableStream<Uint8Array>;
+    const writable = Writable.toWeb(nodeSocket as Writable) as WebWritableStream<Uint8Array>;
+    clientConnection = { readable, writable };
   } else {
     // Fallback or error if neither Deno nor Node.js recognized
     throw new Error("Unsupported runtime: This module supports Deno and Node.js.");
   }
 
-  const client = new redis.RedisClient(connection as any); // Cast might still be needed due to library expectations
+  const client = new redis.RedisClient(clientConnection as any); // Cast might still be needed
 
   if (currentPassword) {
     await client.sendCommand(["AUTH", currentPassword]);
