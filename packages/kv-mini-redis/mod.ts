@@ -127,9 +127,9 @@ export async function createRedisDriver(
     }
 
     // URL provides base values, overridden by explicit options if they exist
-    currentHostname = hostname ?? url.hostname || "127.0.0.1";
+    currentHostname = (hostname ?? url.hostname) || "127.0.0.1";
     currentPort = port ?? (url.port ? parseInt(url.port, 10) : 6379);
-    currentPassword = password ?? url.password || undefined;
+    currentPassword = (password ?? url.password) || undefined;
 
     if (url.pathname && url.pathname !== "/") {
       const dbNumFromUrl = parseInt(url.pathname.substring(1), 10);
