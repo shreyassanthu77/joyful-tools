@@ -133,8 +133,6 @@ export async function createRedisDriver(
 export async function createRedisDriver(
   options?: RedisConnectionOptions,
 ): Promise<KvDriver<string, RedisClient>>;
-// Implementation for createRedisDriver overloads.
-// This signature should not be called directly if using TypeScript; use one of the overloads above.
 export async function createRedisDriver(
   optionsOrUrl?: string | RedisConnectionOptions,
 ): Promise<KvDriver<string, RedisClient>> {
@@ -150,8 +148,8 @@ export async function createRedisDriver(
       throw new Error(`Invalid Redis URL scheme: ${url.protocol}`);
     }
 
-    currentHostname = url.hostname || "127.0.0.1"; // Default here is if URL has no hostname
-    currentPort = url.port ? parseInt(url.port, 10) : 6379; // Default here is if URL has no port
+    currentHostname = url.hostname || "127.0.0.1";
+    currentPort = url.port ? parseInt(url.port, 10) : 6379;
     currentPassword = url.password || undefined;
 
     if (url.pathname && url.pathname !== "/") {
@@ -161,14 +159,13 @@ export async function createRedisDriver(
       }
     }
     currentUseTls = url.protocol === "rediss:";
-  } else if (optionsOrUrl) { // It's RedisConnectionOptions
-    currentHostname = optionsOrUrl.hostname ?? currentHostname; // Use initial default if property is null/undefined
+  } else if (optionsOrUrl) {
+    currentHostname = optionsOrUrl.hostname ?? currentHostname;
     currentPort = optionsOrUrl.port ?? currentPort;
-    currentUseTls = optionsOrUrl.tls ?? currentUseTls; // Use initial default (false) if property is null/undefined
+    currentUseTls = optionsOrUrl.tls ?? currentUseTls;
     currentPassword = optionsOrUrl.password;
     currentDb = optionsOrUrl.db;
   }
-  // If optionsOrUrl is undefined, the initial defaults (127.0.0.1:6379, no TLS) are used.
 
   let stream: ConstructorParameters<typeof redis.RedisClient>[0];
   let conn: Conn;
