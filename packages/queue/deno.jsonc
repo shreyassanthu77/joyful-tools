@@ -1,0 +1,9 @@
+{
+  "name": "@joyful/queue",
+  "version": "0.0.1",
+  "license": "MIT",
+  "imports": {},
+  "exports": {
+    ".": "./src/queue.ts"
+  }
+}
