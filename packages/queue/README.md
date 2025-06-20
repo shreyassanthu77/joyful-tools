@@ -4,86 +4,44 @@ A robust and flexible job queue system for Deno/TypeScript applications.
 
 ## Installation
 
-To use this package in your Deno project, you can import it directly from its URL (e.g., a GitHub raw URL or a Deno Land URL once published).
+To use this package in your Deno project, assuming it is published on JSR (Deno's JavaScript Registry) or available locally with a `deno.jsonc` file that defines its exports:
+
+**Using JSR (recommended for published packages):**
+Add the package to your `deno.jsonc` or `deno.json` file's `imports` section:
+```json
+{
+  "imports": {
+    "@joyful/queue": "jsr:@joyful/queue@^0.1.0"
+  }
+}
+```
+Then, in your code:
+```typescript
+import { Queue, QueueWorker } from "@joyful/queue";
+import { MemoryBroker } from "@joyful/queue/memory";
+```
+
+**Using local path (if developing locally or package not on JSR):**
+If you have the `@joyful/queue` package locally and its `deno.jsonc` is set up with exports, you can use relative paths from your project's `deno.jsonc` or directly if it's a local module. For example, if your project structure allows direct pathing or uses an import map:
 
 ```typescript
-// main.ts
-import { Queue, QueueWorker } from "https://deno.land/x/joyful_queue/mod.ts"; // Replace with the actual URL once published
-// Or, if you have it locally or as a submodule:
-// import { Queue, QueueWorker } from "./packages/queue/src/mod.ts"; // Adjust path as needed
+// Example assuming direct local import from a consuming project's deno.jsonc or similar setup
+// This path might vary based on your project structure and how you map local modules.
+// For this example, we'll use the JSR-style imports as if the package is consumed.
+import { Queue, QueueWorker } from "@joyful/queue"; // Or "jsr:@joyful/queue"
+import { MemoryBroker } from "@joyful/queue/memory"; // Or "jsr:@joyful/queue/memory"
 ```
 
 ## Basic Usage
 
-Here's a basic example of how to use `@joyful/queue` with a hypothetical `MemoryBroker`.
-
-First, you would need a broker implementation. For this example, let's assume a simple `MemoryBroker` (you'd need to implement this or use a pre-built one for a specific backend).
-
-```typescript
-// memory_broker.ts (Hypothetical example)
-import { Broker, Job } from "https://deno.land/x/joyful_queue/mod.ts"; // Adjust import path
-
-export class MemoryBroker implements Broker {
-  private queues: Map<string, Job<unknown>[]> = new Map();
-  private jobData: Map<string, Job<unknown>> = new Map();
-
-  async enqueue(queueName: string, job: Job<unknown>, delay?: number): Promise<void> {
-    if (!this.queues.has(queueName)) {
-      this.queues.set(queueName, []);
-    }
-    this.jobData.set(job.id, job);
-
-    if (delay && delay > 0) {
-      setTimeout(() => {
-        this.queues.get(queueName)!.push(job);
-      }, delay);
-    } else {
-      this.queues.get(queueName)!.push(job);
-    }
-    console.log(`Job ${job.id} enqueued to ${queueName}.`);
-  }
-
-  async dequeue(queueName: string): Promise<Job<unknown> | null> {
-    const queue = this.queues.get(queueName);
-    if (queue && queue.length > 0) {
-      const job = queue.shift();
-      if (job) {
-        console.log(`Job ${job.id} dequeued from ${queueName}.`);
-        return this.jobData.get(job.id) || null;
-      }
-    }
-    return null;
-  }
-
-  async completeJob(queueName: string, id: string): Promise<void> {
-    const job = this.jobData.get(id);
-    if (job) {
-      job.processedAt = new Date();
-      // In a real broker, you might move this to a completed set or remove it
-      console.log(`Job ${id} in ${queueName} marked as complete.`);
-    }
-  }
-
-  async failJob(queueName: string, id: string, error: string): Promise<void> {
-    const job = this.jobData.get(id);
-    if (job) {
-      job.failedAt = new Date();
-      job.error = error;
-      // In a real broker, you might move this to a failed set or handle retries
-      console.log(`Job ${id} in ${queueName} marked as failed: ${error}`);
-    }
-  }
-}
-```
-
-Now, you can use the `Queue` and `QueueWorker`:
+Here's a basic example of how to use `@joyful/queue`. It uses the built-in `MemoryBroker`.
 
 ```typescript
 // main.ts
-import { Queue, QueueWorker } from "https://deno.land/x/joyful_queue/mod.ts"; // Adjust import path
-import { MemoryBroker } from "./memory_broker.ts"; // Assuming a local MemoryBroker
+import { Queue, QueueWorker } from "@joyful/queue";
+import { MemoryBroker } from "@joyful/queue/memory";
 
-// 1. Initialize a broker
+// 1. Initialize the MemoryBroker
 const broker = new MemoryBroker();
 
 // 2. Create a queue
@@ -141,7 +99,7 @@ console.log("Worker started, listening for jobs on email-queue...");
 
 The `Broker` is an interface that defines the contract for message storage and retrieval. It's responsible for the underlying mechanics of how jobs are persisted, dequeued for processing, and how their state (completed, failed) is updated.
 
-You can implement custom brokers to support various backends like Redis, PostgreSQL, RabbitMQ, or even a simple in-memory broker for testing (as shown in the example). This decouples the queue logic from the specific storage technology.
+You can implement custom brokers to support various backends like Redis, PostgreSQL, RabbitMQ. The package includes a `MemoryBroker` which is useful for testing or simple single-process applications. This decouples the queue logic from the specific storage technology.
 
 ### `BackoffStrategy`
 
