@@ -1,6 +1,8 @@
 .git
 node_modules
 
+data/
+
 # Output
 .output
 .vercel

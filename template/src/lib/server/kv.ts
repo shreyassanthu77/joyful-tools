@@ -1,8 +1,8 @@
 import { createKv } from "@joyful/kv";
-import { openKv, createDenoDriver } from "@joyful/kv/deno-kv-node";
+import { openKv, createDenoDriver } from "@joyful/kv-node-denokv";
 import { serialize as encodeV8, deserialize as decodeV8 } from "node:v8";
 
-const denoKv = await openKv("kv.db", {
+const denoKv = await openKv("data/kv.db", {
 	implementation: "sqlite",
 	encodeV8,
 	decodeV8,
