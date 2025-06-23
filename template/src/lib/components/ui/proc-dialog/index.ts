@@ -1,6 +1,6 @@
 import type { Component, ComponentProps, Snippet } from "svelte";
 import DialogProvider from "./dialog-provider.svelte";
-import { dialogState } from "./dialog_state.svelte";
+import { dialogState } from "./dialog-state.svelte.ts";
 import ConfirmDialog from "./confirm-dialog.svelte";
 
 export interface DialogBaseProps<T> {
