@@ -4,10 +4,17 @@
 		defaultStyles?: boolean;
 	};
 
-	let { children, defaultStyles, class: className, ...rest }: Props = $props();
+	let {
+		children,
+		defaultStyles,
+		class: className,
+		ref = $bindable(null),
+		...rest
+	}: Props = $props();
 </script>
 
 <BitsButton.Root
+	bind:ref
 	class={[
 		{
 			"rounded-lg px-6 py-2 shadow-sm transition-[filter] hover:brightness-90":

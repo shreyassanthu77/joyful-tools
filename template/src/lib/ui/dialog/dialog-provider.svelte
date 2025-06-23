@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { dialogState } from "./dialog_state.svelte.ts";
-	import Dialog from "./Dialog.svelte";
+	import Dialog from "./dialog.svelte";
 
 	const dialogs = $derived(dialogState.dialogs);
 </script>

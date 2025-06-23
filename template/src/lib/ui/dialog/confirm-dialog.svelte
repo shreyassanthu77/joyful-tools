@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { ConfirmDialogOptions, DialogComponentProps } from "./index.ts";
 	import Button from "$lib/ui/Button.svelte";
+	import { onMount } from "svelte";
 
 	let {
 		title,
@@ -14,8 +15,10 @@
 		Content,
 	}: DialogComponentProps<ConfirmDialogOptions, boolean> = $props();
 
-	let state = $state<"idle" | "confirming" | "cancelling">("idle");
-	let disabled = $derived(state !== "idle");
+	let loading_state = $state<"idle" | "confirming" | "cancelling">("idle");
+	let disabled = $derived(loading_state !== "idle");
+	let cancelButton = $state<HTMLButtonElement | null>(null);
+	const triggerElement = document?.activeElement as HTMLElement | null;
 
 	const defaultStyles =
 		styles.defaults === false
@@ -28,26 +31,42 @@
 				}
 			: (styles.defaults ?? {});
 
+	async function handleOpenAutoFocus(ev: Event) {
+		if (cancelButton) {
+			ev.preventDefault();
+			cancelButton.focus();
+		}
+	}
+
+	async function handleCloseAutoFocus(ev: Event) {
+		if (triggerElement) {
+			ev.preventDefault();
+			triggerElement?.focus();
+		}
+	}
+
 	async function confirm() {
 		if (onConfirm) {
-			state = "confirming";
+			loading_state = "confirming";
 			await onConfirm();
 			close(true);
-			state = "idle";
+			loading_state = "idle";
 		} else close(true);
 	}
 
 	async function cancel() {
 		if (onCancel) {
-			state = "cancelling";
+			loading_state = "cancelling";
 			await onCancel();
 			close(false);
-			state = "idle";
+			loading_state = "idle";
 		} else close(false);
 	}
 </script>
 
 <Content
+	onOpenAutoFocus={handleOpenAutoFocus}
+	onCloseAutoFocus={handleCloseAutoFocus}
 	class={[
 		{
 			"animate-dialog-contents absolute top-1/2 left-1/2 w-full max-w-lg -translate-x-1/2 -translate-y-1/2 p-4":
@@ -94,21 +113,23 @@
 		{disabled}
 		onclick={confirm}
 	>
-		{#if state === "confirming"}
+		{#if loading_state === "confirming"}
 			Confirming...
 		{:else}
 			Confirm
 		{/if}
 	</Button>
 {/snippet}
+
 {#snippet CancelButton()}
 	<Button
 		defaultStyles={defaultStyles.cancel}
 		class={["w-full md:w-auto", styles.cancel]}
 		{disabled}
+		bind:ref={cancelButton}
 		onclick={cancel}
 	>
-		{#if state === "cancelling"}
+		{#if loading_state === "cancelling"}
 			Cancelling...
 		{:else}
 			Cancel

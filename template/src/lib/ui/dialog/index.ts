@@ -1,8 +1,8 @@
 import type { Component, ComponentProps, Snippet } from "svelte";
-import DialogProvider from "./DialogProvider.svelte";
+import DialogProvider from "./dialog-provider.svelte";
 import { dialogState } from "./dialog_state.svelte";
 import type { Dialog } from "bits-ui";
-import ConfirmDialog from "./ConfirmDialog.svelte";
+import ConfirmDialog from "./confirm-dialog.svelte";
 
 export interface DialogBaseProps<T> {
 	Title: typeof Dialog.Title;
@@ -125,6 +125,16 @@ async function confirm(options: ConfirmDialogOptions): Promise<boolean> {
 	const res = await component(ConfirmDialog, options);
 	return res ?? false;
 }
+
+confirm.danger = function dangerConfirm(
+	options: ConfirmDialogOptions,
+): Promise<boolean> {
+	options.styles = {
+		confirm: "bg-red-500 text-white font-bold",
+		...options.styles,
+	};
+	return confirm(options);
+};
 
 export const dialog = {
 	Provider: DialogProvider,

@@ -5,10 +5,9 @@
 
 	async function deleteData() {
 		if (
-			await dialog.confirm({
+			await dialog.confirm.danger({
 				title: "Delete Data",
 				message: "Are you sure you want to delete all data?",
-				styles: { confirm: "bg-red-500 text-white font-bold" },
 			})
 		) {
 			console.log("Deleted");
