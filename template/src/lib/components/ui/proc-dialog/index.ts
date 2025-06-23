@@ -1,13 +1,9 @@
 import type { Component, ComponentProps, Snippet } from "svelte";
 import DialogProvider from "./dialog-provider.svelte";
 import { dialogState } from "./dialog_state.svelte";
-import type { Dialog } from "bits-ui";
 import ConfirmDialog from "./confirm-dialog.svelte";
 
 export interface DialogBaseProps<T> {
-	Title: typeof Dialog.Title;
-	Description: typeof Dialog.Description;
-	Content: typeof Dialog.Content;
 	close: void extends T ? () => void : (result: T) => void;
 }
 

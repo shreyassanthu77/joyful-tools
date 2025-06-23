@@ -1,7 +1,13 @@
 <script lang="ts">
 	import type { ConfirmDialogOptions, DialogComponentProps } from "./index.ts";
-	import Button from "$lib/ui/Button.svelte";
-	import { cn } from "$lib/utils/cn.ts";
+	import { Button } from "$lib/components/ui/button";
+	import {
+		Title,
+		Description,
+		Content,
+		Header,
+		Footer,
+	} from "$lib/components/ui/dialog";
 
 	let {
 		title,
@@ -10,9 +16,6 @@
 		onConfirm,
 		close,
 		styles = $bindable({}),
-		Title,
-		Description,
-		Content,
 	}: DialogComponentProps<ConfirmDialogOptions, boolean> = $props();
 
 	let loading_state = $state<"idle" | "confirming" | "cancelling">("idle");
@@ -67,34 +70,12 @@
 <Content
 	onOpenAutoFocus={handleOpenAutoFocus}
 	onCloseAutoFocus={handleCloseAutoFocus}
-	class={cn([
-		{
-			"animate-dialog-contents absolute top-1/2 left-1/2 w-full max-w-lg -translate-x-1/2 -translate-y-1/2 p-4":
-				defaultStyles.contentContainer !== false,
-		},
-		styles.contentContainer,
-	])}
+	showCloseButton={false}
 >
-	<div class="flex flex-col rounded-lg bg-white p-4">
-		<Title
-			class={cn(
-				{ "text-2xl font-bold": defaultStyles.title !== false },
-				styles.title,
-			)}>{title}</Title
-		>
-		<Description
-			class={cn({ "text-lg": defaultStyles.message !== false }, styles.message)}
-			>{message}</Description
-		>
-		<div
-			class={cn(
-				{
-					"mt-3 flex flex-wrap items-center justify-end gap-2 md:gap-3":
-						defaultStyles.buttonsContainer !== false,
-				},
-				styles.buttonsContainer,
-			)}
-		>
+	<Header>
+		<Title>{title}</Title>
+		<Description>{message}</Description>
+		<Footer class="mt-3">
 			{#if styles.reverseActions === true}
 				{@render CancelButton()}
 				{@render ConfirmButton()}
@@ -102,17 +83,12 @@
 				{@render ConfirmButton()}
 				{@render CancelButton()}
 			{/if}
-		</div>
-	</div>
+		</Footer>
+	</Header>
 </Content>
 
 {#snippet ConfirmButton()}
-	<Button
-		defaultStyles={defaultStyles.confirm}
-		class={["w-full md:w-auto", styles.confirm]}
-		{disabled}
-		onclick={confirm}
-	>
+	<Button variant="destructive" {disabled} onclick={confirm}>
 		{#if loading_state === "confirming"}
 			Confirming...
 		{:else}
@@ -122,13 +98,7 @@
 {/snippet}
 
 {#snippet CancelButton()}
-	<Button
-		defaultStyles={defaultStyles.cancel}
-		class={["w-full md:w-auto", styles.cancel]}
-		{disabled}
-		bind:ref={cancelButton}
-		onclick={cancel}
-	>
+	<Button variant="outline" {disabled} bind:ref={cancelButton} onclick={cancel}>
 		{#if loading_state === "cancelling"}
 			Cancelling...
 		{:else}

@@ -1,7 +1,8 @@
 <script lang="ts">
 	import type { PageProps } from "./$types";
 	let { data }: PageProps = $props();
-	import { dialog } from "$lib/ui/dialog";
+	import { dialog } from "$lib/components/ui/proc-dialog";
+	import { toast } from "svelte-sonner";
 
 	async function deleteData() {
 		if (
@@ -10,9 +11,9 @@
 				message: "Are you sure you want to delete all data?",
 			})
 		) {
-			console.log("Deleted");
+			toast.success("Data deleted");
 		} else {
-			console.log("Cancelled");
+			toast.error("Data not deleted");
 		}
 	}
 </script>

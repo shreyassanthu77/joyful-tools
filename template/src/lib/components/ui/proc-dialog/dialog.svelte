@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Dialog } from "bits-ui";
+	import * as Dialog from "$lib/components/ui/dialog";
 	import { dialogState } from "./dialog_state.svelte";
 	import type { DialogBaseProps, Dialog as DialogT } from "./index.ts";
 
@@ -21,9 +21,6 @@
 
 	const baseProps: DialogBaseProps<any> = {
 		close,
-		Title: Dialog.Title,
-		Description: Dialog.Description,
-		Content: Dialog.Content,
 	};
 </script>
 
