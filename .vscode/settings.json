@@ -1,5 +1,8 @@
 {
   "deno.disablePaths": [
     "./template"
+  ],
+  "tailwindCSS.experimental.classRegex": [
+    ["([\"'`][^\"'`]*.*?[\"'`])", "[\"'`]([^\"'`]*).*?[\"'`]"]
   ]
 }

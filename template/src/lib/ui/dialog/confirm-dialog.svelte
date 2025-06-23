@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { ConfirmDialogOptions, DialogComponentProps } from "./index.ts";
 	import Button from "$lib/ui/Button.svelte";
-	import { onMount } from "svelte";
+	import { cn } from "$lib/utils/cn.ts";
 
 	let {
 		title,
@@ -67,33 +67,33 @@
 <Content
 	onOpenAutoFocus={handleOpenAutoFocus}
 	onCloseAutoFocus={handleCloseAutoFocus}
-	class={[
+	class={cn([
 		{
 			"animate-dialog-contents absolute top-1/2 left-1/2 w-full max-w-lg -translate-x-1/2 -translate-y-1/2 p-4":
 				defaultStyles.contentContainer !== false,
 		},
 		styles.contentContainer,
-	]}
+	])}
 >
 	<div class="flex flex-col rounded-lg bg-white p-4">
 		<Title
-			class={[
+			class={cn(
 				{ "text-2xl font-bold": defaultStyles.title !== false },
 				styles.title,
-			]}>{title}</Title
+			)}>{title}</Title
 		>
 		<Description
-			class={[{ "text-lg": defaultStyles.message !== false }, styles.message]}
+			class={cn({ "text-lg": defaultStyles.message !== false }, styles.message)}
 			>{message}</Description
 		>
 		<div
-			class={[
+			class={cn(
 				{
 					"mt-3 flex flex-wrap items-center justify-end gap-2 md:gap-3":
 						defaultStyles.buttonsContainer !== false,
 				},
 				styles.buttonsContainer,
-			]}
+			)}
 		>
 			{#if styles.reverseActions === true}
 				{@render CancelButton()}

@@ -45,7 +45,9 @@
     "@joyful/kv": "^0.0.11",
     "@joyful/kv-node-denokv": "npm:@jsr/joyful__kv-node-denokv",
     "better-auth": "^1.2.8",
+    "clsx": "^2.1.1",
     "drizzle-orm": "^0.40.0",
-    "postgres": "^3.4.5"
+    "postgres": "^3.4.5",
+    "tailwind-merge": "^3.3.1"
   }
 }
