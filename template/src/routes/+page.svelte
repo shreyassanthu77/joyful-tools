@@ -9,7 +9,13 @@
 			await dialog.confirm({
 				title: "Delete Data",
 				message: "Are you sure you want to delete all data?",
-				styles: { confirmVariant: "default" },
+				styles: { cancelVariant: "secondary" },
+				onConfirm: () =>
+					dialog.confirm({
+						title: "Are you really really sure?",
+						message:
+							"This can't be undone. Are you sure you want to delete all data?",
+					}),
 			})
 		) {
 			toast.success("Data deleted");
@@ -19,8 +25,6 @@
 	}
 </script>
 
-<h1>Welcome to Joy!</h1>
+<h1>Welcome</h1>
 <button onclick={deleteData}> Delete </button>
-<p>
-	Visit number {data.views}
-</p>
+<p>Visit number {data.views}</p>

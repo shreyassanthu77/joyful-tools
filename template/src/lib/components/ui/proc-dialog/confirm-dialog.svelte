@@ -40,8 +40,8 @@
 	async function confirm() {
 		if (onConfirm) {
 			loading_state = "confirming";
-			await onConfirm();
-			close(true);
+			const res = await onConfirm();
+			close(res ?? true);
 			loading_state = "idle";
 		} else close(true);
 	}
@@ -49,8 +49,8 @@
 	async function cancel() {
 		if (onCancel) {
 			loading_state = "cancelling";
-			await onCancel();
-			close(false);
+			const res = await onCancel();
+			close(res ?? false);
 			loading_state = "idle";
 		} else close(false);
 	}

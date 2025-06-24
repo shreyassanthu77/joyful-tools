@@ -29,6 +29,8 @@ type Prettify<T> = {
 	[K in keyof T]: T[K];
 } & {};
 
+type PromiseOr<T> = T | Promise<T>;
+
 export type ConfirmDialogOptions = {
 	title: string;
 	message: string;
@@ -44,8 +46,8 @@ export type ConfirmDialogOptions = {
 		cancel?: string;
 		cancelVariant?: ButtonVariant;
 	};
-	onConfirm?: () => void | Promise<void>;
-	onCancel?: () => void | Promise<void>;
+	onConfirm?: () => PromiseOr<void | boolean | undefined>;
+	onCancel?: () => PromiseOr<void | boolean | undefined>;
 };
 
 export type Dialog =
