@@ -23,17 +23,6 @@
 	let cancelButton = $state<HTMLButtonElement | null>(null);
 	const triggerElement = document?.activeElement as HTMLElement | null;
 
-	const defaultStyles =
-		styles.defaults === false
-			? {
-					title: false,
-					message: false,
-					confirm: false,
-					cancel: false,
-					buttonsContainer: false,
-				}
-			: (styles.defaults ?? {});
-
 	async function handleOpenAutoFocus(ev: Event) {
 		if (cancelButton) {
 			ev.preventDefault();
@@ -71,24 +60,31 @@
 	onOpenAutoFocus={handleOpenAutoFocus}
 	onCloseAutoFocus={handleCloseAutoFocus}
 	showCloseButton={false}
+	class={styles.content}
 >
-	<Header>
-		<Title>{title}</Title>
-		<Description>{message}</Description>
-		<Footer class="mt-3">
-			{#if styles.reverseActions === true}
-				{@render CancelButton()}
-				{@render ConfirmButton()}
-			{:else}
-				{@render ConfirmButton()}
-				{@render CancelButton()}
-			{/if}
-		</Footer>
+	<Header class={styles.header}>
+		<Title class={styles.title}>{title}</Title>
+		<Description class={styles.message}>{message}</Description>
 	</Header>
+	<Footer class={styles.footer}>
+		{#if styles.reverseActions === true}
+			{@render CancelButton()}
+			{@render ConfirmButton()}
+		{:else}
+			{@render ConfirmButton()}
+			{@render CancelButton()}
+		{/if}
+	</Footer>
 </Content>
 
 {#snippet ConfirmButton()}
-	<Button variant="destructive" {disabled} onclick={confirm}>
+	<Button
+		variant={styles.confirmVariant ?? "destructive"}
+		{disabled}
+		onclick={confirm}
+		class={styles.confirm}
+	>
+		>
 		{#if loading_state === "confirming"}
 			Confirming...
 		{:else}
@@ -98,7 +94,14 @@
 {/snippet}
 
 {#snippet CancelButton()}
-	<Button variant="outline" {disabled} bind:ref={cancelButton} onclick={cancel}>
+	<Button
+		variant={styles.cancelVariant ?? "outline"}
+		{disabled}
+		bind:ref={cancelButton}
+		onclick={cancel}
+		class={styles.cancel}
+	>
+		>
 		{#if loading_state === "cancelling"}
 			Cancelling...
 		{:else}

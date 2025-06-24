@@ -2,6 +2,7 @@ import type { Component, ComponentProps, Snippet } from "svelte";
 import DialogProvider from "./dialog-provider.svelte";
 import { dialogState } from "./dialog-state.svelte.ts";
 import ConfirmDialog from "./confirm-dialog.svelte";
+import type { ButtonVariant } from "$lib/components/ui/button"
 
 export interface DialogBaseProps<T> {
 	close: void extends T ? () => void : (result: T) => void;
@@ -33,23 +34,15 @@ export type ConfirmDialogOptions = {
 	message: string;
 	styles?: {
 		reverseActions?: boolean;
-		defaults?:
-			| {
-					contentContainer?: boolean;
-					buttonsContainer?: boolean;
-					title?: boolean;
-					message?: boolean;
-					confirm?: boolean;
-					cancel?: boolean;
-			  }
-			| false;
-
-		contentContainer?: string;
-		buttonsContainer?: string;
+		header?: string;
+		content?: string;
+		footer?: string;
 		title?: string;
 		message?: string;
 		confirm?: string;
+		confirmVariant?: ButtonVariant;
 		cancel?: string;
+		cancelVariant?: ButtonVariant;
 	};
 	onConfirm?: () => void | Promise<void>;
 	onCancel?: () => void | Promise<void>;
@@ -57,21 +50,21 @@ export type ConfirmDialogOptions = {
 
 export type Dialog =
 	| BaseDialog<
-			"snippet",
-			{
-				snippet: {
-					s: Snippet<[DialogSnippetProps<any>]>;
-					props: any;
-				};
-			}
-	  >
-	| BaseDialog<
-			"component",
-			{
-				component: Component<any, any, any>;
+		"snippet",
+		{
+			snippet: {
+				s: Snippet<[DialogSnippetProps<any>]>;
 				props: any;
-			}
-	  >
+			};
+		}
+	>
+	| BaseDialog<
+		"component",
+		{
+			component: Component<any, any, any>;
+			props: any;
+		}
+	>
 	| BaseDialog<"confirm", ConfirmDialogOptions>;
 
 let id = 0;
@@ -103,7 +96,7 @@ function component<
 	Props = Prettify<Omit<AllProps, keyof DialogBaseProps<any>>>,
 	Res = AllProps extends DialogBaseProps<infer T> ? T : void,
 	Args = {} extends Props ? [] : [Props],
-	// @ts-expect-error Args is an array dw
+// @ts-expect-error Args is an array dw
 >(component: C, ...args: NoInfer<Args>): Promise<Res | void> {
 	const resolvers = withResolvers<Res | void>();
 	dialogState.add({
@@ -117,7 +110,6 @@ function component<
 }
 
 async function confirm(options: ConfirmDialogOptions): Promise<boolean> {
-	// @ts-expect-error svelte component types are weird for some reason
 	const res = await component(ConfirmDialog, options);
 	return res ?? false;
 }
@@ -147,8 +139,7 @@ function withResolvers<T>() {
 		resolve = res;
 		reject = rej;
 	});
-	// @ts-expect-error they are assigned in the promise constructor which is synchronous
-	return { promise, resolve, reject };
+	return { promise, resolve: resolve!, reject: reject! };
 }
 
 export default dialog;
