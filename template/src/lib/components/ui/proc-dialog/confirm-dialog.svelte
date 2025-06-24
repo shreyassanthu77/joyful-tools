@@ -84,7 +84,6 @@
 		onclick={confirm}
 		class={styles.confirm}
 	>
-		>
 		{#if loading_state === "confirming"}
 			Confirming...
 		{:else}
@@ -101,7 +100,6 @@
 		onclick={cancel}
 		class={styles.cancel}
 	>
-		>
 		{#if loading_state === "cancelling"}
 			Cancelling...
 		{:else}

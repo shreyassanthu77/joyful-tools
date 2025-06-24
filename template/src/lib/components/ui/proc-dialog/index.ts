@@ -114,16 +114,6 @@ async function confirm(options: ConfirmDialogOptions): Promise<boolean> {
 	return res ?? false;
 }
 
-confirm.danger = function dangerConfirm(
-	options: ConfirmDialogOptions,
-): Promise<boolean> {
-	options.styles = {
-		confirm: "bg-red-500 text-white font-bold",
-		...options.styles,
-	};
-	return confirm(options);
-};
-
 export const dialog = {
 	Provider: DialogProvider,
 	snippet,
