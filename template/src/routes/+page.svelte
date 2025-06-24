@@ -9,7 +9,7 @@
 			await dialog.confirm({
 				title: "Delete Data",
 				message: "Are you sure you want to delete all data?",
-				styles: { cancelVariant: "secondary" },
+				styles: { cancelVariant: "outline" },
 				onConfirm: () =>
 					dialog.confirm({
 						title: "Are you really really sure?",
