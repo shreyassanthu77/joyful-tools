@@ -21,11 +21,19 @@
 	let loading_state = $state<"idle" | "confirming" | "cancelling">("idle");
 	let disabled = $derived(loading_state !== "idle");
 	let cancelButton = $state<HTMLButtonElement | null>(null);
+	const triggerElement = document?.activeElement as HTMLElement | null;
 
 	async function handleOpenAutoFocus(ev: Event) {
 		if (cancelButton) {
 			ev.preventDefault();
 			cancelButton.focus();
+		}
+	}
+
+	async function handleCloseAutoFocus(ev: Event) {
+		if (triggerElement) {
+			ev.preventDefault();
+			triggerElement?.focus();
 		}
 	}
 
@@ -50,6 +58,7 @@
 
 <Content
 	onOpenAutoFocus={handleOpenAutoFocus}
+	onCloseAutoFocus={handleCloseAutoFocus}
 	showCloseButton={false}
 	class={styles.content}
 >
