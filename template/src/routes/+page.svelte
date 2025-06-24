@@ -6,9 +6,10 @@
 
 	async function deleteData() {
 		if (
-			await dialog.confirm.danger({
+			await dialog.confirm({
 				title: "Delete Data",
 				message: "Are you sure you want to delete all data?",
+				styles: { confirmVariant: "default" },
 			})
 		) {
 			toast.success("Data deleted");
