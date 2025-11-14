@@ -5,7 +5,7 @@ export const load: PageServerLoad = async () => {
 	const existingViews = await kv.get("views");
 	if (!existingViews.ok) throw existingViews.error;
 	const views = +(existingViews.value ?? 0) + 1;
-	await kv.set("views", views.toString());
+	kv.set("views", views.toString());
 	return {
 		views,
 	};

@@ -1,8 +1,9 @@
 <script lang="ts">
 	import type { PageProps } from "./$types";
-	let { data }: PageProps = $props();
 	import { dialog } from "$lib/components/ui/proc-dialog";
 	import { toast } from "svelte-sonner";
+
+	let { data }: PageProps = $props();
 
 	async function deleteData() {
 		if (
