@@ -1,22 +1,22 @@
-import { Result } from './result';
+import { Err, Ok, Result } from './result';
 
 export function jsonParse(value: string): Result<unknown, Error>;
 export function jsonParse(value: string, defaultValue: unknown): Result<unknown, never>;
 export function jsonParse(value: string, defaultValue?: unknown): Result<unknown, Error> {
 	try {
-		return Result.ok(JSON.parse(value));
+		return new Ok(JSON.parse(value));
 	} catch (e) {
 		if (defaultValue !== undefined) {
-			return Result.ok(defaultValue);
+			return new Ok(defaultValue);
 		}
-		return Result.err(e as Error);
+		return new Err(e as Error);
 	}
 }
 
 export function jsonStringify(value: unknown): Result<string, Error> {
 	try {
-		return Result.ok(JSON.stringify(value));
+		return new Ok(JSON.stringify(value));
 	} catch (e) {
-		return Result.err(e as Error);
+		return new Err(e as Error);
 	}
 }

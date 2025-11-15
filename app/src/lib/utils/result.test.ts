@@ -1,142 +1,96 @@
-import { describe, expect, it, vi } from 'vitest';
-import { AsyncResult, Err, Ok, Result } from './result';
+import { describe, expect, it } from 'vitest';
+import { pipe } from './pipe';
+import { Err, Ok, Result } from './result';
 
-describe('Result.Ok', () => {
-	it('ok', () => {
-		const result = new Ok('hello');
-		expect(result.ok()).toBe(true);
+describe('Result', () => {
+	it('ok and err', () => {
+		const ok = new Ok('hello');
+		expect(ok.ok()).toBe(true);
+		expect(ok.err()).toBe(false);
+
+		const err = new Err('hello');
+		expect(err.ok()).toBe(false);
+		expect(err.err()).toBe(true);
 	});
 
-	it('err', () => {
-		const result = new Ok('hello');
-		expect(result.err()).toBe(false);
-	});
+	it('unwrap and unwrapErr', () => {
+		const ok = new Ok('hello');
+		expect(ok.unwrap()).toBe('hello');
+		expect(() => ok.unwrapErr()).toThrow();
 
-	it('unwrap', () => {
-		const result = new Ok('hello');
-		expect(result.unwrap()).toBe('hello');
-	});
-
-	it('unwrapErr', () => {
-		const result = new Ok('hello');
-		expect(() => result.unwrapErr()).toThrow();
-	});
-
-	it('unwrapOr', () => {
-		const result = new Ok('hello');
-		expect(result.unwrapOr('world')).toBe('hello');
-	});
-
-	it('andThen', () => {
-		const result = new Ok('hello').andThen((value) => new Ok(value.toUpperCase()));
-		expect(result.unwrap()).toBe('HELLO');
-	});
-
-	it('orElse', () => {
-		const result = new Ok('hello').orElse(() => new Ok('world'));
-		expect(result.unwrap()).toBe('hello');
+		const err = new Err('hello');
+		expect(() => err.unwrap()).toThrow();
+		expect(err.unwrapErr()).toBe('hello');
 	});
 
 	it('map', () => {
-		const result = new Ok('hello').map((value) => value.toUpperCase());
-		expect(result.unwrap()).toBe('HELLO');
+		const ok = new Ok('hello');
+		const okMapped = pipe(
+			ok,
+			Result.map((value) => value.toUpperCase())
+		);
+		expect(okMapped.ok()).toBe(true);
+		expect(okMapped.unwrap()).toBe('HELLO');
+
+		const err = new Err<string, string>('hello');
+		const errMapped = pipe(
+			err,
+			Result.map((value) => value.toUpperCase())
+		);
+		expect(errMapped.ok()).toBe(false);
 	});
 
 	it('mapErr', () => {
-		const result = new Ok('hello').mapErr(() => 'world');
-		expect(result.unwrap()).toBe('hello');
-	});
+		const ok = new Ok<string, string>('hello');
+		const okMapped = pipe(
+			ok,
+			Result.mapErr((error) => error.toUpperCase())
+		);
+		expect(okMapped.ok()).toBe(true);
+		expect(okMapped.unwrap()).toBe('hello');
 
-	it('mapOrDefault', () => {
-		const withValue = new Ok('hello').mapOrDefault('world');
-		expect(withValue.unwrap()).toBe('hello');
-
-		const withFn = new Ok('hello').mapOrDefault(() => 'world');
-		expect(withFn.unwrap()).toBe('hello');
-	});
-});
-
-describe('Result.Err', () => {
-	it('ok', () => {
-		const result = new Err('hello');
-		expect(result.ok()).toBe(false);
-	});
-
-	it('err', () => {
-		const result = new Err('hello');
-		expect(result.err()).toBe(true);
-	});
-
-	it('unwrap', () => {
-		const result = new Err('hello');
-		expect(() => result.unwrap()).toThrow();
-	});
-
-	it('unwrapErr', () => {
-		const result = new Err('hello');
-		expect(result.unwrapErr()).toBe('hello');
-	});
-
-	it('unwrapOr', () => {
-		const result = new Err('hello');
-		expect(result.unwrapOr('world')).toBe('world');
+		const err = new Err<string, string>('hello');
+		const errMapped = pipe(
+			err,
+			Result.mapErr((error) => error.toUpperCase())
+		);
+		expect(errMapped.ok()).toBe(false);
+		expect(errMapped.unwrapErr()).toBe('HELLO');
 	});
 
 	it('andThen', () => {
-		const result = new Err('hello').andThen(() => new Ok('world'));
-		expect(result.unwrapErr()).toBe('hello');
+		const ok = new Ok('hello');
+		const okLen = pipe(
+			ok,
+			Result.andThen((value) => new Ok(value.length))
+		);
+		expect(okLen.ok()).toBe(true);
+		expect(okLen.unwrap()).toBe(5);
+
+		const err = new Err<string, string>('hello');
+		const errLen = pipe(
+			err,
+			Result.andThen((value) => new Ok(value.length))
+		);
+		expect(errLen.ok()).toBe(false);
+		expect(errLen.unwrapErr()).toBe('hello');
 	});
 
 	it('orElse', () => {
-		const result = new Err('hello').orElse(() => new Ok('world'));
-		expect(result.unwrap()).toBe('world');
-	});
+		const ok = new Ok<string, string>('hello');
+		const okMapped = pipe(
+			ok,
+			Result.orElse(() => new Ok('world'))
+		);
+		expect(okMapped.ok()).toBe(true);
+		expect(okMapped.unwrap()).toBe('hello');
 
-	it('map', () => {
-		const result = new Err('hello').map(() => 'world');
-		expect(result.unwrapErr()).toBe('hello');
-	});
-
-	it('mapErr', () => {
-		const result = new Err('hello').mapErr(() => 'world');
-		expect(result.unwrapErr()).toBe('world');
-	});
-
-	it('mapOrDefault', () => {
-		const withValue = new Err('hello').mapOrDefault('world');
-		expect(withValue.unwrap()).toBe('world');
-
-		const withFn = new Err('hello').mapOrDefault(() => 'world');
-		expect(withFn.unwrap()).toBe('world');
-	});
-});
-
-describe('AsyncResult', () => {
-	it('basic', async () => {
-		const a = new AsyncResult(Promise.resolve(new Ok('hello')));
-		const result = await a;
-		expect(result.ok()).toBe(true);
-		expect(result.unwrap()).toBe('hello');
-
-		const b = new AsyncResult(Promise.resolve(new Err('hello')));
-		const result2 = await b;
-		expect(result2.ok()).toBe(false);
-		expect(result2.unwrapErr()).toBe('hello');
-	});
-
-	it('fromAsync simple', async () => {
-		const a = await Result.fromAsync(async () => {
-			return 'hello';
-		});
-		expect(a).toBeInstanceOf(Ok);
-		expect(a.unwrap()).toBe('hello');
-	});
-
-	it('fromAsync that throws', async () => {
-		const a = await Result.fromAsync<never, Error>(async () => {
-			throw new Error('yoo');
-		});
-		expect(a).toBeInstanceOf(Err);
-		expect(a.unwrapErr()).toBeInstanceOf(Error);
+		const err = new Err<string, string>('hello');
+		const errMapped = pipe(
+			err,
+			Result.orElse((error) => new Ok(error))
+		);
+		expect(errMapped.ok()).toBe(true);
+		expect(errMapped.unwrap()).toBe('hello');
 	});
 });
