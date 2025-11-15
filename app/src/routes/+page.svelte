@@ -10,8 +10,7 @@
 
 	let value = $state('{"a":"hello", "b": 123}');
 	let parsed = $derived(
-		await jsonParse(value)
-			.mapOrDefault({})
+		await jsonParse(value, {})
 			.andThen((v) => validate(schema, v))
 			.toAsync()
 			.map(async (v) => {
