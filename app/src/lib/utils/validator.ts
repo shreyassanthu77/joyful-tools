@@ -1,4 +1,4 @@
-import { Err, Ok, Result } from './result';
+import { Err, Ok, Result, AsyncResult } from './result';
 import type { StandardSchemaV1 } from './standard-schema';
 
 type ValidationResult<Schema extends StandardSchemaV1> = Result<
@@ -26,24 +26,27 @@ export function validate<
 	return new Ok(result.value);
 }
 
-// export function validateAsync<
-// 	Schema extends StandardSchemaV1,
-// 	Input = StandardSchemaV1.InferInput<Schema>
-// >(
-// 	s: Schema,
-// 	input: Input
-// ): AsyncResult<StandardSchemaV1.InferOutput<Schema>, StandardSchemaV1.FailureResult> {
-// 	if (import.meta.env.DEV) {
-// 		if (s['~standard'].version !== 1) {
-// 			throw new Error('Standard schema version mismatch. Expected 1.');
-// 		}
-// 	}
-//
-// 	return Result.fromAsync(async () => {
-// 		const result = await s['~standard'].validate(input);
-// 		if (result.issues) {
-// 			throw result;
-// 		}
-// 		return result.value;
-// 	});
-// }
+export function validateAsync<
+	Schema extends StandardSchemaV1,
+	Input = StandardSchemaV1.InferInput<Schema>
+>(
+	s: Schema,
+	input: Input
+): AsyncResult<StandardSchemaV1.InferOutput<Schema>, StandardSchemaV1.FailureResult> {
+	if (import.meta.env.DEV) {
+		if (s['~standard'].version !== 1) {
+			throw new Error('Standard schema version mismatch. Expected 1.');
+		}
+	}
+
+	return new AsyncResult(
+		new Promise(async (resolve) => {
+			const result = await s['~standard'].validate(input);
+			if (result.issues) {
+				resolve(new Err(result));
+			} else {
+				resolve(new Ok(result.value));
+			}
+		})
+	);
+}

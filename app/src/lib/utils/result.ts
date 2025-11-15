@@ -115,4 +115,76 @@ export namespace Result {
 			return f(result.error);
 		};
 	}
+
+	export function mapAsync<T, E, U>(
+		f: (value: T) => Promise<U>
+	): (result: Result<T, E>) => AsyncResult<U, E>;
+	export function mapAsync<T, E, U>(
+		f: (value: T) => U | Promise<U>
+	): (result: AsyncResult<T, E>) => AsyncResult<U, E>;
+	export function mapAsync<T, E, U>(
+		f: (value: T) => U | Promise<U>
+	): (result: Result<T, E> | AsyncResult<T, E>) => AsyncResult<U, E> {
+		return (result) => {
+			if (result instanceof AsyncResult) {
+				return new AsyncResult(
+					result._promise
+						.then(async (r) => {
+							if (r instanceof Err) {
+								return new Err(r.error);
+							}
+							const value = await f(r.value);
+							return new Ok(value);
+						})
+						.catch((e) => new Err(e))
+				);
+			}
+
+			if (result instanceof Ok) {
+				const value = f(result.value);
+				if (value instanceof Promise) {
+					return new AsyncResult(value.then((value) => new Ok(value)).catch((e) => new Err(e)));
+				}
+				return new AsyncResult(Promise.resolve(new Ok(value)));
+			}
+
+			return new AsyncResult(Promise.resolve(new Err(result.error)));
+		};
+	}
+
+	export function mapErrAsync<T, E, F>(
+		f: (error: E) => Promise<F>
+	): (result: Result<T, E>) => AsyncResult<T, F>;
+	export function mapErrAsync<T, E, F>(
+		f: (error: E) => F | Promise<F>
+	): (result: AsyncResult<T, E>) => AsyncResult<T, F>;
+	export function mapErrAsync<T, E, F>(
+		f: (error: E) => F | Promise<F>
+	): (result: Result<T, E> | AsyncResult<T, E>) => AsyncResult<T, F> {
+		return (result) => {
+			if (result instanceof AsyncResult) {
+				return new AsyncResult(
+					result._promise
+						.then(async (r) => {
+							if (r instanceof Ok) {
+								return new Ok(r.value);
+							}
+							const error = await f(r.error);
+							return new Err(error);
+						})
+						.catch((e) => new Err(e))
+				);
+			}
+
+			if (result instanceof Ok) {
+				return new AsyncResult(Promise.resolve(new Ok(result.value)));
+			}
+
+			const error = f(result.error);
+			if (error instanceof Promise) {
+				return new AsyncResult(error.then((error) => new Err(error)).catch((e) => new Err(e)));
+			}
+			return new AsyncResult(Promise.resolve(new Err(error)));
+		};
+	}
 }

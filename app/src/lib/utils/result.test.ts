@@ -93,4 +93,39 @@ describe('Result', () => {
 		expect(errMapped.ok()).toBe(true);
 		expect(errMapped.unwrap()).toBe('hello');
 	});
+
+	it('map async', async () => {
+		const ok = new Ok('hello');
+		const okMapped = await pipe(
+			ok,
+			Result.mapAsync(async (value) => value.toUpperCase())
+		);
+		expect(okMapped.ok()).toBe(true);
+		expect(okMapped.unwrap()).toBe('HELLO');
+
+		const err = new Err<string, string>('hello');
+		const errMapped = await pipe(
+			err,
+			Result.mapAsync(async (value) => value.toUpperCase())
+		);
+		expect(errMapped.ok()).toBe(false);
+	});
+
+	it('mapErr async', async () => {
+		const ok = new Ok<string, string>('hello');
+		const okMapped = await pipe(
+			ok,
+			Result.mapErrAsync(async (error) => error.toUpperCase())
+		);
+		expect(okMapped.ok()).toBe(true);
+		expect(okMapped.unwrap()).toBe('hello');
+
+		const err = new Err<string, string>('hello');
+		const errMapped = await pipe(
+			err,
+			Result.mapErrAsync(async (error) => error.toUpperCase())
+		);
+		expect(errMapped.ok()).toBe(false);
+		expect(errMapped.unwrapErr()).toBe('HELLO');
+	});
 });

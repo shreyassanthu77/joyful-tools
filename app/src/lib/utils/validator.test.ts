@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import * as v from 'valibot';
-import { validate } from './validator';
+import { validate, validateAsync } from './validator';
 import { Err, Ok } from './result';
 
 describe('sync', () => {
@@ -26,18 +26,18 @@ describe('sync', () => {
 	});
 });
 
-// describe('async', () => {
-// 	it('should validate', async () => {
-// 		const schema = v.pipeAsync(v.string());
-// 		const result = await validateAsync(schema, 'hello');
-// 		expect(result).toBeInstanceOf(Ok);
-// 		expect(result.unwrap()).toBe('hello');
-// 	});
-//
-// 	it('should fail', async () => {
-// 		const schema = v.pipeAsync(v.object({ a: v.string() }));
-// 		const result = await validateAsync(schema, {});
-// 		expect(result).toBeInstanceOf(Err);
-// 		expect(result.unwrapErr().issues.length).toBe(1);
-// 	});
-// });
+describe('async', () => {
+	it('should validate', async () => {
+		const schema = v.pipeAsync(v.string());
+		const result = await validateAsync(schema, 'hello');
+		expect(result).toBeInstanceOf(Ok);
+		expect(result.unwrap()).toBe('hello');
+	});
+
+	it('should fail', async () => {
+		const schema = v.pipeAsync(v.object({ a: v.string() }));
+		const result = await validateAsync(schema, {});
+		expect(result).toBeInstanceOf(Err);
+		expect(result.unwrapErr().issues.length).toBe(1);
+	});
+});
