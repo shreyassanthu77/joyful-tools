@@ -41,8 +41,8 @@ interface BaseResult<T, E> {
 	 */
 	mapErr<O>(f: (value: E) => O): Result<T, O>;
 
-	mapOrDefault<U>(default_v: U): Result<T | U, never>;
-	mapOrDefault<U>(default_f: (err: E) => U): Result<T | U, never>;
+	mapOrDefault<U>(defaultValue: U): Result<T | U, never>;
+	mapOrDefault<U>(defaultFunc: (err: E) => U): Result<T | U, never>;
 
 	/** Converts the result to an `AsyncResult`. */
 	toAsync(): AsyncResult<T, E>;
@@ -94,8 +94,8 @@ export class Ok<T, E> implements BaseResult<T, E> {
 		return new Ok(this.value);
 	}
 
-	mapOrDefault<U>(default_v: U): Result<T | U, never>;
-	mapOrDefault<U>(default_f: (err: E) => U): Result<T | U, never>;
+	mapOrDefault<U>(defaultValue: U): Result<T | U, never>;
+	mapOrDefault<U>(defaultFunc: (err: E) => U): Result<T | U, never>;
 	mapOrDefault<U>(_: U | ((err: E) => U)): Result<T | U, never> {
 		return new Ok(this.value);
 	}
@@ -151,8 +151,8 @@ export class Err<T, E> implements BaseResult<T, E> {
 		return new Err(f(this.error));
 	}
 
-	mapOrDefault<U>(default_v: U): Result<T | U, never>;
-	mapOrDefault<U>(default_f: (err: E) => U): Result<T | U, never>;
+	mapOrDefault<U>(defaultValue: U): Result<T | U, never>;
+	mapOrDefault<U>(defaultFunc: (err: E) => U): Result<T | U, never>;
 	mapOrDefault<U>(d: U | ((err: E) => U)): Result<T | U, never> {
 		if (typeof d === 'function') {
 			// @ts-ignore - d is a function
@@ -162,7 +162,7 @@ export class Err<T, E> implements BaseResult<T, E> {
 	}
 
 	toAsync(): AsyncResult<T, E> {
-		return new AsyncResult(Promise.reject(this.error));
+		return new AsyncResult(Promise.resolve(this));
 	}
 }
 
@@ -214,7 +214,7 @@ export class AsyncResult<T, E> implements PromiseLike<Result<T, E>> {
 		this.#promise = promise;
 	}
 
-	map<U>(f: (value: T) => U | PromiseLike<U>): AsyncResult<U, E> {
+	map<U>(f: (value: T) => U | Promise<U>): AsyncResult<U, E> {
 		return new AsyncResult(
 			this.#promise.then(async (result) => {
 				if (result.ok()) {
@@ -266,6 +266,24 @@ export class AsyncResult<T, E> implements PromiseLike<Result<T, E>> {
 					return newResult.#promise;
 				}
 				return newResult;
+			})
+		);
+	}
+
+	mapOrDefault<U>(defaultValue: U): AsyncResult<T | U, never>;
+	mapOrDefault<U>(defaultFunc: (err: E) => U): AsyncResult<T | U, never>;
+	mapOrDefault<U>(d: U | ((err: E) => U)): AsyncResult<T | U, never> {
+		return new AsyncResult(
+			this.#promise.then(async (result) => {
+				if (result.ok()) {
+					return new Ok(result.value);
+				}
+				if (typeof d === 'function') {
+					// @ts-ignore - d is a function
+					return new Ok(d(result.error));
+				}
+
+				return new Ok(d);
 			})
 		);
 	}
