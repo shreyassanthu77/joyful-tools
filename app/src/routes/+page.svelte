@@ -1,5 +1,7 @@
 <script lang="ts">
 	import { jsonParse } from '$lib/utils/json';
+	import { pipe } from '$lib/utils/pipe';
+	import { Result } from '$lib/utils/result';
 	import { validate } from '$lib/utils/validator';
 	import * as v from 'valibot';
 
@@ -10,13 +12,10 @@
 
 	let value = $state('{"a":"hello", "b": 123}');
 	let parsed = $derived(
-		await jsonParse(value, {})
-			.andThen((v) => validate(schema, v))
-			.toAsync()
-			.map(async (v) => {
-				await new Promise((r) => setTimeout(r, 1000));
-				return `${v.a} ${v.b}`;
-			})
+		pipe(
+			jsonParse(value, {}),
+			Result.andThen((v) => validate(schema, v))
+		)
 	);
 </script>
 

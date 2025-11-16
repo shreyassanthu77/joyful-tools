@@ -8,11 +8,11 @@ interface BaseResult<T, E> {
 export class Ok<T, E = never> implements BaseResult<T, E> {
 	constructor(public value: T) {}
 
-	ok(): boolean {
+	ok(): this is Ok<T, E> {
 		return true;
 	}
 
-	err(): boolean {
+	err(): this is Err<E, T> {
 		return false;
 	}
 
@@ -28,11 +28,11 @@ export class Ok<T, E = never> implements BaseResult<T, E> {
 export class Err<E, T = never> implements BaseResult<T, E> {
 	constructor(public error: E) {}
 
-	ok(): boolean {
+	ok(): this is Ok<T, E> {
 		return false;
 	}
 
-	err(): boolean {
+	err(): this is Err<E, T> {
 		return true;
 	}
 

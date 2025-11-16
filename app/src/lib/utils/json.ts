@@ -1,15 +1,15 @@
 import { Err, Ok, Result } from './result';
 
-export function jsonParse(value: string): Result<unknown, Error>;
+export function jsonParse(value: string): Result<unknown, SyntaxError>;
 export function jsonParse(value: string, defaultValue: unknown): Result<unknown, never>;
-export function jsonParse(value: string, defaultValue?: unknown): Result<unknown, Error> {
+export function jsonParse(value: string, defaultValue?: unknown): Result<unknown, SyntaxError> {
 	try {
 		return new Ok(JSON.parse(value));
 	} catch (e) {
 		if (defaultValue !== undefined) {
 			return new Ok(defaultValue);
 		}
-		return new Err(e as Error);
+		return new Err(e as SyntaxError);
 	}
 }
 
