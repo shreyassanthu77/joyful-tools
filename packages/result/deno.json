@@ -6,22 +6,16 @@
     "test": "vitest"
   },
   "imports": {
-    "zimmerframe": "npm:zimmerframe@^1.1.4",
-    "vite": "npm:vite@^7.2.2",
-    "estree": "npm:@types/estree@^1.0.8",
-    "astring": "npm:astring@^1.9.0"
   },
   "exports": {
-    ".": "./src/main.ts",
-    "./vite": "./src/vite.ts"
+    ".": "./src/main.ts"
   },
   "publish": {
     "include": [
       "LICENSE",
       "README.md",
       "src/main.ts",
-      "src/result.ts",
-      "src/vite.ts"
+      "src/result.ts"
     ]
   }
 }
