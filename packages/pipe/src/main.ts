@@ -1,3 +1,23 @@
+/**
+ * Pipes a value through a series of functions.
+ *
+ * This is the implementation that handles any number of functions.
+ * The overloads above provide type safety for up to 15 functions.
+ *
+ * @param value - The initial value to pipe through the functions
+ * @param fns - Functions to apply in sequence
+ * @returns The final result after applying all functions
+ *
+ * @example
+ * ```typescript
+ * const double = (x: number) => x * 2;
+ * const square = (x: number) => x * x;
+ * const addFive = (x: number) => x + 5;
+ *
+ * // Works with any number of functions
+ * pipe(2, double, square, addFive, double); // returns 52
+ * ```
+ */
 export function pipe<T, U>(value: T, f: (value: T) => U): U;
 export function pipe<T, U, V>(
   value: T,
