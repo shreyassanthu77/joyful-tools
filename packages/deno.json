@@ -3,6 +3,7 @@
     "kv",
     "kv-node-denokv",
     "kv-mini-redis",
-    "kv-nats"
+    "kv-nats",
+    "pipe"
   ]
 }
