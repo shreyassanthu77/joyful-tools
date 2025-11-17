@@ -4,6 +4,35 @@ import { walk } from "zimmerframe";
 import * as astring from "astring";
 
 /**
+ * Vite plugin for optimizing pipe function calls at build time.
+ * 
+ * This module provides a Vite plugin that transforms `pipe` function calls into
+ * nested function calls during the build process. This eliminates the runtime
+ * overhead of the pipe function itself while maintaining the same functionality.
+ * 
+ * The plugin automatically detects pipe imports and transforms calls like:
+ * ```typescript
+ * pipe(value, fn1, fn2, fn3)
+ * ```
+ * 
+ * Into optimized nested calls:
+ * ```typescript
+ * fn3(fn2(fn1(value)))
+ * ```
+ * 
+ * @example
+ * ```typescript
+ * import { pipePlugin } from "@joyful/pipe/vite";
+ * 
+ * export default {
+ *   plugins: [pipePlugin()]
+ * }
+ * ```
+ * 
+ * @module vite
+ */
+
+/**
  * Configuration options for the pipe plugin.
  */
 export type PipeOptions = {

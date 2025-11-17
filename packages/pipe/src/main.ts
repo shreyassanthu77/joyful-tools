@@ -1,4 +1,32 @@
 /**
+ * A functional programming utility for composing functions in a readable, left-to-right pipeline.
+ * 
+ * This module provides a `pipe` function that allows you to chain multiple functions
+ * together, passing the result of each function as input to the next. This creates
+ * a clean, declarative way to express data transformations.
+ * 
+ * The pipe function is fully type-safe with TypeScript, providing overloaded signatures
+ * for up to 15 functions to maintain precise type inference throughout the pipeline.
+ * 
+ * @example
+ * ```typescript
+ * import { pipe } from "@joyful/pipe";
+ * 
+ * const double = (x: number) => x * 2;
+ * const square = (x: number) => x * x;
+ * const addFive = (x: number) => x + 5;
+ * 
+ * // Chain operations in a readable way
+ * const result = pipe(2, double, square, addFive); // returns 13
+ * 
+ * // Works with any number of functions
+ * const complex = pipe(2, double, square, addFive, double, toString); // returns "26"
+ * ```
+ * 
+ * @module
+ */
+
+/**
  * Pipes a value through a single function.
  *
  * @param value - The initial value to pipe through the function
