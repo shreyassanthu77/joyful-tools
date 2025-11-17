@@ -3,6 +3,7 @@ interface BaseResult<T, E> {
   err(): boolean;
   unwrap(): T;
   unwrapErr(): E;
+  unwrapOr(defaultValue: T): T;
 }
 
 export class Ok<T, E = never> implements BaseResult<T, E> {
@@ -23,6 +24,10 @@ export class Ok<T, E = never> implements BaseResult<T, E> {
   unwrapErr(): E {
     throw new Error("called `unwrapErr` on an `Ok` value");
   }
+
+  unwrapOr(_: T): T {
+    return this.value;
+  }
 }
 
 export class Err<E, T = never> implements BaseResult<T, E> {
@@ -42,6 +47,10 @@ export class Err<E, T = never> implements BaseResult<T, E> {
 
   unwrapErr(): E {
     return this.error;
+  }
+
+  unwrapOr(defaultValue: T): T {
+    return defaultValue;
   }
 }
 

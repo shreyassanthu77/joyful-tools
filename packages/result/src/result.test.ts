@@ -22,6 +22,14 @@ describe("Core", () => {
     expect(() => err.unwrap()).toThrow();
     expect(err.unwrapErr()).toBe("hello");
   });
+
+  it("unwrapOr", () => {
+    const ok = new Result.Ok("hello");
+    expect(ok.unwrapOr("world")).toBe("hello");
+
+    const err = new Result.Err<string, string>("hello");
+    expect(err.unwrapOr("world")).toBe("world");
+  });
 });
 
 describe("map", () => {
