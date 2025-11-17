@@ -3,6 +3,9 @@ import type { Node, Expression } from "estree";
 import { walk } from "zimmerframe";
 import * as astring from "astring";
 
+/**
+ * Configuration options for the pipe plugin.
+ */
 export type PipeOptions = {
   /** The import path for `@joyful/pipe`. Use this if you import this package from a different path
    *
@@ -11,6 +14,24 @@ export type PipeOptions = {
   importPath?: string;
 };
 
+/**
+ * Vite plugin that transforms pipe function calls into nested function calls at build time.
+ * 
+ * This plugin optimizes pipe calls by converting them from runtime function calls to
+ * direct nested function calls, eliminating the overhead of the pipe function itself.
+ * 
+ * @param options - Configuration options for the plugin
+ * @returns A Vite plugin instance
+ * 
+ * @example
+ * ```typescript
+ * import { pipePlugin } from '@joyful/pipe/vite';
+ * 
+ * export default {
+ *   plugins: [pipePlugin()]
+ * }
+ * ```
+ */
 export function pipePlugin(options: PipeOptions = {}): PluginOption {
   const { importPath = "@joyful/pipe" } = options;
 
