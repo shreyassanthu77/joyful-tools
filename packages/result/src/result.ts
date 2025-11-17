@@ -46,3 +46,39 @@ export class Err<E, T = never> implements BaseResult<T, E> {
 }
 
 export type Result<T, E> = Ok<T, E> | Err<E, T>;
+
+export function map<T, U, E>(
+  f: (value: T) => U,
+): (result: Result<T, E>) => Result<U, E> {
+  return (result: Result<T, E>): Result<U, E> => {
+    return result instanceof Ok
+      ? new Ok(f(result.value))
+      : (result as Err<E, never>);
+  };
+}
+
+export function mapErr<T, U, E>(
+  f: (error: E) => U,
+): (result: Result<T, E>) => Result<T, U> {
+  return (result: Result<T, E>): Result<T, U> => {
+    return result instanceof Err
+      ? new Err(f(result.error))
+      : (result as Ok<T, never>);
+  };
+}
+
+export function andThen<T1, T2, E1, E2>(
+  f: (value: T1) => Result<T2, E2>,
+): (result: Result<T1, E1>) => Result<T2, E1 | E2> {
+  return (result: Result<T1, E1>): Result<T2, E1 | E2> => {
+    return result instanceof Ok ? f(result.value) : (result as Err<E1, never>);
+  };
+}
+
+export function orElse<T1, T2, E1, E2>(
+  f: (error: E1) => Result<T2, E2>,
+): (result: Result<T1, E1>) => Result<T1 | T2, E2> {
+  return (result: Result<T1, E1>): Result<T1 | T2, E2> => {
+    return result instanceof Err ? f(result.error) : (result as Ok<T1, never>);
+  };
+}
