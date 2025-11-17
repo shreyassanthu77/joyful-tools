@@ -1,27 +1,27 @@
 /**
  * Base interface for Result types that provides common methods for handling
  * success and error states.
- * 
+ *
  * This interface defines the contract that both Ok and Err classes must implement,
  * ensuring consistent behavior across all Result variants.
  */
 /**
  * A TypeScript implementation of the Result type for error handling.
- * 
+ *
  * This module provides a robust way to handle operations that might fail
  * without throwing exceptions. The Result type represents either success
  * (Ok) or failure (Err) and forces explicit handling of both cases.
- * 
+ *
  * Inspired by Rust's Result type, this implementation provides:
  * - Type-safe error handling
  * - Functional composition utilities (map, andThen, etc.)
  * - Pattern matching capabilities
  * - Integration with functional programming patterns
- * 
+ *
  * @example
  * ```typescript
  * import { Result } from "@joyful/result";
- * 
+ *
  * // Function that might fail
  * function parseJson(json: string): Result<object, string> {
  *   try {
@@ -30,16 +30,16 @@
  *     return new Err(`Invalid JSON: ${e.message}`);
  *   }
  * }
- * 
+ *
  * // Using the Result
  * const result = parseJson('{"name": "Alice"}');
- * 
+ *
  * if (result.ok()) {
  *   console.log("Parsed:", result.unwrap());
  * } else {
  *   console.log("Error:", result.unwrapErr());
  * }
- * 
+ *
  * // Functional composition (works great with @joyful/pipe)
  * import { pipe } from "@joyful/pipe";
  * const processed = pipe(
@@ -48,7 +48,7 @@
  *   Result.map((age: number) => age + 1)
  * );
  * ```
- * 
+ *
  * @module
  */
 
@@ -67,11 +67,11 @@ interface BaseResult<T, E> {
 
 /**
  * Represents a successful result containing a value of type T.
- * 
+ *
  * Ok is used to indicate that an operation succeeded and contains the
  * successful result. It implements the BaseResult interface to provide
  * consistent error handling behavior.
- * 
+ *
  * @example
  * ```typescript
  * const result = new Ok(42);
@@ -82,11 +82,6 @@ interface BaseResult<T, E> {
 export class Ok<T, E = never> implements BaseResult<T, E> {
   /** The success value contained in this Ok */
   constructor(public value: T) {}
-
-  /**
-   * Type guard that returns true for Ok instances.
-   * @returns true (always, since this is an Ok)
-   */
   ok(): this is Ok<T, E> {
     return true;
   }
@@ -127,11 +122,11 @@ export class Ok<T, E = never> implements BaseResult<T, E> {
 
 /**
  * Represents an error result containing an error of type E.
- * 
+ *
  * Err is used to indicate that an operation failed and contains the
  * error information. It implements the BaseResult interface to provide
  * consistent error handling behavior.
- * 
+ *
  * @example
  * ```typescript
  * const result = new Err("Something went wrong");
@@ -187,14 +182,14 @@ export class Err<E, T = never> implements BaseResult<T, E> {
 
 /**
  * A Result type that represents either success (Ok) or failure (Err).
- * 
+ *
  * Result is a powerful way to handle operations that might fail without
  * throwing exceptions. It forces the caller to handle both success and error
  * cases explicitly, leading to more robust and predictable code.
- * 
+ *
  * @template T - The type of the success value
  * @template E - The type of the error value
- * 
+ *
  * @example
  * ```typescript
  * function parseNumber(str: string): Result<number, string> {
@@ -204,7 +199,7 @@ export class Err<E, T = never> implements BaseResult<T, E> {
  *   }
  *   return new Ok(num);
  * }
- * 
+ *
  * const result = parseNumber("42");
  * if (result.ok()) {
  *   console.log("Success:", result.unwrap()); // 42
@@ -216,30 +211,54 @@ export class Err<E, T = never> implements BaseResult<T, E> {
 export type Result<T, E> = Ok<T, E> | Err<E, T>;
 
 /**
- * Creates a function that maps the success value of a Result.
- * 
- * This function takes a mapping function and returns a new function that
- * can be applied to a Result. If the Result is Ok, the mapping function
- * is applied to the contained value. If the Result is Err, it is passed
- * through unchanged.
- * 
- * @param f - Function to apply to the success value
- * @returns A function that takes a Result and returns a mapped Result
- * 
+ * Maps the success value of a Result.
+ *
+ * This function supports two calling patterns:
+ * 1. Curried: `map(fn)(result)` - perfect for pipe composition
+ * 2. Binary: `map(result, fn)` - more intuitive for direct calls
+ *
+ * If the Result is Ok, the mapping function is applied to the contained value.
+ * If the Result is Err, it is passed through unchanged.
+ *
  * @example
  * ```typescript
  * const result = new Ok(5);
+ *
+ * // Curried form (great for pipes)
  * const doubled = map((x: number) => x * 2)(result);
  * console.log(doubled.unwrap()); // 10
- * 
+ *
+ * // Binary form (more direct)
+ * const doubled2 = map(result, (x: number) => x * 2);
+ * console.log(doubled2.unwrap()); // 10
+ *
  * const error = new Err("failed");
- * const unchanged = map((x: number) => x * 2)(error);
+ * const unchanged = map(error, (x: number) => x * 2);
  * console.log(unchanged.unwrapErr()); // "failed"
  * ```
  */
 export function map<T, U, E>(
+  result: Result<T, E>,
   f: (value: T) => U,
-): (result: Result<T, E>) => Result<U, E> {
+): Result<U, E>;
+export function map<T, U, E>(
+  f: (value: T) => U,
+): (result: Result<T, E>) => Result<U, E>;
+export function map<T, U, E>(
+  resultOrFn: Result<T, E> | ((value: T) => U),
+  maybeFn?: (value: T) => U,
+): Result<U, E> | ((result: Result<T, E>) => Result<U, E>) {
+  // Binary form: map(result, fn)
+  if (maybeFn !== undefined) {
+    const result = resultOrFn as Result<T, E>;
+    const f = maybeFn;
+    return result instanceof Ok
+      ? new Ok(f(result.value))
+      : (result as Err<E, never>);
+  }
+
+  // Curried form: map(fn)(result)
+  const f = resultOrFn as (value: T) => U;
   return (result: Result<T, E>): Result<U, E> => {
     return result instanceof Ok
       ? new Ok(f(result.value))
@@ -248,30 +267,54 @@ export function map<T, U, E>(
 }
 
 /**
- * Creates a function that maps the error value of a Result.
- * 
- * This function takes a mapping function and returns a new function that
- * can be applied to a Result. If the Result is Err, the mapping function
- * is applied to the contained error. If the Result is Ok, it is passed
- * through unchanged.
- * 
- * @param f - Function to apply to the error value
- * @returns A function that takes a Result and returns a Result with mapped error
- * 
+ * Maps the error value of a Result.
+ *
+ * This function supports two calling patterns:
+ * 1. Curried: `mapErr(fn)(result)` - perfect for pipe composition
+ * 2. Binary: `mapErr(result, fn)` - more intuitive for direct calls
+ *
+ * If the Result is Err, the mapping function is applied to the contained error.
+ * If the Result is Ok, it is passed through unchanged.
+ *
  * @example
  * ```typescript
  * const result = new Err("network error");
+ *
+ * // Curried form (great for pipes)
  * const withCode = mapErr((msg: string) => `ERROR: ${msg}`)(result);
  * console.log(withCode.unwrapErr()); // "ERROR: network error"
- * 
+ *
+ * // Binary form (more direct)
+ * const withCode2 = mapErr(result, (msg: string) => `ERROR: ${msg}`);
+ * console.log(withCode2.unwrapErr()); // "ERROR: network error"
+ *
  * const success = new Ok(42);
- * const unchanged = mapErr((msg: string) => `ERROR: ${msg}`)(success);
+ * const unchanged = mapErr(success, (msg: string) => `ERROR: ${msg}`);
  * console.log(unchanged.unwrap()); // 42
  * ```
  */
 export function mapErr<T, U, E>(
+  result: Result<T, E>,
   f: (error: E) => U,
-): (result: Result<T, E>) => Result<T, U> {
+): Result<T, U>;
+export function mapErr<T, U, E>(
+  f: (error: E) => U,
+): (result: Result<T, E>) => Result<T, U>;
+export function mapErr<T, U, E>(
+  resultOrFn: Result<T, E> | ((error: E) => U),
+  maybeFn?: (error: E) => U,
+): Result<T, U> | ((result: Result<T, E>) => Result<T, U>) {
+  // Binary form: mapErr(result, fn)
+  if (maybeFn !== undefined) {
+    const result = resultOrFn as Result<T, E>;
+    const f = maybeFn;
+    return result instanceof Err
+      ? new Err(f(result.error))
+      : (result as Ok<T, never>);
+  }
+
+  // Curried form: mapErr(fn)(result)
+  const f = resultOrFn as (error: E) => U;
   return (result: Result<T, E>): Result<T, U> => {
     return result instanceof Err
       ? new Err(f(result.error))
@@ -280,19 +323,19 @@ export function mapErr<T, U, E>(
 }
 
 /**
- * Creates a function that chains operations that return Results.
- * 
- * This function is used for chaining operations that might fail. If the
- * input Result is Ok, the provided function is applied to the contained
+ * Chains operations that return Results.
+ *
+ * This function supports two calling patterns:
+ * 1. Curried: `andThen(fn)(result)` - perfect for pipe composition
+ * 2. Binary: `andThen(result, fn)` - more intuitive for direct calls
+ *
+ * If the input Result is Ok, the provided function is applied to the contained
  * value and its Result is returned. If the input Result is Err, it is
  * passed through unchanged (short-circuiting the chain).
- * 
+ *
  * This is equivalent to the "bind" or "flatMap" operation in functional
  * programming.
- * 
- * @param f - Function that takes a success value and returns a new Result
- * @returns A function that chains Results together
- * 
+ *
  * @example
  * ```typescript
  * const parseAge = (str: string): Result<number, string> => {
@@ -302,104 +345,176 @@ export function mapErr<T, U, E>(
  *   if (age > 150) return new Err("Age too high");
  *   return new Ok(age);
  * };
- * 
- * const validate = (age: number): Result<string, string> => {
- *   if (age < 18) return new Err("Too young");
- *   return new Ok("Valid");
- * };
- * 
+ *
  * const result = new Ok("25");
+ *
+ * // Curried form (great for pipes)
  * const final = andThen(parseAge)(result);
- * const validated = andThen(validate)(final);
- * console.log(validated.unwrap()); // "Valid"
+ * console.log(final.unwrap()); // 25
+ *
+ * // Binary form (more direct)
+ * const final2 = andThen(result, parseAge);
+ * console.log(final2.unwrap()); // 25
  * ```
  */
 export function andThen<T1, T2, E1, E2>(
+  result: Result<T1, E1>,
   f: (value: T1) => Result<T2, E2>,
-): (result: Result<T1, E1>) => Result<T2, E1 | E2> {
+): Result<T2, E1 | E2>;
+export function andThen<T1, T2, E1, E2>(
+  f: (value: T1) => Result<T2, E2>,
+): (result: Result<T1, E1>) => Result<T2, E1 | E2>;
+export function andThen<T1, T2, E1, E2>(
+  resultOrFn: Result<T1, E1> | ((value: T1) => Result<T2, E2>),
+  maybeFn?: (value: T1) => Result<T2, E2>,
+): Result<T2, E1 | E2> | ((result: Result<T1, E1>) => Result<T2, E1 | E2>) {
+  // Binary form: andThen(result, fn)
+  if (maybeFn !== undefined) {
+    const result = resultOrFn as Result<T1, E1>;
+    const f = maybeFn;
+    return result instanceof Ok ? f(result.value) : (result as Err<E1, never>);
+  }
+
+  // Curried form: andThen(fn)(result)
+  const f = resultOrFn as (value: T1) => Result<T2, E2>;
   return (result: Result<T1, E1>): Result<T2, E1 | E2> => {
     return result instanceof Ok ? f(result.value) : (result as Err<E1, never>);
   };
 }
 
 /**
- * Creates a function that provides fallback behavior for Results.
- * 
- * This function is used to provide alternative operations when a Result
- * is an Err. If the input Result is Err, the provided function is applied
+ * Provides fallback behavior for Results.
+ *
+ * This function supports two calling patterns:
+ * 1. Curried: `orElse(fn)(result)` - perfect for pipe composition
+ * 2. Binary: `orElse(result, fn)` - more intuitive for direct calls
+ *
+ * If the input Result is Err, the provided function is applied
  * to the error value and its Result is returned. If the input Result is
  * Ok, it is passed through unchanged.
- * 
+ *
  * This is useful for providing default values or alternative recovery
  * strategies when operations fail.
- * 
- * @param f - Function that takes an error value and returns a fallback Result
- * @returns A function that provides fallback behavior for Results
- * 
+ *
  * @example
  * ```typescript
  * const fetchFromCache = (id: string): Result<string, string> => {
  *   // Simulate cache miss
  *   return new Err("Not found in cache");
  * };
- * 
+ *
  * const fetchFromDB = (id: string): Result<string, string> => {
  *   // Simulate database fetch
  *   return new Ok(`Data for ${id}`);
  * };
- * 
+ *
  * const result = new Err("Not found in cache");
+ *
+ * // Curried form (great for pipes)
  * const fallback = orElse(fetchFromDB)(result);
  * console.log(fallback.unwrap()); // "Data for [id]"
- * 
+ *
+ * // Binary form (more direct)
+ * const fallback2 = orElse(result, fetchFromDB);
+ * console.log(fallback2.unwrap()); // "Data for [id]"
+ *
  * const success = new Ok("Already have data");
- * const unchanged = orElse(fetchFromDB)(success);
+ * const unchanged = orElse(success, fetchFromDB);
  * console.log(unchanged.unwrap()); // "Already have data"
  * ```
  */
 export function orElse<T1, T2, E1, E2>(
+  result: Result<T1, E1>,
   f: (error: E1) => Result<T2, E2>,
-): (result: Result<T1, E1>) => Result<T1 | T2, E2> {
+): Result<T1 | T2, E2>;
+export function orElse<T1, T2, E1, E2>(
+  f: (error: E1) => Result<T2, E2>,
+): (result: Result<T1, E1>) => Result<T1 | T2, E2>;
+export function orElse<T1, T2, E1, E2>(
+  resultOrFn: Result<T1, E1> | ((error: E1) => Result<T2, E2>),
+  maybeFn?: (error: E1) => Result<T2, E2>,
+): Result<T1 | T2, E2> | ((result: Result<T1, E1>) => Result<T1 | T2, E2>) {
+  // Binary form: orElse(result, fn)
+  if (maybeFn !== undefined) {
+    const result = resultOrFn as Result<T1, E1>;
+    const f = maybeFn;
+    return result instanceof Err ? f(result.error) : (result as Ok<T1, never>);
+  }
+
+  // Curried form: orElse(fn)(result)
+  const f = resultOrFn as (error: E1) => Result<T2, E2>;
   return (result: Result<T1, E1>): Result<T1 | T2, E2> => {
     return result instanceof Err ? f(result.error) : (result as Ok<T1, never>);
   };
 }
 
 /**
- * Creates a function that pattern matches on a Result.
- * 
+ * Pattern matches on a Result.
+ *
+ * This function supports two calling patterns:
+ * 1. Curried: `match(okFn, errFn)(result)` - perfect for pipe composition
+ * 2. Binary: `match(result, okFn, errFn)` - more intuitive for direct calls
+ *
  * This function provides a way to handle both success and error cases
  * in a single expression. It takes two handler functions - one for Ok
- * values and one for Err values - and returns a function that applies
- * the appropriate handler based on the Result variant.
- * 
+ * values and one for Err values - and applies the appropriate handler
+ * based on the Result variant.
+ *
  * This is similar to pattern matching in languages like Rust or Haskell.
- * 
- * @param ok - Function to handle Ok (success) values
- * @param err - Function to handle Err (error) values
- * @returns A function that pattern matches on a Result
- * 
+ *
  * @example
  * ```typescript
  * const result = new Ok(42);
+ *
+ * // Curried form (great for pipes)
  * const message = match(
  *   (value: number) => `Success: ${value}`,
  *   (error: string) => `Error: ${error}`
  * )(result);
  * console.log(message); // "Success: 42"
- * 
- * const error = new Err("Something went wrong");
- * const errorMsg = match(
+ *
+ * // Binary form (more direct)
+ * const message2 = match(
+ *   result,
  *   (value: number) => `Success: ${value}`,
  *   (error: string) => `Error: ${error}`
- * )(error);
+ * );
+ * console.log(message2); // "Success: 42"
+ *
+ * const error = new Err("Something went wrong");
+ * const errorMsg = match(
+ *   error,
+ *   (value: number) => `Success: ${value}`,
+ *   (error: string) => `Error: ${error}`
+ * );
  * console.log(errorMsg); // "Error: Something went wrong"
  * ```
  */
 export function match<T, E, U>(
+  result: Result<T, E>,
   ok: (value: T) => U,
   err: (error: E) => U,
-): (result: Result<T, E>) => U {
+): U;
+export function match<T, E, U>(
+  ok: (value: T) => U,
+  err: (error: E) => U,
+): (result: Result<T, E>) => U;
+export function match<T, E, U>(
+  okOrResult: ((value: T) => U) | Result<T, E>,
+  errOrOk?: ((error: E) => U) | ((value: T) => U),
+  maybeErr?: (error: E) => U,
+): U | ((result: Result<T, E>) => U) {
+  // Binary form: match(result, okFn, errFn)
+  if (maybeErr !== undefined) {
+    const result = okOrResult as Result<T, E>;
+    const ok = errOrOk as (value: T) => U;
+    const err = maybeErr;
+    return result instanceof Ok ? ok(result.value) : err(result.error);
+  }
+
+  // Curried form: match(okFn, errFn)(result)
+  const ok = okOrResult as (value: T) => U;
+  const err = errOrOk as (error: E) => U;
   return (result: Result<T, E>): U => {
     return result instanceof Ok ? ok(result.value) : err(result.error);
   };

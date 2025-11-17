@@ -78,11 +78,16 @@ import { pipe } from "@joyful/pipe";
 
 const result = new Result.Ok(5);
 
+// Curried form (great for pipes)
 const doubled = pipe(
   result,
   Result.map((x: number) => x * 2)
 );
 console.log(doubled.unwrap()); // 10
+
+// Binary form (more direct)
+const doubled2 = Result.map(result, (x: number) => x * 2);
+console.log(doubled2.unwrap()); // 10
 
 // Mapping errors doesn't affect Ok values
 const unchanged = pipe(
@@ -109,12 +114,17 @@ const validateAge = (age: number): Result<string, string> => {
   return new Result.Ok("Age is valid");
 };
 
+// Curried form (great for pipes)
 const processAge = pipe(
   parseAge("25"),
   Result.andThen(validateAge)
 );
-
 console.log(processAge.unwrap()); // "Age is valid"
+
+// Binary form (more direct)
+const ageResult = parseAge("25");
+const processAge2 = Result.andThen(ageResult, validateAge);
+console.log(processAge2.unwrap()); // "Age is valid"
 ```
 
 ### Providing Fallbacks with `orElse`
@@ -129,12 +139,17 @@ const fetchFromDatabase = (id: string): Result<string, string> => {
   return new Result.Ok(`Data for ${id} from database`);
 };
 
+// Curried form (great for pipes)
 const result = pipe(
   fetchFromCache("user123"),
   Result.orElse(fetchFromDatabase)
 );
-
 console.log(result.unwrap()); // "Data for user123 from database"
+
+// Binary form (more direct)
+const cacheResult = fetchFromCache("user123");
+const result2 = Result.orElse(cacheResult, fetchFromDatabase);
+console.log(result2.unwrap()); // "Data for user123 from database"
 ```
 
 ### Pattern Matching with `match`
@@ -142,6 +157,7 @@ console.log(result.unwrap()); // "Data for user123 from database"
 ```typescript
 const result = new Result.Err("Network timeout");
 
+// Curried form (great for pipes)
 const message = pipe(
   result,
   Result.match(
@@ -149,8 +165,15 @@ const message = pipe(
     (error: string) => `❌ Error: ${error}`
   )
 );
-
 console.log(message); // "❌ Error: Network timeout"
+
+// Binary form (more direct)
+const message2 = Result.match(
+  result,
+  (value: string) => `✅ Success: ${value}`,
+  (error: string) => `❌ Error: ${error}`
+);
+console.log(message2); // "❌ Error: Network timeout"
 ```
 
 ## API Reference
@@ -178,18 +201,36 @@ Class representing an error result containing an error of type `E`.
 
 ### Functional Utilities
 
+All utility functions support two calling patterns:
+
+1. **Curried form**: `fn(arg)(result)` - perfect for pipe composition
+2. **Binary form**: `fn(result, arg)` - more intuitive for direct calls
+
+#### `map<T, U, E>(result: Result<T, E>, f: (value: T) => U): Result<U, E>`
 #### `map<T, U, E>(f: (value: T) => U): (result: Result<T, E>) => Result<U, E>`
 Maps the success value of a Result.
 
+```typescript
+// Binary form (direct)
+const result = Result.map(new Result.Ok(5), x => x * 2);
+
+// Curried form (for pipes)
+const result = pipe(new Result.Ok(5), Result.map(x => x * 2));
+```
+
+#### `mapErr<T, U, E>(result: Result<T, E>, f: (error: E) => U): Result<T, U>`
 #### `mapErr<T, U, E>(f: (error: E) => U): (result: Result<T, E>) => Result<T, U>`
 Maps the error value of a Result.
 
+#### `andThen<T1, T2, E1, E2>(result: Result<T1, E1>, f: (value: T1) => Result<T2, E2>): Result<T2, E1 | E2>`
 #### `andThen<T1, T2, E1, E2>(f: (value: T1) => Result<T2, E2>): (result: Result<T1, E1>) => Result<T2, E1 | E2>`
 Chains operations that return Results (flatMap/bind).
 
+#### `orElse<T1, T2, E1, E2>(result: Result<T1, E1>, f: (error: E1) => Result<T2, E2>): Result<T1 | T2, E2>`
 #### `orElse<T1, T2, E1, E2>(f: (error: E1) => Result<T2, E2>): (result: Result<T1, E1>) => Result<T1 | T2, E2>`
 Provides fallback behavior for Results.
 
+#### `match<T, E, U>(result: Result<T, E>, ok: (value: T) => U, err: (error: E) => U): U`
 #### `match<T, E, U>(ok: (value: T) => U, err: (error: E) => U): (result: Result<T, E>) => U`
 Pattern matches on a Result, applying the appropriate handler.
 
