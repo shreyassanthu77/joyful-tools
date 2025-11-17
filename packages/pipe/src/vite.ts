@@ -4,15 +4,15 @@ import { walk } from "zimmerframe";
 import * as astring from "astring";
 
 export type PipeOptions = {
-  /** The package alias for `@joyful/pipe`. Use this if you have a different alias for this package
+  /** The import path for `@joyful/pipe`. Use this if you import this package from a different path
    *
    * default: "@joyful/pipe"
    */
-  pipePackage?: string;
+  importPath?: string;
 };
 
 export function pipePlugin(options: PipeOptions = {}): PluginOption {
-  const { pipePackage = "@joyful/pipe" } = options;
+  const { importPath = "@joyful/pipe" } = options;
 
   const name = "vite-plugin-joyful-pipe";
   return {
@@ -28,7 +28,7 @@ export function pipePlugin(options: PipeOptions = {}): PluginOption {
         const namespacedAliases: string[] = [];
         walk(ast as Node, null, {
           ImportDeclaration({ source }, { next, state }) {
-            if (source.value === pipePackage) {
+            if (source.value === importPath) {
               next(state);
             }
           },

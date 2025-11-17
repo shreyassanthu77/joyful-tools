@@ -79,8 +79,8 @@ import { pipePlugin } from "@joyful/pipe/vite";
 export default {
   plugins: [
     pipePlugin({
-      // Optional: specify a different package alias
-      pipePackage: "@joyful/pipe"
+      // Optional: specify a different import path
+      importPath: "@joyful/pipe"
     })
   ]
 };
@@ -90,11 +90,11 @@ export default {
 
 ```typescript
 export type PipeOptions = {
-  /** The package alias for `@joyful/pipe`. Use this if you have a different alias for this package
+  /** The import path for `@joyful/pipe`. Use this if you import this package from a different path
    *
    * default: "@joyful/pipe"
    */
-  pipePackage?: string;
+  importPath?: string;
 };
 ```
 
