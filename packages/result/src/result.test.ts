@@ -160,3 +160,29 @@ describe("orElse", () => {
     expect(mapped.unwrapErr()).toBe(2);
   });
 });
+
+describe("match", () => {
+  it("should match Ok", () => {
+    const ok = new Result.Ok(1);
+    const matched = pipe(
+      ok,
+      Result.match(
+        (value) => value + 1,
+        (error) => error + 2,
+      ),
+    );
+    expect(matched).toBe(2);
+  });
+
+  it("should match Err", () => {
+    const err = new Result.Err(1);
+    const matched = pipe(
+      err,
+      Result.match(
+        (value) => value + 1,
+        (error) => error + 2,
+      ),
+    );
+    expect(matched).toBe(3);
+  });
+});

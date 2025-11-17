@@ -91,3 +91,12 @@ export function orElse<T1, T2, E1, E2>(
     return result instanceof Err ? f(result.error) : (result as Ok<T1, never>);
   };
 }
+
+export function match<T, E, U>(
+  ok: (value: T) => U,
+  err: (error: E) => U,
+): (result: Result<T, E>) => U {
+  return (result: Result<T, E>): U => {
+    return result instanceof Ok ? ok(result.value) : err(result.error);
+  };
+}
