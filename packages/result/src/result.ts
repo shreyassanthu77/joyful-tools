@@ -210,6 +210,18 @@ export class Err<E, T = never> implements BaseResult<T, E> {
  */
 export type Result<T, E> = Ok<T, E> | Err<E, T>;
 
+export function fromThrowable<T, E>(
+  fn: () => T,
+  onError: (error: unknown) => E,
+): Result<T, E> {
+  try {
+    const result = fn();
+    return new Ok(result);
+  } catch (e) {
+    return new Err(onError(e));
+  }
+}
+
 /**
  * Maps the success value of a Result.
  *
