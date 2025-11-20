@@ -1,6 +1,6 @@
 {
   "name": "@joyful/result",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "license": "MIT",
   "tasks": {
     "test": "vitest"
@@ -15,7 +15,8 @@
       "LICENSE",
       "README.md",
       "src/main.ts",
-      "src/result.ts"
+      "src/result.ts",
+      "src/async-result.ts"
     ]
   }
 }
