@@ -124,3 +124,219 @@ describe("mapErr", () => {
     expect(mapped.unwrap()).toBe("hello");
   });
 });
+
+describe("andThen", () => {
+  it("should chain Ok values with AsyncResult return (curried)", async () => {
+    const ok = AsyncResult.fromResult(new Result.Ok("hello"));
+    const chained = await pipe(
+      ok,
+      AsyncResult.andThen((value) => {
+        return AsyncResult.fromResult(new Result.Ok(value.toUpperCase()));
+      }),
+    );
+
+    expect(chained.ok()).toBe(true);
+    expect(chained.unwrap()).toBe("HELLO");
+  });
+
+  it("should chain Ok values with Result return (curried)", async () => {
+    const ok = AsyncResult.fromResult(new Result.Ok("hello"));
+    const chained = await pipe(
+      ok,
+      AsyncResult.andThen((value) => {
+        return new Result.Ok(value.toUpperCase());
+      }),
+    );
+
+    expect(chained.ok()).toBe(true);
+    expect(chained.unwrap()).toBe("HELLO");
+  });
+
+  it("should chain Ok values with AsyncResult return (binary)", async () => {
+    const ok = AsyncResult.fromResult(new Result.Ok("hello"));
+    const chained = await AsyncResult.andThen(ok, (value) => {
+      return AsyncResult.fromResult(new Result.Ok(value.toUpperCase()));
+    });
+
+    expect(chained.ok()).toBe(true);
+    expect(chained.unwrap()).toBe("HELLO");
+  });
+
+  it("should chain Ok values with Result return (binary)", async () => {
+    const ok = AsyncResult.fromResult(new Result.Ok("hello"));
+    const chained = await AsyncResult.andThen(ok, (value) => {
+      return new Result.Ok(value.toUpperCase());
+    });
+
+    expect(chained.ok()).toBe(true);
+    expect(chained.unwrap()).toBe("HELLO");
+  });
+
+  it("should short-circuit on Err values (curried)", async () => {
+    const err = AsyncResult.fromResult(new Result.Err<string, string>("error"));
+    const chained = await pipe(
+      err,
+      AsyncResult.andThen((value) => {
+        return AsyncResult.fromResult(new Result.Ok(value.toUpperCase()));
+      }),
+    );
+
+    expect(chained.ok()).toBe(false);
+    expect(chained.unwrapErr()).toBe("error");
+  });
+
+  it("should short-circuit on Err values (binary)", async () => {
+    const err = AsyncResult.fromResult(new Result.Err<string, string>("error"));
+    const chained = await AsyncResult.andThen(err, (value) => {
+      return AsyncResult.fromResult(new Result.Ok(value.toUpperCase()));
+    });
+
+    expect(chained.ok()).toBe(false);
+    expect(chained.unwrapErr()).toBe("error");
+  });
+});
+
+describe("orElse", () => {
+  it("should provide fallback for Err values with AsyncResult return (curried)", async () => {
+    const err = AsyncResult.fromResult(new Result.Err("error"));
+    const fallback = await pipe(
+      err,
+      AsyncResult.orElse((error) => {
+        return AsyncResult.fromResult(new Result.Ok(`fallback: ${error}`));
+      }),
+    );
+
+    expect(fallback.ok()).toBe(true);
+    expect(fallback.unwrap()).toBe("fallback: error");
+  });
+
+  it("should provide fallback for Err values with Result return (curried)", async () => {
+    const err = AsyncResult.fromResult(new Result.Err("error"));
+    const fallback = await pipe(
+      err,
+      AsyncResult.orElse((error) => {
+        return new Result.Ok(`fallback: ${error}`);
+      }),
+    );
+
+    expect(fallback.ok()).toBe(true);
+    expect(fallback.unwrap()).toBe("fallback: error");
+  });
+
+  it("should provide fallback for Err values with AsyncResult return (binary)", async () => {
+    const err = AsyncResult.fromResult(new Result.Err("error"));
+    const fallback = await AsyncResult.orElse(err, (error) => {
+      return AsyncResult.fromResult(new Result.Ok(`fallback: ${error}`));
+    });
+
+    expect(fallback.ok()).toBe(true);
+    expect(fallback.unwrap()).toBe("fallback: error");
+  });
+
+  it("should provide fallback for Err values with Result return (binary)", async () => {
+    const err = AsyncResult.fromResult(new Result.Err("error"));
+    const fallback = await AsyncResult.orElse(err, (error) => {
+      return new Result.Ok(`fallback: ${error}`);
+    });
+
+    expect(fallback.ok()).toBe(true);
+    expect(fallback.unwrap()).toBe("fallback: error");
+  });
+
+  it("should not affect Ok values (curried)", async () => {
+    const ok = AsyncResult.fromResult(new Result.Ok("success"));
+    const unchanged = await pipe(
+      ok,
+      AsyncResult.orElse((error) => {
+        return AsyncResult.fromResult(new Result.Ok(`fallback: ${error}`));
+      }),
+    );
+
+    expect(unchanged.ok()).toBe(true);
+    expect(unchanged.unwrap()).toBe("success");
+  });
+
+  it("should not affect Ok values (binary)", async () => {
+    const ok = AsyncResult.fromResult(new Result.Ok("success"));
+    const unchanged = await AsyncResult.orElse(ok, (error) => {
+      return AsyncResult.fromResult(new Result.Ok(`fallback: ${error}`));
+    });
+
+    expect(unchanged.ok()).toBe(true);
+    expect(unchanged.unwrap()).toBe("success");
+  });
+});
+
+describe("match", () => {
+  it("should match Ok values (curried)", async () => {
+    const ok = AsyncResult.fromResult(new Result.Ok("hello"));
+    const result = await pipe(
+      ok,
+      AsyncResult.match(
+        async (value) => {
+          await new Promise((resolve) => setTimeout(resolve, 1));
+          return `Success: ${value.toUpperCase()}`;
+        },
+        async (error) => {
+          await new Promise((resolve) => setTimeout(resolve, 1));
+          return `Error: ${error}`;
+        },
+      ),
+    );
+
+    expect(result).toBe("Success: HELLO");
+  });
+
+  it("should match Ok values (binary)", async () => {
+    const ok = AsyncResult.fromResult(new Result.Ok("hello"));
+    const result = await AsyncResult.match(
+      ok,
+      async (value) => {
+        await new Promise((resolve) => setTimeout(resolve, 1));
+        return `Success: ${value.toUpperCase()}`;
+      },
+      async (error) => {
+        await new Promise((resolve) => setTimeout(resolve, 1));
+        return `Error: ${error}`;
+      },
+    );
+
+    expect(result).toBe("Success: HELLO");
+  });
+
+  it("should match Err values (curried)", async () => {
+    const err = AsyncResult.fromResult(new Result.Err("error"));
+    const result = await pipe(
+      err,
+      AsyncResult.match(
+        async (value) => {
+          await new Promise((resolve) => setTimeout(resolve, 1));
+          return `Success: ${value}`;
+        },
+        async (error) => {
+          await new Promise((resolve) => setTimeout(resolve, 1));
+          return `Error: ${error.toUpperCase()}`;
+        },
+      ),
+    );
+
+    expect(result).toBe("Error: ERROR");
+  });
+
+  it("should match Err values (binary)", async () => {
+    const err = AsyncResult.fromResult(new Result.Err("error"));
+    const result = await AsyncResult.match(
+      err,
+      async (value) => {
+        await new Promise((resolve) => setTimeout(resolve, 1));
+        return `Success: ${value}`;
+      },
+      async (error) => {
+        await new Promise((resolve) => setTimeout(resolve, 1));
+        return `Error: ${error.toUpperCase()}`;
+      },
+    );
+
+    expect(result).toBe("Error: ERROR");
+  });
+});

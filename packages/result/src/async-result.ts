@@ -131,7 +131,7 @@ export function mapErr<T, U, E>(
 
 async function andThenInner<T1, T2, E1, E2>(
   result: Result<T1, E1> | AsyncResult<T1, E1>,
-  f: (value: T1) => AsyncResult<T2, E2>,
+  f: (value: T1) => Result<T2, E2> | AsyncResult<T2, E2> | Promise<Result<T2, E2> | AsyncResult<T2, E2>>,
 ): Promise<Result<T2, E1 | E2>> {
   const value =
     result instanceof AsyncResultImpl
@@ -139,22 +139,28 @@ async function andThenInner<T1, T2, E1, E2>(
       : (result as Result<T1, E1>);
   if (value instanceof Err) return value as Err<E1, never>;
   const mapped = f(value.value);
-  return mapped.promise;
+  const awaited = mapped instanceof Promise ? await mapped : mapped;
+  
+  if (awaited instanceof AsyncResultImpl) {
+    return awaited.promise;
+  } else {
+    return Promise.resolve(awaited);
+  }
 }
 
 export function andThen<T1, T2, E1, E2>(
   result: Result<T1, E1> | AsyncResult<T1, E1>,
-  f: (value: T1) => AsyncResult<T2, E2>,
+  f: (value: T1) => Result<T2, E2> | AsyncResult<T2, E2> | Promise<Result<T2, E2> | AsyncResult<T2, E2>>,
 ): AsyncResult<T2, E1 | E2>;
 export function andThen<T1, T2, E1, E2>(
-  f: (value: T1) => AsyncResult<T2, E2>,
+  f: (value: T1) => Result<T2, E2> | AsyncResult<T2, E2> | Promise<Result<T2, E2> | AsyncResult<T2, E2>>,
 ): (result: Result<T1, E1> | AsyncResult<T1, E1>) => AsyncResult<T2, E1 | E2>;
 export function andThen<T1, T2, E1, E2>(
   resultOrFn:
     | Result<T1, E1>
     | AsyncResult<T1, E1>
-    | ((value: T1) => AsyncResult<T2, E2>),
-  maybeFn?: (value: T1) => AsyncResult<T2, E2>,
+    | ((value: T1) => Result<T2, E2> | AsyncResult<T2, E2> | Promise<Result<T2, E2> | AsyncResult<T2, E2>>),
+  maybeFn?: (value: T1) => Result<T2, E2> | AsyncResult<T2, E2> | Promise<Result<T2, E2> | AsyncResult<T2, E2>>,
 ):
   | AsyncResult<T2, E1 | E2>
   | ((
@@ -170,7 +176,105 @@ export function andThen<T1, T2, E1, E2>(
     result: Result<T1, E1> | AsyncResult<T1, E1>,
   ): AsyncResult<T2, E1 | E2> => {
     return new AsyncResultImpl(
-      andThenInner(result, resultOrFn as (value: T1) => AsyncResult<T2, E2>),
+      andThenInner(result, resultOrFn as (value: T1) => Result<T2, E2> | AsyncResult<T2, E2> | Promise<Result<T2, E2> | AsyncResult<T2, E2>>),
     );
+  };
+}
+
+async function orElseInner<T1, T2, E1, E2>(
+  result: Result<T1, E1> | AsyncResult<T1, E1>,
+  f: (error: E1) => Result<T2, E2> | AsyncResult<T2, E2> | Promise<Result<T2, E2> | AsyncResult<T2, E2>>,
+): Promise<Result<T1 | T2, E2>> {
+  const value =
+    result instanceof AsyncResultImpl
+      ? await (result as AsyncResultImpl<T1, E1>).promise
+      : (result as Result<T1, E1>);
+  if (value instanceof Ok) return value as Ok<T1, never>;
+  const mapped = f(value.error);
+  const awaited = mapped instanceof Promise ? await mapped : mapped;
+  
+  if (awaited instanceof AsyncResultImpl) {
+    return awaited.promise;
+  } else {
+    return Promise.resolve(awaited);
+  }
+}
+
+export function orElse<T1, T2, E1, E2>(
+  result: Result<T1, E1> | AsyncResult<T1, E1>,
+  f: (error: E1) => Result<T2, E2> | AsyncResult<T2, E2> | Promise<Result<T2, E2> | AsyncResult<T2, E2>>,
+): AsyncResult<T1 | T2, E2>;
+export function orElse<T1, T2, E1, E2>(
+  f: (error: E1) => Result<T2, E2> | AsyncResult<T2, E2> | Promise<Result<T2, E2> | AsyncResult<T2, E2>>,
+): (result: Result<T1, E1> | AsyncResult<T1, E1>) => AsyncResult<T1 | T2, E2>;
+export function orElse<T1, T2, E1, E2>(
+  resultOrFn:
+    | Result<T1, E1>
+    | AsyncResult<T1, E1>
+    | ((error: E1) => Result<T2, E2> | AsyncResult<T2, E2> | Promise<Result<T2, E2> | AsyncResult<T2, E2>>),
+  maybeFn?: (error: E1) => Result<T2, E2> | AsyncResult<T2, E2> | Promise<Result<T2, E2> | AsyncResult<T2, E2>>,
+):
+  | AsyncResult<T1 | T2, E2>
+  | ((
+      result: Result<T1, E1> | AsyncResult<T1, E1>,
+    ) => AsyncResult<T1 | T2, E2>) {
+  if (maybeFn !== undefined) {
+    const result = resultOrFn as Result<T1, E1> | AsyncResult<T1, E1>;
+    const f = maybeFn;
+    return new AsyncResultImpl(orElseInner(result, f));
+  }
+
+  return (
+    result: Result<T1, E1> | AsyncResult<T1, E1>,
+  ): AsyncResult<T1 | T2, E2> => {
+    return new AsyncResultImpl(
+      orElseInner(result, resultOrFn as (error: E1) => Result<T2, E2> | AsyncResult<T2, E2> | Promise<Result<T2, E2> | AsyncResult<T2, E2>>),
+    );
+  };
+}
+
+async function matchInner<T, E, U>(
+  result: Result<T, E> | AsyncResult<T, E>,
+  ok: (value: T) => U | Promise<U>,
+  err: (error: E) => U | Promise<U>,
+): Promise<U> {
+  const value =
+    result instanceof AsyncResultImpl
+      ? await (result as AsyncResultImpl<T, E>).promise
+      : (result as Result<T, E>);
+  if (value instanceof Ok) {
+    const result = ok(value.value);
+    return result instanceof Promise ? await result : result;
+  } else {
+    const result = err(value.error);
+    return result instanceof Promise ? await result : result;
+  }
+}
+
+export function match<T, E, U>(
+  result: Result<T, E> | AsyncResult<T, E>,
+  ok: (value: T) => U | Promise<U>,
+  err: (error: E) => U | Promise<U>,
+): Promise<U>;
+export function match<T, E, U>(
+  ok: (value: T) => U | Promise<U>,
+  err: (error: E) => U | Promise<U>,
+): (result: Result<T, E> | AsyncResult<T, E>) => Promise<U>;
+export function match<T, E, U>(
+  okOrResult: ((value: T) => U | Promise<U>) | Result<T, E> | AsyncResult<T, E>,
+  errOrOk?: ((error: E) => U | Promise<U>) | ((value: T) => U | Promise<U>),
+  maybeErr?: (error: E) => U | Promise<U>,
+): Promise<U> | ((result: Result<T, E> | AsyncResult<T, E>) => Promise<U>) {
+  if (maybeErr !== undefined) {
+    const result = okOrResult as Result<T, E> | AsyncResult<T, E>;
+    const ok = errOrOk as (value: T) => U | Promise<U>;
+    const err = maybeErr;
+    return matchInner(result, ok, err);
+  }
+
+  const ok = okOrResult as (value: T) => U | Promise<U>;
+  const err = errOrOk as (error: E) => U | Promise<U>;
+  return (result: Result<T, E> | AsyncResult<T, E>): Promise<U> => {
+    return matchInner(result, ok, err);
   };
 }
