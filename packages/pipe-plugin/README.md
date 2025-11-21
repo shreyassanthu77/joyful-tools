@@ -83,6 +83,7 @@ pipePlugin({
 The transformation happens at build time using static analysis (AST). The optimization will apply when:
 1. The `pipe` function is imported from `@joyful/pipe` (or configured `importPath`).
 2. The function call is direct (e.g., `pipe(...)` or `P.pipe(...)`).
+3. The function call is not a dynamic import.
 3. Arguments are not spread (e.g., `pipe(val, ...funcs)` is **not** optimized).
 4. There are at least 2 arguments (value + at least one function).
 
