@@ -14,6 +14,7 @@ jobs:
       - uses: denoland/setup-deno@v2
 
       - name: Run tests
+        working-directory: packages/
         run: deno task test
 
   publish:
