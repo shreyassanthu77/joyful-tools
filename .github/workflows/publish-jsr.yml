@@ -3,6 +3,7 @@ on:
   push:
     paths:
       - "packages/**"
+      - ".github/workflows/publish-jsr.yml"
     branches:
       - main
 
