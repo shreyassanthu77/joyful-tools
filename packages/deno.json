@@ -1,4 +1,7 @@
 {
+  "imports": {
+    "assert": "jsr:@std/assert"
+  },
   "workspace": [
     "kv",
     "kv-node-denokv",
