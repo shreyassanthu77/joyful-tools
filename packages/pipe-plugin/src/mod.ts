@@ -22,7 +22,7 @@ import * as astring from "astring";
  * 
  * @example
  * ```typescript
- * import { pipePlugin } from "@joyful/pipe/vite";
+ * import { pipePlugin } from "@joyful/pipe-plugin";
  * 
  * export default {
  *   plugins: [pipePlugin()]
@@ -54,7 +54,7 @@ export type PipeOptions = {
  * 
  * @example
  * ```typescript
- * import { pipePlugin } from '@joyful/pipe/vite';
+ * import { pipePlugin } from '@joyful/pipe-plugin';
  * 
  * export default {
  *   plugins: [pipePlugin()]
