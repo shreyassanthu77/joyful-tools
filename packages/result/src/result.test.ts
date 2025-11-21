@@ -1,253 +1,253 @@
 import { pipe } from "@joyful/pipe";
 import { Result } from "@joyful/result";
-import { describe, expect, it } from "vitest";
+import { assertEquals, assertThrows } from "assert";
 
-describe("Core", () => {
-  it("ok and err", () => {
+Deno.test("Core", async (t) => {
+  await t.step("ok and err", () => {
     const ok = new Result.Ok("hello");
-    expect(ok.ok()).toBe(true);
-    expect(ok.err()).toBe(false);
+    assertEquals(ok.ok(), true);
+    assertEquals(ok.err(), false);
 
     const err = new Result.Err("hello");
-    expect(err.ok()).toBe(false);
-    expect(err.err()).toBe(true);
+    assertEquals(err.ok(), false);
+    assertEquals(err.err(), true);
   });
 
-  it("unwrap and unwrapErr", () => {
+  await t.step("unwrap and unwrapErr", () => {
     const ok = new Result.Ok("hello");
-    expect(ok.unwrap()).toBe("hello");
-    expect(() => ok.unwrapErr()).toThrow();
+    assertEquals(ok.unwrap(), "hello");
+    assertThrows(() => ok.unwrapErr());
 
     const err = new Result.Err("hello");
-    expect(() => err.unwrap()).toThrow();
-    expect(err.unwrapErr()).toBe("hello");
+    assertThrows(() => err.unwrap());
+    assertEquals(err.unwrapErr(), "hello");
   });
 
-  it("unwrapOr", () => {
+  await t.step("unwrapOr", () => {
     const ok = new Result.Ok("hello");
-    expect(ok.unwrapOr("world")).toBe("hello");
+    assertEquals(ok.unwrapOr("world"), "hello");
 
     const err = new Result.Err<string, string>("hello");
-    expect(err.unwrapOr("world")).toBe("world");
+    assertEquals(err.unwrapOr("world"), "world");
   });
 });
 
-describe("map", () => {
-  it("should map an Ok value (curried)", () => {
+Deno.test("map", async (t) => {
+  await t.step("should map an Ok value (curried)", () => {
     const ok = new Result.Ok(1);
     const mapped = pipe(
       ok,
       Result.map((value) => value + 1),
     );
 
-    expect(mapped.ok()).toBe(true);
-    expect(mapped.unwrap()).toBe(2);
+    assertEquals(mapped.ok(), true);
+    assertEquals(mapped.unwrap(), 2);
   });
 
-  it("should map an Ok value (binary)", () => {
+  await t.step("should map an Ok value (binary)", () => {
     const ok = new Result.Ok(1);
     const mapped = Result.map(ok, (value) => value + 1);
 
-    expect(mapped.ok()).toBe(true);
-    expect(mapped.unwrap()).toBe(2);
+    assertEquals(mapped.ok(), true);
+    assertEquals(mapped.unwrap(), 2);
   });
 
-  it("should not map an Err value (curried)", () => {
+  await t.step("should not map an Err value (curried)", () => {
     const err = new Result.Err(1);
     const mapped = pipe(
       err,
       Result.map((value) => value + 1),
     );
-    expect(mapped.ok()).toBe(false);
-    expect(mapped.unwrapErr()).toBe(1);
+    assertEquals(mapped.ok(), false);
+    assertEquals(mapped.unwrapErr(), 1);
   });
 
-  it("should not map an Err value (binary)", () => {
+  await t.step("should not map an Err value (binary)", () => {
     const err = new Result.Err(1);
     const mapped = Result.map(err, (value) => value + 1);
-    expect(mapped.ok()).toBe(false);
-    expect(mapped.unwrapErr()).toBe(1);
+    assertEquals(mapped.ok(), false);
+    assertEquals(mapped.unwrapErr(), 1);
   });
 });
 
-describe("mapErr", () => {
-  it("should map an Err value (curried)", () => {
+Deno.test("mapErr", async (t) => {
+  await t.step("should map an Err value (curried)", () => {
     const err = new Result.Err(1);
     const mapped = pipe(
       err,
       Result.mapErr((error) => error + 1),
     );
-    expect(mapped.ok()).toBe(false);
-    expect(mapped.unwrapErr()).toBe(2);
+    assertEquals(mapped.ok(), false);
+    assertEquals(mapped.unwrapErr(), 2);
   });
 
-  it("should map an Err value (binary)", () => {
+  await t.step("should map an Err value (binary)", () => {
     const err = new Result.Err(1);
     const mapped = Result.mapErr(err, (error) => error + 1);
-    expect(mapped.ok()).toBe(false);
-    expect(mapped.unwrapErr()).toBe(2);
+    assertEquals(mapped.ok(), false);
+    assertEquals(mapped.unwrapErr(), 2);
   });
 
-  it("should not map an Ok value (curried)", () => {
+  await t.step("should not map an Ok value (curried)", () => {
     const ok = new Result.Ok(1);
     const mapped = pipe(
       ok,
       Result.mapErr((error) => error + 1),
     );
-    expect(mapped.ok()).toBe(true);
-    expect(mapped.unwrap()).toBe(1);
+    assertEquals(mapped.ok(), true);
+    assertEquals(mapped.unwrap(), 1);
   });
 
-  it("should not map an Ok value (binary)", () => {
+  await t.step("should not map an Ok value (binary)", () => {
     const ok = new Result.Ok(1);
     const mapped = Result.mapErr(ok, (error) => error + 1);
-    expect(mapped.ok()).toBe(true);
-    expect(mapped.unwrap()).toBe(1);
+    assertEquals(mapped.ok(), true);
+    assertEquals(mapped.unwrap(), 1);
   });
 });
 
-describe("andThen", () => {
-  it("Ok + Ok1 => Ok1 (curried)", () => {
+Deno.test("andThen", async (t) => {
+  await t.step("Ok + Ok1 => Ok1 (curried)", () => {
     const ok = new Result.Ok(1);
     const mapped = pipe(
       ok,
       Result.andThen((value) => new Result.Ok(value + 1)),
     );
-    expect(mapped.ok()).toBe(true);
-    expect(mapped.unwrap()).toBe(2);
+    assertEquals(mapped.ok(), true);
+    assertEquals(mapped.unwrap(), 2);
   });
 
-  it("Ok + Ok1 => Ok1 (binary)", () => {
+  await t.step("Ok + Ok1 => Ok1 (binary)", () => {
     const ok = new Result.Ok(1);
     const mapped = Result.andThen(ok, (value) => new Result.Ok(value + 1));
-    expect(mapped.ok()).toBe(true);
-    expect(mapped.unwrap()).toBe(2);
+    assertEquals(mapped.ok(), true);
+    assertEquals(mapped.unwrap(), 2);
   });
 
-  it("Ok + Err => Err (curried)", () => {
+  await t.step("Ok + Err => Err (curried)", () => {
     const ok = new Result.Ok(1);
     const mapped = pipe(
       ok,
       Result.andThen((value) => new Result.Err(value + 1)),
     );
-    expect(mapped.ok()).toBe(false);
-    expect(mapped.unwrapErr()).toBe(2);
+    assertEquals(mapped.ok(), false);
+    assertEquals(mapped.unwrapErr(), 2);
   });
 
-  it("Ok + Err => Err (binary)", () => {
+  await t.step("Ok + Err => Err (binary)", () => {
     const ok = new Result.Ok(1);
     const mapped = Result.andThen(ok, (value) => new Result.Err(value + 1));
-    expect(mapped.ok()).toBe(false);
-    expect(mapped.unwrapErr()).toBe(2);
+    assertEquals(mapped.ok(), false);
+    assertEquals(mapped.unwrapErr(), 2);
   });
 
-  it("Err + Ok => Err (curried)", () => {
+  await t.step("Err + Ok => Err (curried)", () => {
     const err = new Result.Err(1);
     const mapped = pipe(
       err,
       Result.andThen((value) => new Result.Ok(value + 1)),
     );
-    expect(mapped.ok()).toBe(false);
-    expect(mapped.unwrapErr()).toBe(1);
+    assertEquals(mapped.ok(), false);
+    assertEquals(mapped.unwrapErr(), 1);
   });
 
-  it("Err + Ok => Err (binary)", () => {
+  await t.step("Err + Ok => Err (binary)", () => {
     const err = new Result.Err(1);
     const mapped = Result.andThen(err, (value) => new Result.Ok(value + 1));
-    expect(mapped.ok()).toBe(false);
-    expect(mapped.unwrapErr()).toBe(1);
+    assertEquals(mapped.ok(), false);
+    assertEquals(mapped.unwrapErr(), 1);
   });
 
-  it("Err + Err1 => Err (curried)", () => {
+  await t.step("Err + Err1 => Err (curried)", () => {
     const err = new Result.Err(1);
     const mapped = pipe(
       err,
       Result.andThen((value) => new Result.Err(value + 1)),
     );
-    expect(mapped.ok()).toBe(false);
-    expect(mapped.unwrapErr()).toBe(1);
+    assertEquals(mapped.ok(), false);
+    assertEquals(mapped.unwrapErr(), 1);
   });
 
-  it("Err + Err1 => Err (binary)", () => {
+  await t.step("Err + Err1 => Err (binary)", () => {
     const err = new Result.Err(1);
     const mapped = Result.andThen(err, (value) => new Result.Err(value + 1));
-    expect(mapped.ok()).toBe(false);
-    expect(mapped.unwrapErr()).toBe(1);
+    assertEquals(mapped.ok(), false);
+    assertEquals(mapped.unwrapErr(), 1);
   });
 });
 
-describe("orElse", () => {
-  it("Ok + Ok1 => Ok (curried)", () => {
+Deno.test("orElse", async (t) => {
+  await t.step("Ok + Ok1 => Ok (curried)", () => {
     const ok = new Result.Ok(1);
     const mapped = pipe(
       ok,
       Result.orElse((error) => new Result.Ok(error + 1)),
     );
-    expect(mapped.ok()).toBe(true);
-    expect(mapped.unwrap()).toBe(1);
+    assertEquals(mapped.ok(), true);
+    assertEquals(mapped.unwrap(), 1);
   });
 
-  it("Ok + Ok1 => Ok (binary)", () => {
+  await t.step("Ok + Ok1 => Ok (binary)", () => {
     const ok = new Result.Ok(1);
     const mapped = Result.orElse(ok, (error) => new Result.Ok(error + 1));
-    expect(mapped.ok()).toBe(true);
-    expect(mapped.unwrap()).toBe(1);
+    assertEquals(mapped.ok(), true);
+    assertEquals(mapped.unwrap(), 1);
   });
 
-  it("Ok + Err => Ok (curried)", () => {
+  await t.step("Ok + Err => Ok (curried)", () => {
     const ok = new Result.Ok(1);
     const mapped = pipe(
       ok,
       Result.orElse((error) => new Result.Err(error + 1)),
     );
-    expect(mapped.ok()).toBe(true);
-    expect(mapped.unwrap()).toBe(1);
+    assertEquals(mapped.ok(), true);
+    assertEquals(mapped.unwrap(), 1);
   });
 
-  it("Ok + Err => Ok (binary)", () => {
+  await t.step("Ok + Err => Ok (binary)", () => {
     const ok = new Result.Ok(1);
     const mapped = Result.orElse(ok, (error) => new Result.Err(error + 1));
-    expect(mapped.ok()).toBe(true);
-    expect(mapped.unwrap()).toBe(1);
+    assertEquals(mapped.ok(), true);
+    assertEquals(mapped.unwrap(), 1);
   });
 
-  it("Err + Ok => Ok (curried)", () => {
+  await t.step("Err + Ok => Ok (curried)", () => {
     const err = new Result.Err(1);
     const mapped = pipe(
       err,
       Result.orElse((error) => new Result.Ok(error + 1)),
     );
-    expect(mapped.ok()).toBe(true);
-    expect(mapped.unwrap()).toBe(2);
+    assertEquals(mapped.ok(), true);
+    assertEquals(mapped.unwrap(), 2);
   });
 
-  it("Err + Ok => Ok (binary)", () => {
+  await t.step("Err + Ok => Ok (binary)", () => {
     const err = new Result.Err(1);
     const mapped = Result.orElse(err, (error) => new Result.Ok(error + 1));
-    expect(mapped.ok()).toBe(true);
-    expect(mapped.unwrap()).toBe(2);
+    assertEquals(mapped.ok(), true);
+    assertEquals(mapped.unwrap(), 2);
   });
 
-  it("Err + Err1 => Err1 (curried)", () => {
+  await t.step("Err + Err1 => Err1 (curried)", () => {
     const err = new Result.Err(1);
     const mapped = pipe(
       err,
       Result.orElse((error) => new Result.Err(error + 1)),
     );
-    expect(mapped.ok()).toBe(false);
-    expect(mapped.unwrapErr()).toBe(2);
+    assertEquals(mapped.ok(), false);
+    assertEquals(mapped.unwrapErr(), 2);
   });
 
-  it("Err + Err1 => Err1 (binary)", () => {
+  await t.step("Err + Err1 => Err1 (binary)", () => {
     const err = new Result.Err(1);
     const mapped = Result.orElse(err, (error) => new Result.Err(error + 1));
-    expect(mapped.ok()).toBe(false);
-    expect(mapped.unwrapErr()).toBe(2);
+    assertEquals(mapped.ok(), false);
+    assertEquals(mapped.unwrapErr(), 2);
   });
 });
 
-describe("match", () => {
-  it("should match Ok (curried)", () => {
+Deno.test("match", async (t) => {
+  await t.step("should match Ok (curried)", () => {
     const ok = new Result.Ok(1);
     const matched = pipe(
       ok,
@@ -256,20 +256,20 @@ describe("match", () => {
         (error) => error + 2,
       ),
     );
-    expect(matched).toBe(2);
+    assertEquals(matched, 2);
   });
 
-  it("should match Ok (binary)", () => {
+  await t.step("should match Ok (binary)", () => {
     const ok = new Result.Ok(1);
     const matched = Result.match(
       ok,
       (value) => value + 1,
       (error) => error + 2,
     );
-    expect(matched).toBe(2);
+    assertEquals(matched, 2);
   });
 
-  it("should match Err (curried)", () => {
+  await t.step("should match Err (curried)", () => {
     const err = new Result.Err(1);
     const matched = pipe(
       err,
@@ -278,152 +278,170 @@ describe("match", () => {
         (error) => error + 2,
       ),
     );
-    expect(matched).toBe(3);
+    assertEquals(matched, 3);
   });
 
-  it("should match Err (binary)", () => {
+  await t.step("should match Err (binary)", () => {
     const err = new Result.Err(1);
     const matched = Result.match(
       err,
       (value) => value + 1,
       (error) => error + 2,
     );
-    expect(matched).toBe(3);
+    assertEquals(matched, 3);
   });
 });
 
-describe("fromThrowable", () => {
-  it("should return Ok when function succeeds", () => {
-    const result = Result.fromThrowable(() => 42, (e) => String(e));
-    expect(result.ok()).toBe(true);
-    expect(result.unwrap()).toBe(42);
+Deno.test("fromThrowable", async (t) => {
+  await t.step("should return Ok when function succeeds", () => {
+    const result = Result.fromThrowable(
+      () => 42,
+      (e) => String(e),
+    );
+    assertEquals(result.ok(), true);
+    assertEquals(result.unwrap(), 42);
   });
 
-  it("should return Err when function throws", () => {
-    const result = Result.fromThrowable(() => {
-      throw new Error("test error");
-    }, (e) => (e as Error).message);
-    expect(result.ok()).toBe(false);
-    expect(result.unwrapErr()).toBe("test error");
+  await t.step("should return Err when function throws", () => {
+    const result = Result.fromThrowable(
+      () => {
+        throw new Error("test error");
+      },
+      (e) => (e as Error).message,
+    );
+    assertEquals(result.ok(), false);
+    assertEquals(result.unwrapErr(), "test error");
   });
 
-  it("should handle different error types", () => {
-    const result = Result.fromThrowable(() => {
-      throw "string error";
-    }, (e) => String(e));
-    expect(result.ok()).toBe(false);
-    expect(result.unwrapErr()).toBe("string error");
+  await t.step("should handle different error types", () => {
+    const result = Result.fromThrowable(
+      () => {
+        throw "string error";
+      },
+      (e) => String(e),
+    );
+    assertEquals(result.ok(), false);
+    assertEquals(result.unwrapErr(), "string error");
   });
 
-  it("should work with complex return types", () => {
-    const result = Result.fromThrowable(() => ({ name: "test", value: 123 }), (e) => String(e));
-    expect(result.ok()).toBe(true);
-    expect(result.unwrap()).toEqual({ name: "test", value: 123 });
+  await t.step("should work with complex return types", () => {
+    const result = Result.fromThrowable(
+      () => ({ name: "test", value: 123 }),
+      (e) => String(e),
+    );
+    assertEquals(result.ok(), true);
+    assertEquals(result.unwrap(), { name: "test", value: 123 });
   });
 });
 
-describe("Error messages", () => {
-  it("should throw correct error message when calling unwrap on Err", () => {
-    const err = new Result.Err("test error");
-    expect(() => err.unwrap()).toThrow("called `unwrap` on an `Err` value");
-  });
+Deno.test("Error messages", async (t) => {
+  await t.step(
+    "should throw correct error message when calling unwrap on Err",
+    () => {
+      const err = new Result.Err("test error");
+      assertThrows(() => err.unwrap(), "called `unwrap` on an `Err` value");
+    },
+  );
 
-  it("should throw correct error message when calling unwrapErr on Ok", () => {
-    const ok = new Result.Ok("test value");
-    expect(() => ok.unwrapErr()).toThrow("called `unwrapErr` on an `Ok` value");
-  });
+  await t.step(
+    "should throw correct error message when calling unwrapErr on Ok",
+    () => {
+      const ok = new Result.Ok("test value");
+      assertThrows(() => ok.unwrapErr(), "called `unwrapErr` on an `Ok` value");
+    },
+  );
 });
 
-describe("Type narrowing", () => {
-  it("should narrow type after ok() check", () => {
-    const result = Math.random() > 0.5 
-      ? new Result.Ok("success") 
-      : new Result.Err(404);
-    
+Deno.test("Type narrowing", async (t) => {
+  await t.step("should narrow type after ok() check", () => {
+    const result =
+      Math.random() > 0.5 ? new Result.Ok("success") : new Result.Err(404);
+
     if (result.ok()) {
-      expect(typeof result.unwrap()).toBe("string");
-      expect(result.unwrap()).toBe("success");
+      assertEquals(typeof result.unwrap(), "string");
+      assertEquals(result.unwrap(), "success");
     } else {
-      expect(typeof result.unwrapErr()).toBe("number");
-      expect(result.unwrapErr()).toBe(404);
+      assertEquals(typeof result.unwrapErr(), "number");
+      assertEquals(result.unwrapErr(), 404);
     }
   });
 
-  it("should narrow type after err() check", () => {
-    const result = Math.random() > 0.5 
-      ? new Result.Ok(42) 
-      : new Result.Err("error");
-    
+  await t.step("should narrow type after err() check", () => {
+    const result =
+      Math.random() > 0.5 ? new Result.Ok(42) : new Result.Err("error");
+
     if (result.err()) {
-      expect(typeof result.unwrapErr()).toBe("string");
-      expect(result.unwrapErr()).toBe("error");
+      assertEquals(typeof result.unwrapErr(), "string");
+      assertEquals(result.unwrapErr(), "error");
     } else {
-      expect(typeof result.unwrap()).toBe("number");
-      expect(result.unwrap()).toBe(42);
+      assertEquals(typeof result.unwrap(), "number");
+      assertEquals(result.unwrap(), 42);
     }
   });
 });
 
-describe("Complex chaining", () => {
-  it("should chain multiple operations", () => {
+Deno.test("Complex chaining", async (t) => {
+  await t.step("should chain multiple operations", () => {
     const result = pipe(
       new Result.Ok(42),
       Result.map((n) => n * 2),
-      Result.andThen((n) => new Result.Ok(n + 10))
+      Result.andThen((n) => new Result.Ok(n + 10)),
     );
 
-    expect(result.ok()).toBe(true);
-    expect(result.unwrap()).toBe(94);
+    assertEquals(result.ok(), true);
+    assertEquals(result.unwrap(), 94);
   });
 
-  it("should short-circuit on errors", () => {
+  await t.step("should short-circuit on errors", () => {
     const result = pipe(
       new Result.Err("initial error"),
       Result.map((n) => n * 2),
-      Result.andThen((n) => new Result.Ok(n + 10))
+      Result.andThen((n) => new Result.Ok(n + 10)),
     );
 
-    expect(result.ok()).toBe(false);
-    expect(result.unwrapErr()).toBe("initial error");
+    assertEquals(result.ok(), false);
+    assertEquals(result.unwrapErr(), "initial error");
   });
 
-  it("should handle mixed map and andThen operations", () => {
+  await t.step("should handle mixed map and andThen operations", () => {
     const result = pipe(
       new Result.Ok("hello"),
       Result.map((s) => s.length),
-      Result.andThen((n) => n > 3 ? new Result.Ok(n * 2) : new Result.Err("Too short")),
-      Result.mapErr((e) => `Error: ${e}`)
+      Result.andThen((n) =>
+        n > 3 ? new Result.Ok(n * 2) : new Result.Err("Too short"),
+      ),
+      Result.mapErr((e) => `Error: ${e}`),
     );
 
-    expect(result.ok()).toBe(true);
-    expect(result.unwrap()).toBe(10);
+    assertEquals(result.ok(), true);
+    assertEquals(result.unwrap(), 10);
   });
 });
 
-describe("Integration scenarios", () => {
-  it("should handle JSON parsing with validation", () => {
+Deno.test("Integration scenarios", async (t) => {
+  await t.step("should handle JSON parsing with validation", () => {
     const json = '{"name": "Alice", "age": 30}';
     const result = pipe(
       Result.fromThrowable(
         () => JSON.parse(json),
         (e) => `Invalid JSON: ${(e as Error).message}`,
       ),
-      Result.andThen((obj) => 
+      Result.andThen((obj) =>
         !obj.name || typeof obj.name !== "string"
           ? new Result.Err("Missing or invalid name")
           : !obj.age || typeof obj.age !== "number"
-          ? new Result.Err("Missing or invalid age")
-          : new Result.Ok({ name: obj.name, age: obj.age })
-      )
+            ? new Result.Err("Missing or invalid age")
+            : new Result.Ok({ name: obj.name, age: obj.age }),
+      ),
     );
 
-    expect(result.ok()).toBe(true);
-    expect(result.unwrap()).toEqual({ name: "Alice", age: 30 });
+    assertEquals(result.ok(), true);
+    assertEquals(result.unwrap(), { name: "Alice", age: 30 });
   });
 
-  it("should handle file processing workflow", () => {
+  await t.step("should handle file processing workflow", () => {
     const result = pipe(
-      new Result.Ok("file content"),
+      new Result.Ok("file content") as Result.Result<string, string>,
       Result.andThen((content) => {
         const lines = content.split("\n").filter((line) => line.trim());
         if (lines.length === 0) return new Result.Err("INVALID_FORMAT");
@@ -431,10 +449,10 @@ describe("Integration scenarios", () => {
           lines.map((line, i) => ({ line: i + 1, content: line.trim() })),
         );
       }),
-      Result.andThen((data) => new Result.Ok(data.length))
+      Result.andThen((data) => new Result.Ok(data.length)),
     );
 
-    expect(result.ok()).toBe(true);
-    expect(result.unwrap()).toBe(1);
+    assertEquals(result.ok(), true);
+    assertEquals(result.unwrap(), 1);
   });
 });

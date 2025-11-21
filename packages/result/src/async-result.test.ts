@@ -1,69 +1,72 @@
 import { pipe } from "@joyful/pipe";
 import { AsyncResult, Result } from "@joyful/result";
-import { describe, expect, it } from "vitest";
+import { assertEquals, assertInstanceOf } from "assert";
 
-describe("AsyncResult", () => {
-  it("fromResult", async () => {
+Deno.test("AsyncResult", async (t) => {
+  await t.step("fromResult", async () => {
     const result = new Result.Ok("hello");
     const asyncResult = await AsyncResult.fromResult(result);
-    expect(asyncResult.ok()).toBe(true);
-    expect(asyncResult.unwrap()).toBe("hello");
+    assertEquals(asyncResult.ok(), true);
+    assertEquals(asyncResult.unwrap(), "hello");
   });
 
-  it("fromThrowable with a promise factory", async () => {
+  await t.step("fromThrowable with a promise factory", async () => {
     const result = await AsyncResult.fromThrowable(() =>
       Promise.resolve("hello"),
     );
-    expect(result.ok()).toBe(true);
-    expect(result.unwrap()).toBe("hello");
+    assertEquals(result.ok(), true);
+    assertEquals(result.unwrap(), "hello");
   });
 
-  it("fromThrowable with a promise factory that throws", async () => {
+  await t.step("fromThrowable with a promise factory that throws", async () => {
     const result = await AsyncResult.fromThrowable(() => {
       throw "hello";
     });
-    expect(result.ok()).toBe(false);
-    expect(result.unwrapErr()).toBe("hello");
+    assertEquals(result.ok(), false);
+    assertEquals(result.unwrapErr(), "hello");
   });
 
-  it("fromThrowable with custom error handler", async () => {
+  await t.step("fromThrowable with custom error handler", async () => {
     const result = await AsyncResult.fromThrowable(
       () => {
         throw new Error("custom error");
       },
       (e) => `Handled: ${(e as Error).message}`,
     );
-    expect(result.ok()).toBe(false);
-    expect(result.unwrapErr()).toBe("Handled: custom error");
+    assertEquals(result.ok(), false);
+    assertEquals(result.unwrapErr(), "Handled: custom error");
   });
 
-  it("fromThrowable with sync function returning promise", async () => {
-    const result = await AsyncResult.fromThrowable(() =>
-      Promise.resolve("async value"),
-    );
-    expect(result.ok()).toBe(true);
-    expect(result.unwrap()).toBe("async value");
-  });
+  await t.step(
+    "fromThrowable with sync function returning promise",
+    async () => {
+      const result = await AsyncResult.fromThrowable(() =>
+        Promise.resolve("async value"),
+      );
+      assertEquals(result.ok(), true);
+      assertEquals(result.unwrap(), "async value");
+    },
+  );
 
-  it("fromThrowable with sync function throwing", async () => {
+  await t.step("fromThrowable with sync function throwing", async () => {
     const result = await AsyncResult.fromThrowable(() => {
       throw new Error("sync error");
     });
-    expect(result.ok()).toBe(false);
-    expect(result.unwrapErr()).toBeInstanceOf(Error);
+    assertEquals(result.ok(), false);
+    assertInstanceOf(result.unwrapErr(), Error);
   });
 
-  it("fromThrowable with async function that rejects", async () => {
+  await t.step("fromThrowable with async function that rejects", async () => {
     const result = await AsyncResult.fromThrowable(async () => {
       throw new Error("async error");
     });
-    expect(result.ok()).toBe(false);
-    expect(result.unwrapErr()).toBeInstanceOf(Error);
+    assertEquals(result.ok(), false);
+    assertInstanceOf(result.unwrapErr(), Error);
   });
 });
 
-describe("map", () => {
-  it("should map an Ok value (curried)", async () => {
+Deno.test("map", async (t) => {
+  await t.step("should map an Ok value (curried)", async () => {
     const ok = AsyncResult.fromResult(new Result.Ok("hello"));
     const mapped = await pipe(
       ok,
@@ -73,22 +76,22 @@ describe("map", () => {
       }),
     );
 
-    expect(mapped.ok()).toBe(true);
-    expect(mapped.unwrap()).toBe("HELLO");
+    assertEquals(mapped.ok(), true);
+    assertEquals(mapped.unwrap(), "HELLO");
   });
 
-  it("should map an Ok value (binary)", async () => {
+  await t.step("should map an Ok value (binary)", async () => {
     const ok = AsyncResult.fromResult(new Result.Ok("hello"));
     const mapped = await AsyncResult.map(ok, async (value) => {
       await new Promise((resolve) => setTimeout(resolve, 1));
       return value.toUpperCase();
     });
 
-    expect(mapped.ok()).toBe(true);
-    expect(mapped.unwrap()).toBe("HELLO");
+    assertEquals(mapped.ok(), true);
+    assertEquals(mapped.unwrap(), "HELLO");
   });
 
-  it("should not map an Err value (curried)", async () => {
+  await t.step("should not map an Err value (curried)", async () => {
     const err = AsyncResult.fromResult(new Result.Err<string, string>("hello"));
     const mapped = await pipe(
       err,
@@ -97,23 +100,23 @@ describe("map", () => {
         return value.toUpperCase();
       }),
     );
-    expect(mapped.ok()).toBe(false);
-    expect(mapped.unwrapErr()).toBe("hello");
+    assertEquals(mapped.ok(), false);
+    assertEquals(mapped.unwrapErr(), "hello");
   });
 
-  it("should not map an Err value (binary)", async () => {
+  await t.step("should not map an Err value (binary)", async () => {
     const err = AsyncResult.fromResult(new Result.Err<string, string>("hello"));
     const mapped = await AsyncResult.map(err, async (value) => {
       await new Promise((resolve) => setTimeout(resolve, 1));
       return value.toUpperCase();
     });
-    expect(mapped.ok()).toBe(false);
-    expect(mapped.unwrapErr()).toBe("hello");
+    assertEquals(mapped.ok(), false);
+    assertEquals(mapped.unwrapErr(), "hello");
   });
 });
 
-describe("mapErr", () => {
-  it("should map an Err value (curried)", async () => {
+Deno.test("mapErr", async (t) => {
+  await t.step("should map an Err value (curried)", async () => {
     const err = AsyncResult.fromResult(new Result.Err("hello"));
     const mapped = await pipe(
       err,
@@ -122,21 +125,21 @@ describe("mapErr", () => {
         return error.toUpperCase();
       }),
     );
-    expect(mapped.ok()).toBe(false);
-    expect(mapped.unwrapErr()).toBe("HELLO");
+    assertEquals(mapped.ok(), false);
+    assertEquals(mapped.unwrapErr(), "HELLO");
   });
 
-  it("should map an Err value (binary)", async () => {
+  await t.step("should map an Err value (binary)", async () => {
     const err = AsyncResult.fromResult(new Result.Err("hello"));
     const mapped = await AsyncResult.mapErr(err, async (error) => {
       await new Promise((resolve) => setTimeout(resolve, 1));
       return error.toUpperCase();
     });
-    expect(mapped.ok()).toBe(false);
-    expect(mapped.unwrapErr()).toBe("HELLO");
+    assertEquals(mapped.ok(), false);
+    assertEquals(mapped.unwrapErr(), "HELLO");
   });
 
-  it("should not map an Ok value (curried)", async () => {
+  await t.step("should not map an Ok value (curried)", async () => {
     const ok = AsyncResult.fromResult(new Result.Ok<string, string>("hello"));
     const mapped = await pipe(
       ok,
@@ -145,69 +148,81 @@ describe("mapErr", () => {
         return error.toUpperCase();
       }),
     );
-    expect(mapped.ok()).toBe(true);
-    expect(mapped.unwrap()).toBe("hello");
+    assertEquals(mapped.ok(), true);
+    assertEquals(mapped.unwrap(), "hello");
   });
 
-  it("should not map an Ok value (binary)", async () => {
+  await t.step("should not map an Ok value (binary)", async () => {
     const ok = AsyncResult.fromResult(new Result.Ok<string, string>("hello"));
     const mapped = await AsyncResult.mapErr(ok, async (error) => {
       await new Promise((resolve) => setTimeout(resolve, 1));
       return error.toUpperCase();
     });
-    expect(mapped.ok()).toBe(true);
-    expect(mapped.unwrap()).toBe("hello");
+    assertEquals(mapped.ok(), true);
+    assertEquals(mapped.unwrap(), "hello");
   });
 });
 
-describe("andThen", () => {
-  it("should chain Ok values with AsyncResult return (curried)", async () => {
-    const ok = AsyncResult.fromResult(new Result.Ok("hello"));
-    const chained = await pipe(
-      ok,
-      AsyncResult.andThen((value) => {
+Deno.test("andThen", async (t) => {
+  await t.step(
+    "should chain Ok values with AsyncResult return (curried)",
+    async () => {
+      const ok = AsyncResult.fromResult(new Result.Ok("hello"));
+      const chained = await pipe(
+        ok,
+        AsyncResult.andThen((value) => {
+          return AsyncResult.fromResult(new Result.Ok(value.toUpperCase()));
+        }),
+      );
+
+      assertEquals(chained.ok(), true);
+      assertEquals(chained.unwrap(), "HELLO");
+    },
+  );
+
+  await t.step(
+    "should chain Ok values with Result return (curried)",
+    async () => {
+      const ok = AsyncResult.fromResult(new Result.Ok("hello"));
+      const chained = await pipe(
+        ok,
+        AsyncResult.andThen((value) => {
+          return new Result.Ok(value.toUpperCase());
+        }),
+      );
+
+      assertEquals(chained.ok(), true);
+      assertEquals(chained.unwrap(), "HELLO");
+    },
+  );
+
+  await t.step(
+    "should chain Ok values with AsyncResult return (binary)",
+    async () => {
+      const ok = AsyncResult.fromResult(new Result.Ok("hello"));
+      const chained = await AsyncResult.andThen(ok, (value) => {
         return AsyncResult.fromResult(new Result.Ok(value.toUpperCase()));
-      }),
-    );
+      });
 
-    expect(chained.ok()).toBe(true);
-    expect(chained.unwrap()).toBe("HELLO");
-  });
+      assertEquals(chained.ok(), true);
+      assertEquals(chained.unwrap(), "HELLO");
+    },
+  );
 
-  it("should chain Ok values with Result return (curried)", async () => {
-    const ok = AsyncResult.fromResult(new Result.Ok("hello"));
-    const chained = await pipe(
-      ok,
-      AsyncResult.andThen((value) => {
+  await t.step(
+    "should chain Ok values with Result return (binary)",
+    async () => {
+      const ok = AsyncResult.fromResult(new Result.Ok("hello"));
+      const chained = await AsyncResult.andThen(ok, (value) => {
         return new Result.Ok(value.toUpperCase());
-      }),
-    );
+      });
 
-    expect(chained.ok()).toBe(true);
-    expect(chained.unwrap()).toBe("HELLO");
-  });
+      assertEquals(chained.ok(), true);
+      assertEquals(chained.unwrap(), "HELLO");
+    },
+  );
 
-  it("should chain Ok values with AsyncResult return (binary)", async () => {
-    const ok = AsyncResult.fromResult(new Result.Ok("hello"));
-    const chained = await AsyncResult.andThen(ok, (value) => {
-      return AsyncResult.fromResult(new Result.Ok(value.toUpperCase()));
-    });
-
-    expect(chained.ok()).toBe(true);
-    expect(chained.unwrap()).toBe("HELLO");
-  });
-
-  it("should chain Ok values with Result return (binary)", async () => {
-    const ok = AsyncResult.fromResult(new Result.Ok("hello"));
-    const chained = await AsyncResult.andThen(ok, (value) => {
-      return new Result.Ok(value.toUpperCase());
-    });
-
-    expect(chained.ok()).toBe(true);
-    expect(chained.unwrap()).toBe("HELLO");
-  });
-
-  it("should short-circuit on Err values (curried)", async () => {
+  await t.step("should short-circuit on Err values (curried)", async () => {
     const err = AsyncResult.fromResult(new Result.Err<string, string>("error"));
     const chained = await pipe(
       err,
@@ -216,69 +231,81 @@ describe("andThen", () => {
       }),
     );
 
-    expect(chained.ok()).toBe(false);
-    expect(chained.unwrapErr()).toBe("error");
+    assertEquals(chained.ok(), false);
+    assertEquals(chained.unwrapErr(), "error");
   });
 
-  it("should short-circuit on Err values (binary)", async () => {
+  await t.step("should short-circuit on Err values (binary)", async () => {
     const err = AsyncResult.fromResult(new Result.Err<string, string>("error"));
     const chained = await AsyncResult.andThen(err, (value) => {
       return AsyncResult.fromResult(new Result.Ok(value.toUpperCase()));
     });
 
-    expect(chained.ok()).toBe(false);
-    expect(chained.unwrapErr()).toBe("error");
+    assertEquals(chained.ok(), false);
+    assertEquals(chained.unwrapErr(), "error");
   });
 });
 
-describe("orElse", () => {
-  it("should provide fallback for Err values with AsyncResult return (curried)", async () => {
-    const err = AsyncResult.fromResult(new Result.Err("error"));
-    const fallback = await pipe(
-      err,
-      AsyncResult.orElse((error) => {
+Deno.test("orElse", async (t) => {
+  await t.step(
+    "should provide fallback for Err values with AsyncResult return (curried)",
+    async () => {
+      const err = AsyncResult.fromResult(new Result.Err("error"));
+      const fallback = await pipe(
+        err,
+        AsyncResult.orElse((error) => {
+          return AsyncResult.fromResult(new Result.Ok(`fallback: ${error}`));
+        }),
+      );
+
+      assertEquals(fallback.ok(), true);
+      assertEquals(fallback.unwrap(), "fallback: error");
+    },
+  );
+
+  await t.step(
+    "should provide fallback for Err values with Result return (curried)",
+    async () => {
+      const err = AsyncResult.fromResult(new Result.Err("error"));
+      const fallback = await pipe(
+        err,
+        AsyncResult.orElse((error) => {
+          return new Result.Ok(`fallback: ${error}`);
+        }),
+      );
+
+      assertEquals(fallback.ok(), true);
+      assertEquals(fallback.unwrap(), "fallback: error");
+    },
+  );
+
+  await t.step(
+    "should provide fallback for Err values with AsyncResult return (binary)",
+    async () => {
+      const err = AsyncResult.fromResult(new Result.Err("error"));
+      const fallback = await AsyncResult.orElse(err, (error) => {
         return AsyncResult.fromResult(new Result.Ok(`fallback: ${error}`));
-      }),
-    );
+      });
 
-    expect(fallback.ok()).toBe(true);
-    expect(fallback.unwrap()).toBe("fallback: error");
-  });
+      assertEquals(fallback.ok(), true);
+      assertEquals(fallback.unwrap(), "fallback: error");
+    },
+  );
 
-  it("should provide fallback for Err values with Result return (curried)", async () => {
-    const err = AsyncResult.fromResult(new Result.Err("error"));
-    const fallback = await pipe(
-      err,
-      AsyncResult.orElse((error) => {
+  await t.step(
+    "should provide fallback for Err values with Result return (binary)",
+    async () => {
+      const err = AsyncResult.fromResult(new Result.Err("error"));
+      const fallback = await AsyncResult.orElse(err, (error) => {
         return new Result.Ok(`fallback: ${error}`);
-      }),
-    );
+      });
 
-    expect(fallback.ok()).toBe(true);
-    expect(fallback.unwrap()).toBe("fallback: error");
-  });
+      assertEquals(fallback.ok(), true);
+      assertEquals(fallback.unwrap(), "fallback: error");
+    },
+  );
 
-  it("should provide fallback for Err values with AsyncResult return (binary)", async () => {
-    const err = AsyncResult.fromResult(new Result.Err("error"));
-    const fallback = await AsyncResult.orElse(err, (error) => {
-      return AsyncResult.fromResult(new Result.Ok(`fallback: ${error}`));
-    });
-
-    expect(fallback.ok()).toBe(true);
-    expect(fallback.unwrap()).toBe("fallback: error");
-  });
-
-  it("should provide fallback for Err values with Result return (binary)", async () => {
-    const err = AsyncResult.fromResult(new Result.Err("error"));
-    const fallback = await AsyncResult.orElse(err, (error) => {
-      return new Result.Ok(`fallback: ${error}`);
-    });
-
-    expect(fallback.ok()).toBe(true);
-    expect(fallback.unwrap()).toBe("fallback: error");
-  });
-
-  it("should not affect Ok values (curried)", async () => {
+  await t.step("should not affect Ok values (curried)", async () => {
     const ok = AsyncResult.fromResult(new Result.Ok("success"));
     const unchanged = await pipe(
       ok,
@@ -287,23 +314,23 @@ describe("orElse", () => {
       }),
     );
 
-    expect(unchanged.ok()).toBe(true);
-    expect(unchanged.unwrap()).toBe("success");
+    assertEquals(unchanged.ok(), true);
+    assertEquals(unchanged.unwrap(), "success");
   });
 
-  it("should not affect Ok values (binary)", async () => {
+  await t.step("should not affect Ok values (binary)", async () => {
     const ok = AsyncResult.fromResult(new Result.Ok("success"));
     const unchanged = await AsyncResult.orElse(ok, (error) => {
       return AsyncResult.fromResult(new Result.Ok(`fallback: ${error}`));
     });
 
-    expect(unchanged.ok()).toBe(true);
-    expect(unchanged.unwrap()).toBe("success");
+    assertEquals(unchanged.ok(), true);
+    assertEquals(unchanged.unwrap(), "success");
   });
 });
 
-describe("match", () => {
-  it("should match Ok values (curried)", async () => {
+Deno.test("match", async (t) => {
+  await t.step("should match Ok values (curried)", async () => {
     const ok = AsyncResult.fromResult(new Result.Ok("hello"));
     const result = await pipe(
       ok,
@@ -319,10 +346,10 @@ describe("match", () => {
       ),
     );
 
-    expect(result).toBe("Success: HELLO");
+    assertEquals(result, "Success: HELLO");
   });
 
-  it("should match Ok values (binary)", async () => {
+  await t.step("should match Ok values (binary)", async () => {
     const ok = AsyncResult.fromResult(new Result.Ok("hello"));
     const result = await AsyncResult.match(
       ok,
@@ -336,10 +363,10 @@ describe("match", () => {
       },
     );
 
-    expect(result).toBe("Success: HELLO");
+    assertEquals(result, "Success: HELLO");
   });
 
-  it("should match Err values (curried)", async () => {
+  await t.step("should match Err values (curried)", async () => {
     const err = AsyncResult.fromResult(new Result.Err("error"));
     const result = await pipe(
       err,
@@ -355,10 +382,10 @@ describe("match", () => {
       ),
     );
 
-    expect(result).toBe("Error: ERROR");
+    assertEquals(result, "Error: ERROR");
   });
 
-  it("should match Err values (binary)", async () => {
+  await t.step("should match Err values (binary)", async () => {
     const err = AsyncResult.fromResult(new Result.Err("error"));
     const result = await AsyncResult.match(
       err,
@@ -372,12 +399,12 @@ describe("match", () => {
       },
     );
 
-    expect(result).toBe("Error: ERROR");
+    assertEquals(result, "Error: ERROR");
   });
 });
 
-describe("AsyncResult complex chaining", () => {
-  it("should chain multiple async operations", async () => {
+Deno.test("AsyncResult complex chaining", async (t) => {
+  await t.step("should chain multiple async operations", async () => {
     const fetchUser = async (id: number) => {
       await new Promise((resolve) => setTimeout(resolve, 1));
       if (id === 1) return { id, name: "Alice" };
@@ -393,11 +420,11 @@ describe("AsyncResult complex chaining", () => {
       AsyncResult.map((user) => `Hello, ${user.name}!`),
     );
 
-    expect(result.ok()).toBe(true);
-    expect(result.unwrap()).toBe("Hello, Alice!");
+    assertEquals(result.ok(), true);
+    assertEquals(result.unwrap(), "Hello, Alice!");
   });
 
-  it("should handle mixed sync and async operations", async () => {
+  await t.step("should handle mixed sync and async operations", async () => {
     const result = await pipe(
       AsyncResult.fromResult(new Result.Ok("test")),
       AsyncResult.andThen(async (data: string) => {
@@ -407,11 +434,11 @@ describe("AsyncResult complex chaining", () => {
       AsyncResult.map((data: string) => data.toUpperCase()),
     );
 
-    expect(result.ok()).toBe(true);
-    expect(result.unwrap()).toBe("PROCESSED: TEST");
+    assertEquals(result.ok(), true);
+    assertEquals(result.unwrap(), "PROCESSED: TEST");
   });
 
-  it("should short-circuit on async errors", async () => {
+  await t.step("should short-circuit on async errors", async () => {
     const failingAsyncOp = async () => {
       await new Promise((resolve) => setTimeout(resolve, 1));
       throw new Error("Async failure");
@@ -425,33 +452,36 @@ describe("AsyncResult complex chaining", () => {
       ),
     );
 
-    expect(result.ok()).toBe(false);
-    expect(result.unwrapErr()).toBeInstanceOf(Error);
+    assertEquals(result.ok(), false);
+    assertInstanceOf(result.unwrapErr(), Error);
   });
 });
 
-describe("AsyncResult error handling", () => {
-  it("should handle promise rejections in fromThrowable", async () => {
-    const result = await AsyncResult.fromThrowable(() =>
-      Promise.reject(new Error("Promise rejected")),
-    );
+Deno.test("AsyncResult error handling", async (t) => {
+  await t.step(
+    "should handle promise rejections in fromThrowable",
+    async () => {
+      const result = await AsyncResult.fromThrowable(() =>
+        Promise.reject(new Error("Promise rejected")),
+      );
 
-    expect(result.ok()).toBe(false);
-    expect(result.unwrapErr()).toBeInstanceOf(Error);
-  });
+      assertEquals(result.ok(), false);
+      assertInstanceOf(result.unwrapErr(), Error);
+    },
+  );
 
-  it("should handle nested AsyncResults", async () => {
+  await t.step("should handle nested AsyncResults", async () => {
     const innerResult = AsyncResult.fromResult(new Result.Ok("inner"));
     const outerResult = await AsyncResult.fromThrowable(async () => {
       const result = await innerResult;
       return `wrapped: ${result.unwrap()}`;
     });
 
-    expect(outerResult.ok()).toBe(true);
-    expect(outerResult.unwrap()).toBe("wrapped: inner");
+    assertEquals(outerResult.ok(), true);
+    assertEquals(outerResult.unwrap(), "wrapped: inner");
   });
 
-  it("should handle complex error transformations", async () => {
+  await t.step("should handle complex error transformations", async () => {
     const result = await pipe(
       AsyncResult.fromThrowable(() => {
         throw new Error("Original error");
@@ -462,7 +492,7 @@ describe("AsyncResult error handling", () => {
       ),
     );
 
-    expect(result.ok()).toBe(true);
-    expect(result.unwrap()).toBe("Recovered from: Mapped: Original error");
+    assertEquals(result.ok(), true);
+    assertEquals(result.unwrap(), "Recovered from: Mapped: Original error");
   });
 });

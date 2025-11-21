@@ -755,14 +755,6 @@
           "npm:@deno/kv@0.10"
         ]
       },
-      "pipe": {
-        "packageJson": {
-          "dependencies": [
-            "npm:@deno/vite-plugin@^1.0.5",
-            "npm:vitest@^4.0.9"
-          ]
-        }
-      },
       "pipe-plugin": {
         "dependencies": [
           "npm:@types/estree@^1.0.8",
@@ -770,14 +762,6 @@
           "npm:vite@^7.2.2",
           "npm:zimmerframe@^1.1.4"
         ],
-        "packageJson": {
-          "dependencies": [
-            "npm:@deno/vite-plugin@^1.0.5",
-            "npm:vitest@^4.0.9"
-          ]
-        }
-      },
-      "result": {
         "packageJson": {
           "dependencies": [
             "npm:@deno/vite-plugin@^1.0.5",
