@@ -68,56 +68,7 @@ const result = pipe("  hello world  ", trim, toUpperCase, addExclamation);
 
 ## Vite Plugin
 
-This package also includes a Vite plugin that transforms `pipe` calls into nested function calls and eliminates the runtime overhead of the `pipe` function at build time for better performance.
-
-### Installation
-
-```typescript
-// vite.config.ts
-import { pipePlugin } from "@joyful/pipe/vite";
-
-export default {
-  plugins: [
-    pipePlugin({
-      // Optional: specify a different import path
-      importPath: "@joyful/pipe"
-    })
-  ]
-};
-```
-
-### Plugin Options
-
-```typescript
-export type PipeOptions = {
-  /** The import path for `@joyful/pipe`. Use this if you import this package from a different path
-   *
-   * default: "@joyful/pipe"
-   */
-  importPath?: string;
-};
-```
-
-### How it Works
-
-The plugin transforms `pipe` calls at build time:
-
-```typescript
-// Before transformation
-pipe(4, double, square, addFive);
-
-// After transformation
-addFive(square(double(4)));
-```
-
-This eliminates the runtime overhead of the `pipe` function while maintaining the same functionality and type safety.
-
-### Benefits
-
-- **Zero Runtime**: No function call overhead at runtime
-- **Tree Shaking**: Dead code elimination works better
-- **Bundle Size**: Smaller bundles in production
-- **Type Safety**: Maintains full TypeScript type checking
+For build-time optimization (zero runtime overhead), see [@joyful/pipe-vite](https://jsr.io/@joyful/pipe-vite).
 
 ## License
 

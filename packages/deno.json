@@ -5,6 +5,7 @@
     "kv-mini-redis",
     "kv-nats",
     "pipe",
+    "pipe-plugin",
     "result"
   ]
 }

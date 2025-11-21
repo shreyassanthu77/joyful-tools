@@ -753,6 +753,14 @@
         ]
       },
       "pipe": {
+        "packageJson": {
+          "dependencies": [
+            "npm:@deno/vite-plugin@^1.0.5",
+            "npm:vitest@^4.0.9"
+          ]
+        }
+      },
+      "pipe-plugin": {
         "dependencies": [
           "npm:@types/estree@^1.0.8",
           "npm:astring@^1.9.0",
