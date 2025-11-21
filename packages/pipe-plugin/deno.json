@@ -3,7 +3,7 @@
   "version": "0.0.1",
   "license": "MIT",
   "tasks": {
-    "test": "vitest"
+    "test": "deno -A npm:vitest"
   },
   "imports": {
     "zimmerframe": "npm:zimmerframe@^1.1.4",
