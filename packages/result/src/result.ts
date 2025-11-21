@@ -1,11 +1,4 @@
 /**
- * Base interface for Result types that provides common methods for handling
- * success and error states.
- *
- * This interface defines the contract that both Ok and Err classes must implement,
- * ensuring consistent behavior across all Result variants.
- */
-/**
  * A TypeScript implementation of the Result type for error handling.
  *
  * This module provides a robust way to handle operations that might fail
@@ -52,16 +45,56 @@
  * @module
  */
 
+/**
+ * Base interface for Result types that provides common methods for handling
+ * success and error states.
+ *
+ * This interface defines the contract that both Ok and Err classes must implement,
+ * ensuring consistent behavior across all Result variants.
+ */
+
+/**
+ * Base interface for Result types that provides common methods for handling
+ * success and error states.
+ *
+ * This interface defines the contract that both Ok and Err classes must implement,
+ * ensuring consistent behavior across all Result variants.
+ *
+ * @template T - The type of the success value
+ * @template E - The type of the error value
+ */
 interface BaseResult<T, E> {
-  /** Returns true if this is an Ok (success) value */
+  /**
+   * Type guard that returns true if this is an Ok (success) value.
+   * @returns true for Ok instances, false for Err instances
+   */
   ok(): boolean;
-  /** Returns true if this is an Err (error) value */
+  
+  /**
+   * Type guard that returns true if this is an Err (error) value.
+   * @returns true for Err instances, false for Ok instances
+   */
   err(): boolean;
-  /** Returns the success value, throws if this is an Err */
+  
+  /**
+   * Returns the contained success value.
+   * @throws Error if called on an Err value
+   * @returns The success value of type T
+   */
   unwrap(): T;
-  /** Returns the error value, throws if this is an Ok */
+  
+  /**
+   * Returns the contained error value.
+   * @throws Error if called on an Ok value
+   * @returns The error value of type E
+   */
   unwrapErr(): E;
-  /** Returns the success value or the provided default if this is an Err */
+  
+  /**
+   * Returns the success value or the provided default if this is an Err.
+   * @param defaultValue - The default value to return if this is an Err
+   * @returns The success value or the default value
+   */
   unwrapOr(defaultValue: T): T;
 }
 
@@ -210,6 +243,31 @@ export class Err<E, T = never> implements BaseResult<T, E> {
  */
 export type Result<T, E> = Ok<T, E> | Err<E, T>;
 
+/**
+ * Wraps a throwable function in a Result.
+ *
+ * This function executes the provided function and returns an Ok containing
+ * the result if successful, or an Err containing the transformed error if
+ * an exception is thrown.
+ *
+ * @param fn - The function that might throw an exception
+ * @param onError - Function to transform the caught error into an error value
+ * @returns A Result containing either the success value or the transformed error
+ *
+ * @example
+ * ```typescript
+ * const parseJson = (json: string) => fromThrowable(
+ *   () => JSON.parse(json),
+ *   (e) => `Invalid JSON: ${e.message}`
+ * );
+ *
+ * const result = parseJson('{"name": "Alice"}');
+ * // Returns: Ok({name: "Alice"})
+ *
+ * const badResult = parseJson('invalid json');
+ * // Returns: Err("Invalid JSON: Unexpected token...")
+ * ```
+ */
 export function fromThrowable<T, E>(
   fn: () => T,
   onError: (error: unknown) => E,

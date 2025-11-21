@@ -45,6 +45,8 @@ console.log(error.unwrapErr()); // "Something went wrong"
 ### Handling Results
 
 ```typescript
+import { Result } from "@joyful/result";
+
 function parseNumber(str: string): Result<number, string> {
   const num = parseFloat(str);
   if (isNaN(num)) {
@@ -75,6 +77,7 @@ The Result type works beautifully with functional programming patterns and can b
 
 ```typescript
 import { pipe } from "@joyful/pipe";
+import { Result } from "@joyful/result";
 
 const result = new Result.Ok(5);
 
@@ -100,6 +103,9 @@ console.log(unchanged.unwrap()); // 5
 ### Chaining Operations with `andThen`
 
 ```typescript
+import { Result } from "@joyful/result";
+import { pipe } from "@joyful/pipe";
+
 const parseAge = (str: string): Result<number, string> => {
   const age = parseInt(str, 10);
   if (isNaN(age)) return new Result.Err("Invalid number");
@@ -130,6 +136,9 @@ console.log(processAge2.unwrap()); // "Age is valid"
 ### Providing Fallbacks with `orElse`
 
 ```typescript
+import { Result } from "@joyful/result";
+import { pipe } from "@joyful/pipe";
+
 const fetchFromCache = (id: string): Result<string, string> => {
   // Simulate cache miss
   return new Result.Err("Not found in cache");
@@ -155,6 +164,9 @@ console.log(result2.unwrap()); // "Data for user123 from database"
 ### Pattern Matching with `match`
 
 ```typescript
+import { Result } from "@joyful/result";
+import { pipe } from "@joyful/pipe";
+
 const result = new Result.Err("Network timeout");
 
 // Curried form (great for pipes)
@@ -176,6 +188,55 @@ const message2 = Result.match(
 console.log(message2); // "❌ Error: Network timeout"
 ```
 
+## AsyncResult
+
+The `AsyncResult<T, E>` type provides async-compatible versions of Result utilities, allowing you to work with operations that return Promises and Results. It extends `PromiseLike<Result<T, E>>` to enable seamless integration with async/await syntax.
+
+### Creating AsyncResults
+
+```typescript
+import { AsyncResult } from "@joyful/result";
+
+// Convert a promise that might throw to an AsyncResult
+const fetchData = () => fetch("/api/data");
+const result = AsyncResult.fromThrowable(fetchData, (e) => e.message);
+
+// Convert a sync Result to AsyncResult
+import { Result } from "@joyful/result";
+const syncResult = new Result.Ok(42);
+const asyncResult = AsyncResult.fromResult(syncResult);
+```
+
+### Using AsyncResults
+
+```typescript
+// Use with async/await
+const data = await result;
+if (data.ok()) {
+  console.log("Success:", data.unwrap());
+} else {
+  console.log("Error:", data.unwrapErr());
+}
+
+// Functional composition with async operations
+import { pipe } from "@joyful/pipe";
+const processed = await pipe(
+  result,
+  AsyncResult.map((response) => response.json()),
+  AsyncResult.andThen(validateData)
+);
+```
+
+### AsyncResult Utilities
+
+AsyncResult provides the same functional utilities as Result, but with async support:
+
+- `AsyncResult.map()` - Map success values (supports async mapping functions)
+- `AsyncResult.mapErr()` - Map error values (supports async mapping functions)  
+- `AsyncResult.andThen()` - Chain async operations that return Results
+- `AsyncResult.orElse()` - Provide async fallback behavior
+- `AsyncResult.match()` - Pattern match with async handlers
+
 ## API Reference
 
 ### Types
@@ -188,6 +249,9 @@ Class representing a successful result containing a value of type `T`.
 
 #### `Err<E, T>`
 Class representing an error result containing an error of type `E`.
+
+#### `AsyncResult<T, E>`
+Interface representing an async Result that extends PromiseLike for seamless async/await integration.
 
 ### Methods
 
@@ -205,6 +269,19 @@ All utility functions support two calling patterns:
 
 1. **Curried form**: `fn(arg)(result)` - perfect for pipe composition
 2. **Binary form**: `fn(result, arg)` - more intuitive for direct calls
+
+#### `fromThrowable<T, E>(fn: () => T, onError: (error: unknown) => E): Result<T, E>`
+Wraps a throwable function in a Result.
+
+```typescript
+const parseJson = (json: string) => Result.fromThrowable(
+  () => JSON.parse(json),
+  (e) => `Invalid JSON: ${e.message}`
+);
+
+const result = parseJson('{"name": "Alice"}');
+// Returns: Ok({name: "Alice"})
+```
 
 #### `map<T, U, E>(result: Result<T, E>, f: (value: T) => U): Result<U, E>`
 #### `map<T, U, E>(f: (value: T) => U): (result: Result<T, E>) => Result<U, E>`
@@ -234,6 +311,36 @@ Provides fallback behavior for Results.
 #### `match<T, E, U>(ok: (value: T) => U, err: (error: E) => U): (result: Result<T, E>) => U`
 Pattern matches on a Result, applying the appropriate handler.
 
+### AsyncResult Utilities
+
+AsyncResult provides the same utilities as Result, but with async support:
+
+#### `fromThrowable<T, E>(fn: () => T | Promise<T>, onError?: (error: unknown) => E): AsyncResult<T, E>`
+Wraps a throwable function (sync or async) in an AsyncResult.
+
+#### `fromResult<T, E>(result: Result<T, E>): AsyncResult<T, E>`
+Converts a synchronous Result to an AsyncResult.
+
+#### `AsyncResult.map<T, U, E>(result: Result<T, E> | AsyncResult<T, E>, f: (value: T) => U | Promise<U>): AsyncResult<U, E>`
+#### `AsyncResult.map<T, U, E>(f: (value: T) => U | Promise<U>): (result: Result<T, E> | AsyncResult<T, E>) => AsyncResult<U, E>`
+Maps the success value of an AsyncResult or Result (supports async mapping functions).
+
+#### `AsyncResult.mapErr<T, U, E>(result: Result<T, E> | AsyncResult<T, E>, f: (error: E) => U | Promise<U>): AsyncResult<T, U>`
+#### `AsyncResult.mapErr<T, U, E>(f: (error: E) => U | Promise<U>): (result: Result<T, E> | AsyncResult<T, E>) => AsyncResult<T, U>`
+Maps the error value of an AsyncResult or Result (supports async mapping functions).
+
+#### `AsyncResult.andThen<T1, T2, E1, E2>(result: Result<T1, E1> | AsyncResult<T1, E1>, f: (value: T1) => Result<T2, E2> | AsyncResult<T2, E2> | Promise<Result<T2, E2> | AsyncResult<T2, E2>>): AsyncResult<T2, E1 | E2>`
+#### `AsyncResult.andThen<T1, T2, E1, E2>(f: (value: T1) => Result<T2, E2> | AsyncResult<T2, E2> | Promise<Result<T2, E2> | AsyncResult<T2, E2>>): (result: Result<T1, E1> | AsyncResult<T1, E1>) => AsyncResult<T2, E1 | E2>`
+Chains async operations that return Results or AsyncResults.
+
+#### `AsyncResult.orElse<T1, T2, E1, E2>(result: Result<T1, E1> | AsyncResult<T1, E1>, f: (error: E1) => Result<T2, E2> | AsyncResult<T2, E2> | Promise<Result<T2, E2> | AsyncResult<T2, E2>>): AsyncResult<T1 | T2, E2>`
+#### `AsyncResult.orElse<T1, T2, E1, E2>(f: (error: E1) => Result<T2, E2> | AsyncResult<T2, E2> | Promise<Result<T2, E2> | AsyncResult<T2, E2>>): (result: Result<T1, E1> | AsyncResult<T1, E1>) => AsyncResult<T1 | T2, E2>`
+Provides async fallback behavior for AsyncResults or Results.
+
+#### `AsyncResult.match<T, E, U>(result: Result<T, E> | AsyncResult<T, E>, ok: (value: T) => U | Promise<U>, err: (error: E) => U | Promise<U>): Promise<U>`
+#### `AsyncResult.match<T, E, U>(ok: (value: T) => U | Promise<U>, err: (error: E) => U | Promise<U>): (result: Result<T, E> | AsyncResult<T, E>) => Promise<U>`
+Pattern matches on an AsyncResult or Result with async handlers.
+
 ## Benefits
 
 - **Type Safety**: Full TypeScript support with proper type inference
@@ -242,6 +349,8 @@ Pattern matches on a Result, applying the appropriate handler.
 - **No Exceptions**: Eliminates unexpected runtime errors and try/catch blocks
 - **Predictable**: Control flow is clear and explicit
 - **Testable**: Error paths are easily testable without mocking exceptions
+- **Async Support**: AsyncResult provides seamless integration with promises and async/await
+- **Unified API**: Consistent interface between sync and async operations
 
 ## Integration with @joyful/pipe
 
@@ -249,13 +358,22 @@ This package is designed to work seamlessly with [`@joyful/pipe`](https://jsr.io
 
 ```typescript
 import { pipe } from "@joyful/pipe";
-import { Result } from "@joyful/result";
+import { Result, AsyncResult } from "@joyful/result";
 
+// Sync example
 const process = pipe(
   fetchData(),
   Result.andThen(validate),
   Result.map(transform),
   Result.orElse(handleError)
+);
+
+// Async example
+const asyncProcess = await pipe(
+  AsyncResult.fromThrowable(fetchData, (e) => e.message),
+  AsyncResult.andThen(validateAsync),
+  AsyncResult.map(transformAsync),
+  AsyncResult.orElse(handleErrorAsync)
 );
 ```
 
