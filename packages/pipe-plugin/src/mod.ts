@@ -1,7 +1,8 @@
 import type { PluginOption } from "vite";
-import type { Node, Expression } from "estree";
+import type { Node, Expression, ArrowFunctionExpression } from "estree";
 import { walk } from "zimmerframe";
 import * as astring from "astring";
+import { Pattern } from "estree";
 
 /**
  * Vite plugin for optimizing pipe function calls at build time.
@@ -86,9 +87,17 @@ export function pipePlugin(options: PipeOptions = {}): PluginOption {
               if (arg.type === "SpreadElement") return;
             }
 
-            let res: Expression = args[0] as Expression;
+            let res = args[0] as Expression;
             for (let i = 1; i < args.length; i++) {
               const arg = args[i] as Expression;
+              if (arg.type === "ArrowFunctionExpression") {
+                const inlined = tryInlineArrowFunctionExpression(arg, res);
+                if (inlined) {
+                  res = inlined;
+                  continue;
+                }
+              }
+
               res = {
                 type: "CallExpression",
                 arguments: [res],
@@ -106,6 +115,96 @@ export function pipePlugin(options: PipeOptions = {}): PluginOption {
       },
     },
   };
+}
+
+function tryInlineArrowFunctionExpression(
+  arrorFn: ArrowFunctionExpression,
+  data: Expression,
+): Expression | null {
+  const { body, params, expression, generator, async } = arrorFn;
+  const isExpression = expression && body.type !== "BlockStatement";
+  if (generator || async || !isExpression || params.length > 1) return null;
+
+  if (params.length === 0) {
+    return {
+      type: "SequenceExpression",
+      expressions: [data, body],
+    };
+  }
+  let param: Expression;
+  let paramName: string;
+  switch (params[0].type) {
+    case "Identifier":
+      paramName = params[0].name;
+      break;
+    case "AssignmentPattern": {
+      if (params[0].left.type !== "Identifier") return arrorFn;
+
+      param = {
+        type: "LogicalExpression",
+        left: params[0].left,
+        operator: "??",
+        right: params[0].right,
+      };
+      paramName = params[0].left.name;
+      break;
+    }
+    default:
+      return null;
+  }
+
+  let useCount = 0;
+  let shouldReturn = false;
+  walk(body, null, {
+    ArrowFunctionExpression(node, { next, state, stop }) {
+      for (const arg of node.params) {
+        // look for shadowing
+        if (arg.type === "Identifier" && arg.name === paramName) {
+          return;
+        }
+        let unwrappedArg: Pattern = arg;
+        if (arg.type === "AssignmentPattern") {
+          unwrappedArg = arg.left;
+        }
+        switch (unwrappedArg.type) {
+          case "Identifier": {
+            if (unwrappedArg.name === paramName) {
+              continue;
+            }
+            break;
+          }
+          case "ArrayPattern": {
+            for (const elem of unwrappedArg.elements) {
+              if (!elem) continue;
+            }
+            break;
+          }
+          case "RestElement":
+          case "ObjectPattern":
+          case "MemberExpression":
+          case "AssignmentPattern":
+            shouldReturn = true;
+            stop();
+            return;
+          default:
+            throw "unreachable";
+        }
+      }
+      next(state);
+    },
+    Identifier(node, { next, state, path }) {
+      const parent = path[path.length - 1];
+
+      const isMemberProperty =
+        parent.type === "MemberExpression" &&
+        parent.property === node &&
+        !parent.computed;
+
+      if (!isMemberProperty && node.name === paramName) {
+        useCount++;
+      }
+    },
+  });
 }
 
 interface GetImportsOptions {
