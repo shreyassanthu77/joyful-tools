@@ -2,9 +2,6 @@
   "name": "@joyful/pipe",
   "version": "0.0.5",
   "license": "MIT",
-  "tasks": {
-    "test": "deno test"
-  },
   "imports": {},
   "exports": {
     ".": "./src/main.ts"

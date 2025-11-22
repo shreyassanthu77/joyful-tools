@@ -1,17 +1,6 @@
 {
-  "nodeModulesDir": "auto",
   "imports": {
     "assert": "jsr:@std/assert"
-  },
-  "tasks": {
-    "test:pipe": "deno task --cwd pipe test",
-    "test:result": "deno task --cwd result test",
-    "test": {
-      "dependencies": [
-        "test:pipe",
-        "test:result"
-      ]
-    }
   },
   "workspace": [
     "pipe",
