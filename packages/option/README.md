@@ -51,18 +51,18 @@ console.log(noValue.unwrapOr(0)); // 0
 ### Functional Transformations
 
 ```typescript
-import { Option, map, andThen, match } from "@joyful/option";
+import { Option } from "@joyful/option";
 import { pipe } from "@joyful/pipe";
 
-const divide = (n: number, d: number): Option<number> =>
+const divide = (n: number, d: number): Option.Option<number> =>
   d === 0 ? None : new Some(n / d);
 
 const result = pipe(
-  new Some(20),
+  new Option.Some(20),
   // Map unwrapped value: 20 -> 10
-  map(n => n / 2),
+  Option.map(n => n / 2),
   // Chain operation that might fail
-  andThen(n => divide(n, 2)), // Some(5)
+  Option.andThen(n => divide(n, 2)), // Some(5)
   // Pattern match to get final result
   match(
     val => `Result: ${val}`,
