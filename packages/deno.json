@@ -1,6 +1,9 @@
 {
   "imports": {
-    "assert": "jsr:@std/assert"
+    "assert": "jsr:@std/assert",
+    "@joyful/pipe": "./pipe/src/main.ts",
+    "@joyful/option": "./option/src/main.ts",
+    "@joyful/result": "./result/src/main.ts"
   },
   "tasks": {
     "test": "deno test"

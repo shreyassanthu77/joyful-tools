@@ -1,4 +1,5 @@
 import { assert, assertEquals, assertThrows } from "jsr:@std/assert";
+import { pipe } from "@joyful/pipe";
 import {
   andThen,
   fromNullable,
@@ -8,7 +9,7 @@ import {
   Option,
   orElse,
   Some,
-} from "./option.ts";
+} from "@joyful/option";
 
 Deno.test("Some behaves correctly", () => {
   const s = new Some(10);
@@ -114,11 +115,6 @@ Deno.test("match behaves correctly", () => {
   );
   assertEquals(matcher(s), "Got 10");
 });
-
-// Pipe compatibility test (simulated)
-function pipe<T, U, V>(val: T, f1: (v: T) => U, f2: (v: U) => V): V {
-  return f2(f1(val));
-}
 
 Deno.test("works with pipe", () => {
   const result = pipe(

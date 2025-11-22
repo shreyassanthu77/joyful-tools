@@ -7,7 +7,17 @@ This module provides a robust `Option<T>` type that represents either a value (`
 ## Installation
 
 ```bash
-deno add @joyful/option
+# deno
+deno add jsr:@joyful/option
+
+# pnpm 10.9+
+pnpm add jsr:@joyful/option
+
+# yarn 4.9+
+yarn add jsr:@joyful/option
+
+# npm, bun, and older versions of yarn or pnpm
+npx jsr add @joyful/option
 ```
 
 ## Features
