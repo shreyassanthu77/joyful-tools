@@ -1,7 +1,0 @@
-{
-  "devDependencies": {
-    "@deno/vite-plugin": "^1.0.5",
-    "@vitest/ui": "4.0.9",
-    "vitest": "4.0.9"
-  }
-}

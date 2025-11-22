@@ -5,12 +5,10 @@
   },
   "tasks": {
     "test:pipe": "deno task --cwd pipe test",
-    "test:pipe-plugin": "deno task --cwd pipe-plugin test run",
     "test:result": "deno task --cwd result test",
     "test": {
       "dependencies": [
         "test:pipe",
-        "test:pipe-plugin",
         "test:result"
       ]
     }
@@ -21,7 +19,6 @@
     "kv-mini-redis",
     "kv-nats",
     "pipe",
-    "pipe-plugin",
     "result"
   ]
 }
