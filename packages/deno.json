@@ -2,6 +2,9 @@
   "imports": {
     "assert": "jsr:@std/assert"
   },
+  "tasks": {
+    "test": "deno test"
+  },
   "workspace": [
     "pipe",
     "result"
