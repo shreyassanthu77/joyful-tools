@@ -66,10 +66,6 @@ const result = pipe("  hello world  ", trim, toUpperCase, addExclamation);
 - **Immutability**: Creates new values without mutating the original
 - **Composable**: Easy to create reusable function pipelines
 
-## Vite Plugin
-
-For build-time optimization (zero runtime overhead), see [@joyful/pipe-vite](https://jsr.io/@joyful/pipe-vite).
-
 ## License
 
 MIT
