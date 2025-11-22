@@ -1,5 +1,6 @@
 import { pipe } from "@joyful/pipe";
 import { Result } from "@joyful/result";
+import { Option, Some, None } from "@joyful/option";
 import { assertEquals, assertThrows } from "assert";
 
 Deno.test("Core", async (t) => {
@@ -454,5 +455,89 @@ Deno.test("Integration scenarios", async (t) => {
 
     assertEquals(result.ok(), true);
     assertEquals(result.unwrap(), 1);
+  });
+});
+
+Deno.test("Interop", async (t) => {
+  await t.step("toOption (Ok)", () => {
+    const ok = new Result.Ok("hello");
+    const option = ok.toOption();
+    assertEquals(option.isSome(), true);
+    assertEquals(option.unwrap(), "hello");
+  });
+
+  await t.step("toOption (Err)", () => {
+    const err = new Result.Err("error");
+    const option = err.toOption();
+    assertEquals(option.isNone(), true);
+  });
+
+  await t.step("errToOption (Ok)", () => {
+    const ok = new Result.Ok("hello");
+    const option = ok.errToOption();
+    assertEquals(option.isNone(), true);
+  });
+
+  await t.step("errToOption (Err)", () => {
+    const err = new Result.Err("error");
+    const option = err.errToOption();
+    assertEquals(option.isSome(), true);
+    assertEquals(option.unwrap(), "error");
+  });
+
+  await t.step("okOr (Some) - Binary", () => {
+    const some = new Some("hello");
+    const res = Result.okOr(some, "error");
+    assertEquals(res.ok(), true);
+    assertEquals(res.unwrap(), "hello");
+  });
+
+  await t.step("okOr (Some) - Curried", () => {
+    const some = new Some("hello");
+    const res = pipe(some, Result.okOr("error"));
+    assertEquals(res.ok(), true);
+    assertEquals(res.unwrap(), "hello");
+  });
+
+  await t.step("okOr (None) - Binary", () => {
+    const none = None;
+    const res = Result.okOr(none, "error");
+    assertEquals(res.ok(), false);
+    assertEquals(res.unwrapErr(), "error");
+  });
+
+  await t.step("okOr (None) - Curried", () => {
+    const none = None;
+    const res = pipe(none, Result.okOr("error"));
+    assertEquals(res.ok(), false);
+    assertEquals(res.unwrapErr(), "error");
+  });
+
+  await t.step("okOrElse (Some) - Binary", () => {
+    const some = new Some("hello");
+    const res = Result.okOrElse(some, () => "error");
+    assertEquals(res.ok(), true);
+    assertEquals(res.unwrap(), "hello");
+  });
+
+  await t.step("okOrElse (Some) - Curried", () => {
+    const some = new Some("hello");
+    const res = pipe(some, Result.okOrElse(() => "error"));
+    assertEquals(res.ok(), true);
+    assertEquals(res.unwrap(), "hello");
+  });
+
+  await t.step("okOrElse (None) - Binary", () => {
+    const none = None;
+    const res = Result.okOrElse(none, () => "error");
+    assertEquals(res.ok(), false);
+    assertEquals(res.unwrapErr(), "error");
+  });
+
+  await t.step("okOrElse (None) - Curried", () => {
+    const none = None;
+    const res = pipe(none, Result.okOrElse(() => "error"));
+    assertEquals(res.ok(), false);
+    assertEquals(res.unwrapErr(), "error");
   });
 });

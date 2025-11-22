@@ -1,3 +1,5 @@
+import { Option, Some, None, fromNullable } from "@joyful/option";
+
 /**
  * A TypeScript implementation of the Result type for error handling.
  *
@@ -96,6 +98,20 @@ interface BaseResult<T, E> {
    * @returns The success value or the default value
    */
   unwrapOr(defaultValue: T): T;
+
+  /**
+   * Converts from `Result<T, E>` to `Option<T>`.
+   *
+   * @returns `Some(value)` if the result is Ok, otherwise `None`.
+   */
+  toOption(): Option<NonNullable<T>>;
+
+  /**
+   * Converts from `Result<T, E>` to `Option<E>`.
+   *
+   * @returns `Some(error)` if the result is Err, otherwise `None`.
+   */
+  errToOption(): Option<NonNullable<E>>;
 }
 
 /**
@@ -150,6 +166,22 @@ export class Ok<T, E = never> implements BaseResult<T, E> {
    */
   unwrapOr(_: T): T {
     return this.value;
+  }
+
+  /**
+   * Converts the Ok value into an Option.
+   * @returns Some(value) if value is not null/undefined, otherwise None
+   */
+  toOption(): Option<NonNullable<T>> {
+    return fromNullable(this.value);
+  }
+
+  /**
+   * Converts the Ok value into None (since we're looking for an error).
+   * @returns None
+   */
+  errToOption(): Option<NonNullable<E>> {
+    return None;
   }
 }
 
@@ -210,6 +242,22 @@ export class Err<E, T = never> implements BaseResult<T, E> {
    */
   unwrapOr(defaultValue: T): T {
     return defaultValue;
+  }
+
+  /**
+   * Converts the Err value into None.
+   * @returns None
+   */
+  toOption(): Option<NonNullable<T>> {
+    return None;
+  }
+
+  /**
+   * Converts the Err value into a Some.
+   * @returns Some(error)
+   */
+  errToOption(): Option<NonNullable<E>> {
+    return fromNullable(this.error);
   }
 }
 
@@ -587,5 +635,97 @@ export function match<T, E, U>(
   const err = errOrOk as (error: E) => U;
   return (result: Result<T, E>): U => {
     return result instanceof Ok ? ok(result.value) : err(result.error);
+  };
+}
+
+/**
+ * Converts an Option<T> to a Result<T, E>.
+ *
+ * This function supports two calling patterns:
+ * 1. Curried: `okOr(error)(option)` - perfect for pipe composition
+ * 2. Binary: `okOr(option, error)` - more intuitive for direct calls
+ *
+ * Transforms `Option<T>` into `Result<T, E>`, mapping `Some(v)` to
+ * `Ok(v)` and `None` to `Err(error)`.
+ *
+ * @example
+ * ```typescript
+ * import { Some, None } from "@joyful/option";
+ *
+ * const x = new Some("foo");
+ * const r = okOr(x, 0); // Ok("foo")
+ *
+ * const y = None;
+ * const r2 = okOr(y, 0); // Err(0)
+ * ```
+ */
+export function okOr<T, E>(
+  option: Option<T>,
+  error: E,
+): Result<T, E>;
+export function okOr<T, E>(
+  error: E,
+): (option: Option<T>) => Result<T, E>;
+export function okOr<T, E>(
+  optionOrError: Option<T> | E,
+  maybeError?: E,
+): Result<T, E> | ((option: Option<T>) => Result<T, E>) {
+  // Binary form: okOr(option, error)
+  if (arguments.length === 2) {
+    const option = optionOrError as Option<T>;
+    const error = maybeError as E;
+    return option.isSome() ? new Ok(option.unwrap()) : new Err(error);
+  }
+
+  // Curried form: okOr(error)(option)
+  const error = optionOrError as E;
+  return (option: Option<T>): Result<T, E> => {
+    return option.isSome() ? new Ok(option.unwrap()) : new Err(error);
+  };
+}
+
+/**
+ * Converts an Option<T> to a Result<T, E>.
+ *
+ * This function supports two calling patterns:
+ * 1. Curried: `okOrElse(errFn)(option)` - perfect for pipe composition
+ * 2. Binary: `okOrElse(option, errFn)` - more intuitive for direct calls
+ *
+ * Transforms `Option<T>` into `Result<T, E>`, mapping `Some(v)` to
+ * `Ok(v)` and `None` to `Err(errFn())`.
+ *
+ * @example
+ * ```typescript
+ * import { Some, None } from "@joyful/option";
+ *
+ * const x = new Some("foo");
+ * const r = okOrElse(x, () => 0); // Ok("foo")
+ *
+ * const y = None;
+ * const r2 = okOrElse(y, () => 0); // Err(0)
+ * ```
+ */
+export function okOrElse<T, E>(
+  option: Option<T>,
+  errFn: () => E,
+): Result<T, E>;
+export function okOrElse<T, E>(
+  errFn: () => E,
+): (option: Option<T>) => Result<T, E>;
+export function okOrElse<T, E>(
+  optionOrFn: Option<T> | (() => E),
+  maybeFn?: () => E,
+): Result<T, E> | ((option: Option<T>) => Result<T, E>) {
+  // Binary form: okOrElse(option, errFn)
+  if (arguments.length === 2) {
+    const option = optionOrFn as Option<T>;
+    const errFn = maybeFn as () => E;
+    return option.isSome() ? new Ok(option.unwrap()) : new Err(errFn());
+  }
+
+  // Curried form: okOrElse(errFn)(option)
+  const errFn = optionOrFn as () => E;
+  return (option: Option<T>): Result<T, E> => {
+    return option.isSome() ? new Ok(option.unwrap()) : new Err(errFn());
   };
 }
