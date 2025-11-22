@@ -105,7 +105,7 @@ class NoneImpl implements BaseOption<never> {
 /**
  * The singleton instance of None.
  */
-export const None = new NoneImpl();
+export const None: None = new NoneImpl();
 
 /**
  * Type alias for None to make it easier to use in type definitions.
@@ -133,9 +133,11 @@ export type Option<T> = Some<T extends NonNullable<unknown> ? T : never> | None;
 export function fromNullable<T>(
   value: T | null | undefined,
 ): Option<NonNullable<T>> {
-  return (value === null || value === undefined
-    ? None
-    : new Some(value as NonNullable<T>)) as Option<NonNullable<T>>;
+  return (
+    value === null || value === undefined
+      ? None
+      : new Some(value as NonNullable<T>)
+  ) as Option<NonNullable<T>>;
 }
 
 /**
@@ -150,9 +152,18 @@ export function fromNullable<T>(
  * const mappedNone = map(maybeNone, x => x * 2); // None
  * ```
  */
-export function map<T extends NonNullable<unknown>, U extends NonNullable<unknown>>(option: Option<T>, f: (value: T) => U): Option<U>;
-export function map<T extends NonNullable<unknown>, U extends NonNullable<unknown>>(f: (value: T) => U): (option: Option<T>) => Option<U>;
-export function map<T extends NonNullable<unknown>, U extends NonNullable<unknown>>(
+export function map<
+  T extends NonNullable<unknown>,
+  U extends NonNullable<unknown>,
+>(option: Option<T>, f: (value: T) => U): Option<U>;
+export function map<
+  T extends NonNullable<unknown>,
+  U extends NonNullable<unknown>,
+>(f: (value: T) => U): (option: Option<T>) => Option<U>;
+export function map<
+  T extends NonNullable<unknown>,
+  U extends NonNullable<unknown>,
+>(
   optionOrFn: Option<T> | ((value: T) => U),
   maybeFn?: (value: T) => U,
 ): Option<U> | ((option: Option<T>) => Option<U>) {
@@ -218,13 +229,8 @@ export function andThen<T extends NonNullable<unknown>, U>(
  * const y = orElse(x, () => new Some(5)); // Some(5)
  * ```
  */
-export function orElse<T>(
-  option: Option<T>,
-  f: () => Option<T>,
-): Option<T>;
-export function orElse<T>(
-  f: () => Option<T>,
-): (option: Option<T>) => Option<T>;
+export function orElse<T>(option: Option<T>, f: () => Option<T>): Option<T>;
+export function orElse<T>(f: () => Option<T>): (option: Option<T>) => Option<T>;
 export function orElse<T>(
   optionOrFn: Option<T> | (() => Option<T>),
   maybeFn?: () => Option<T>,
