@@ -161,6 +161,42 @@ const result2 = Result.orElse(cacheResult, fetchFromDatabase);
 console.log(result2.unwrap()); // "Data for user123 from database"
 ```
 
+### Side Effects with `inspect` and `inspectErr`
+
+The `inspect` and `inspectErr` functions allow you to perform side effects (like logging) without changing the Result value. This is perfect for debugging, monitoring, or other operations that shouldn't affect the flow of computation.
+
+```typescript
+import { Result } from "@joyful/result";
+import { pipe } from "@joyful/pipe";
+
+const result = new Result.Ok(42);
+
+// Inspect success values (curried form)
+const withLogging = pipe(
+  result,
+  Result.inspect((value) => console.log("Processing:", value)),
+  Result.map((n) => n * 2),
+  Result.inspect((value) => console.log("Processed:", value))
+);
+console.log(withLogging.unwrap()); // 84 (unchanged by inspection)
+
+// Inspect error values
+const errorResult = new Result.Err("Network error");
+const withErrorLogging = pipe(
+  errorResult,
+  Result.inspectErr((error) => console.error("Error occurred:", error)),
+  Result.orElse(() => new Result.Ok("Default value"))
+);
+// Logs: "Error occurred: Network error"
+console.log(withErrorLogging.unwrap()); // "Default value"
+
+// Binary form (more direct)
+const unchanged = Result.inspect(result, (value) => {
+  console.log("Direct inspection:", value);
+});
+console.log(unchanged.unwrap()); // 42 (unchanged)
+```
+
 ### Pattern Matching with `match`
 
 ```typescript
@@ -229,13 +265,52 @@ const processed = await pipe(
 
 ### AsyncResult Utilities
 
-AsyncResult provides the same functional utilities as Result, but with async support:
+AsyncResult provides same functional utilities as Result, but with async support:
 
 - `AsyncResult.map()` - Map success values (supports async mapping functions)
 - `AsyncResult.mapErr()` - Map error values (supports async mapping functions)  
 - `AsyncResult.andThen()` - Chain async operations that return Results
 - `AsyncResult.orElse()` - Provide async fallback behavior
 - `AsyncResult.match()` - Pattern match with async handlers
+- `AsyncResult.inspect()` - Perform async side effects on success values
+- `AsyncResult.inspectErr()` - Perform async side effects on error values
+
+### Async Side Effects with `inspect` and `inspectErr`
+
+```typescript
+import { AsyncResult } from "@joyful/result";
+import { pipe } from "@joyful/pipe";
+
+const result = AsyncResult.fromResult(new Result.Ok("user data"));
+
+// Async inspection with logging
+const withAsyncLogging = await pipe(
+  result,
+  AsyncResult.inspect(async (data) => {
+    await analytics.track("data_processed", data);
+    console.log("Processing:", data);
+  }),
+  AsyncResult.map(async (data) => {
+    await new Promise(resolve => setTimeout(resolve, 100));
+    return data.toUpperCase();
+  }),
+  AsyncResult.inspect((data) => console.log("Processed:", data))
+);
+console.log(withAsyncLogging.unwrap()); // "USER DATA"
+
+// Async error inspection
+const errorResult = AsyncResult.fromResult(new Result.Err("API error"));
+const withAsyncErrorLogging = await pipe(
+  errorResult,
+  AsyncResult.inspectErr(async (error) => {
+    await logger.error("API call failed", error);
+    console.error("Logged error:", error);
+  }),
+  AsyncResult.orElse(() => new Result.Ok("Fallback data"))
+);
+// Logs error asynchronously
+console.log(withAsyncErrorLogging.unwrap()); // "Fallback data"
+```
 
 ## API Reference
 
@@ -307,8 +382,16 @@ Chains operations that return Results (flatMap/bind).
 #### `orElse<T1, T2, E1, E2>(f: (error: E1) => Result<T2, E2>): (result: Result<T1, E1>) => Result<T1 | T2, E2>`
 Provides fallback behavior for Results.
 
+#### `inspect<T, E>(result: Result<T, E>, f: (value: T) => void): Result<T, E>`
+#### `inspect<T, E>(f: (value: T) => void): (result: Result<T, E>) => Result<T, E>`
+Inspects the success value of a Result without changing it (for side effects like logging).
+
+#### `inspectErr<T, E>(result: Result<T, E>, f: (error: E) => void): Result<T, E>`
+#### `inspectErr<T, E>(f: (error: E) => void): (result: Result<T, E>) => Result<T, E>`
+Inspects the error value of a Result without changing it (for error logging and monitoring).
+
 #### `match<T, E, U>(result: Result<T, E>, ok: (value: T) => U, err: (error: E) => U): U`
-#### `match<T, E, U>(ok: (value: T) => U, err: (error: E) => U): (result: Result<T, E>) => U`
+#### `match<T, E, U>(ok: (value: T) => U, err: (error: E) => U): (result: Result<T, E>) => U>`
 Pattern matches on a Result, applying the appropriate handler.
 
 ### AsyncResult Utilities
@@ -337,6 +420,14 @@ Chains async operations that return Results or AsyncResults.
 #### `AsyncResult.orElse<T1, T2, E1, E2>(f: (error: E1) => Result<T2, E2> | AsyncResult<T2, E2> | Promise<Result<T2, E2> | AsyncResult<T2, E2>>): (result: Result<T1, E1> | AsyncResult<T1, E1>) => AsyncResult<T1 | T2, E2>`
 Provides async fallback behavior for AsyncResults or Results.
 
+#### `AsyncResult.inspect<T, E>(result: Result<T, E> | AsyncResult<T, E>, f: (value: T) => void | Promise<void>): AsyncResult<T, E>`
+#### `AsyncResult.inspect<T, E>(f: (value: T) => void | Promise<void>): (result: Result<T, E> | AsyncResult<T, E>) => AsyncResult<T, E>`
+Inspects success value of an AsyncResult or Result without changing it (supports async inspection functions).
+
+#### `AsyncResult.inspectErr<T, E>(result: Result<T, E> | AsyncResult<T, E>, f: (error: E) => void | Promise<void>): AsyncResult<T, E>`
+#### `AsyncResult.inspectErr<T, E>(f: (error: E) => void | Promise<void>): (result: Result<T, E> | AsyncResult<T, E>) => AsyncResult<T, E>`
+Inspects error value of an AsyncResult or Result without changing it (supports async inspection functions).
+
 #### `AsyncResult.match<T, E, U>(result: Result<T, E> | AsyncResult<T, E>, ok: (value: T) => U | Promise<U>, err: (error: E) => U | Promise<U>): Promise<U>`
 #### `AsyncResult.match<T, E, U>(ok: (value: T) => U | Promise<U>, err: (error: E) => U | Promise<U>): (result: Result<T, E> | AsyncResult<T, E>) => Promise<U>`
 Pattern matches on an AsyncResult or Result with async handlers.
@@ -360,19 +451,28 @@ This package is designed to work seamlessly with [`@joyful/pipe`](https://jsr.io
 import { pipe } from "@joyful/pipe";
 import { Result, AsyncResult } from "@joyful/result";
 
-// Sync example
+// Sync example with logging
 const process = pipe(
   fetchData(),
+  Result.inspect((data) => console.log("Fetched:", data)),
   Result.andThen(validate),
   Result.map(transform),
+  Result.inspect((result) => console.log("Transformed:", result)),
   Result.orElse(handleError)
 );
 
-// Async example
+// Async example with async logging
 const asyncProcess = await pipe(
   AsyncResult.fromThrowable(fetchData, (e) => e.message),
+  AsyncResult.inspect(async (data) => {
+    await analytics.track("data_fetched", data);
+    console.log("Async fetched:", data);
+  }),
   AsyncResult.andThen(validateAsync),
   AsyncResult.map(transformAsync),
+  AsyncResult.inspectErr(async (error) => {
+    await logger.error("Processing failed", error);
+  }),
   AsyncResult.orElse(handleErrorAsync)
 );
 ```

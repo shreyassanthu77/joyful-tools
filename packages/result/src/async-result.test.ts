@@ -457,6 +457,162 @@ Deno.test("AsyncResult complex chaining", async (t) => {
   });
 });
 
+Deno.test("inspect", async (t) => {
+  await t.step("should inspect Ok value (curried)", async () => {
+    let inspectedValue: string | undefined;
+    const ok = AsyncResult.fromResult(new Result.Ok("test"));
+    const result = await pipe(
+      ok,
+      AsyncResult.inspect((value) => {
+        inspectedValue = value;
+      }),
+    );
+
+    assertEquals(inspectedValue, "test");
+    assertEquals(result.ok(), true);
+    assertEquals(result.unwrap(), "test"); // unchanged
+  });
+
+  await t.step("should inspect Ok value (binary)", async () => {
+    let inspectedValue: string | undefined;
+    const ok = AsyncResult.fromResult(new Result.Ok("test"));
+    const result = await AsyncResult.inspect(ok, (value) => {
+      inspectedValue = value;
+    });
+
+    assertEquals(inspectedValue, "test");
+    assertEquals(result.ok(), true);
+    assertEquals(result.unwrap(), "test"); // unchanged
+  });
+
+  await t.step("should not inspect Err value", async () => {
+    let inspectedValue: string | undefined;
+    const err = AsyncResult.fromResult(new Result.Err("error"));
+    const result = await pipe(
+      err,
+      AsyncResult.inspect((value) => {
+        inspectedValue = value;
+      }),
+    );
+
+    assertEquals(inspectedValue, undefined);
+    assertEquals(result.ok(), false);
+    assertEquals(result.unwrapErr(), "error"); // unchanged
+  });
+
+  await t.step("should handle async inspection function", async () => {
+    let inspectedValue: string | undefined;
+    const ok = AsyncResult.fromResult(new Result.Ok("async test"));
+    const result = await pipe(
+      ok,
+      AsyncResult.inspect(async (value) => {
+        await new Promise((resolve) => setTimeout(resolve, 1));
+        inspectedValue = value;
+      }),
+    );
+
+    assertEquals(inspectedValue, "async test");
+    assertEquals(result.ok(), true);
+    assertEquals(result.unwrap(), "async test"); // unchanged
+  });
+
+  await t.step("should handle multiple inspections", async () => {
+    const inspections: string[] = [];
+    const ok = AsyncResult.fromResult(new Result.Ok("multi"));
+    const result = await pipe(
+      ok,
+      AsyncResult.inspect((value) => {
+        inspections.push(`first: ${value}`);
+      }),
+      AsyncResult.inspect(async (value) => {
+        await new Promise((resolve) => setTimeout(resolve, 1));
+        inspections.push(`second: ${value}`);
+      }),
+    );
+
+    assertEquals(inspections, ["first: multi", "second: multi"]);
+    assertEquals(result.unwrap(), "multi"); // unchanged
+  });
+});
+
+Deno.test("inspectErr", async (t) => {
+  await t.step("should inspect Err value (curried)", async () => {
+    let inspectedError: string | undefined;
+    const err = AsyncResult.fromResult(new Result.Err("async error"));
+    const result = await pipe(
+      err,
+      AsyncResult.inspectErr((error) => {
+        inspectedError = error;
+      }),
+    );
+
+    assertEquals(inspectedError, "async error");
+    assertEquals(result.ok(), false);
+    assertEquals(result.unwrapErr(), "async error"); // unchanged
+  });
+
+  await t.step("should inspect Err value (binary)", async () => {
+    let inspectedError: string | undefined;
+    const err = AsyncResult.fromResult(new Result.Err("async error"));
+    const result = await AsyncResult.inspectErr(err, (error) => {
+      inspectedError = error;
+    });
+
+    assertEquals(inspectedError, "async error");
+    assertEquals(result.ok(), false);
+    assertEquals(result.unwrapErr(), "async error"); // unchanged
+  });
+
+  await t.step("should not inspect Ok value", async () => {
+    let inspectedError: string | undefined;
+    const ok = AsyncResult.fromResult(new Result.Ok("success"));
+    const result = await pipe(
+      ok,
+      AsyncResult.inspectErr((error) => {
+        inspectedError = error;
+      }),
+    );
+
+    assertEquals(inspectedError, undefined);
+    assertEquals(result.ok(), true);
+    assertEquals(result.unwrap(), "success"); // unchanged
+  });
+
+  await t.step("should handle async error inspection function", async () => {
+    let inspectedError: string | undefined;
+    const err = AsyncResult.fromResult(new Result.Err("async error"));
+    const result = await pipe(
+      err,
+      AsyncResult.inspectErr(async (error) => {
+        await new Promise((resolve) => setTimeout(resolve, 1));
+        inspectedError = error;
+      }),
+    );
+
+    assertEquals(inspectedError, "async error");
+    assertEquals(result.ok(), false);
+    assertEquals(result.unwrapErr(), "async error"); // unchanged
+  });
+
+  await t.step("should handle multiple error inspections", async () => {
+    const inspections: string[] = [];
+    const err = AsyncResult.fromResult(new Result.Err("multi error"));
+    const result = await pipe(
+      err,
+      AsyncResult.inspectErr((error) => {
+        inspections.push(`first: ${error}`);
+      }),
+      AsyncResult.inspectErr(async (error) => {
+        await new Promise((resolve) => setTimeout(resolve, 1));
+        inspections.push(`second: ${error}`);
+      }),
+    );
+
+    assertEquals(inspections, ["first: multi error", "second: multi error"]);
+    assertEquals(result.unwrapErr(), "multi error"); // unchanged
+  });
+});
+
 Deno.test("AsyncResult error handling", async (t) => {
   await t.step(
     "should handle promise rejections in fromThrowable",
@@ -494,5 +650,55 @@ Deno.test("AsyncResult error handling", async (t) => {
 
     assertEquals(result.ok(), true);
     assertEquals(result.unwrap(), "Recovered from: Mapped: Original error");
+  });
+
+  await t.step("should handle async logging pipeline with inspect", async () => {
+    const logs: string[] = [];
+    const result = await pipe(
+      AsyncResult.fromResult(new Result.Ok("user data")),
+      AsyncResult.inspect((data) => {
+        logs.push(`Processing: ${data}`);
+      }),
+      AsyncResult.map(async (data) => {
+        await new Promise((resolve) => setTimeout(resolve, 1));
+        return data.toUpperCase();
+      }),
+      AsyncResult.inspect((data) => {
+        logs.push(`Processed: ${data}`);
+      }),
+      AsyncResult.andThen(async (data) => {
+        await new Promise((resolve) => setTimeout(resolve, 1));
+        return data.length > 5 ? new Result.Ok(data) : new Result.Err("Too short");
+      }),
+      AsyncResult.inspectErr((error) => {
+        logs.push(`Error: ${error}`);
+      }),
+    );
+
+    assertEquals(logs, ["Processing: user data", "Processed: USER DATA"]);
+    assertEquals(result.ok(), true);
+    assertEquals(result.unwrap(), "USER DATA");
+  });
+
+  await t.step("should handle async error logging pipeline with inspectErr", async () => {
+    const logs: string[] = [];
+    const result = await pipe(
+      AsyncResult.fromResult(new Result.Err("initial async error")),
+      AsyncResult.inspectErr(async (error) => {
+        await new Promise((resolve) => setTimeout(resolve, 1));
+        logs.push(`Initial error: ${error}`);
+      }),
+      AsyncResult.orElse(async (error) => {
+        await new Promise((resolve) => setTimeout(resolve, 1));
+        return new Result.Err(`Fallback: ${error}`);
+      }),
+      AsyncResult.inspectErr((error) => {
+        logs.push(`Final error: ${error}`);
+      }),
+    );
+
+    assertEquals(logs, ["Initial error: initial async error", "Final error: Fallback: initial async error"]);
+    assertEquals(result.ok(), false);
+    assertEquals(result.unwrapErr(), "Fallback: initial async error");
   });
 });

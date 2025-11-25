@@ -418,6 +418,120 @@ Deno.test("Complex chaining", async (t) => {
   });
 });
 
+Deno.test("inspect", async (t) => {
+  await t.step("should inspect Ok value (curried)", () => {
+    let inspectedValue: number | undefined;
+    const ok = new Result.Ok(42);
+    const result = pipe(
+      ok,
+      Result.inspect((value) => {
+        inspectedValue = value;
+      }),
+    );
+
+    assertEquals(inspectedValue, 42);
+    assertEquals(result.ok(), true);
+    assertEquals(result.unwrap(), 42); // unchanged
+  });
+
+  await t.step("should inspect Ok value (binary)", () => {
+    let inspectedValue: number | undefined;
+    const ok = new Result.Ok(42);
+    const result = Result.inspect(ok, (value) => {
+      inspectedValue = value;
+    });
+
+    assertEquals(inspectedValue, 42);
+    assertEquals(result.ok(), true);
+    assertEquals(result.unwrap(), 42); // unchanged
+  });
+
+  await t.step("should not inspect Err value", () => {
+    let inspectedValue: number | undefined;
+    const err = new Result.Err("error");
+    const result = pipe(
+      err,
+      Result.inspect((value) => {
+        inspectedValue = value;
+      }),
+    );
+
+    assertEquals(inspectedValue, undefined);
+    assertEquals(result.ok(), false);
+    assertEquals(result.unwrapErr(), "error"); // unchanged
+  });
+
+  await t.step("should handle multiple inspections", () => {
+    const inspections: string[] = [];
+    const ok = new Result.Ok("test");
+    const result = pipe(
+      ok,
+      Result.inspect((value) => inspections.push(`first: ${value}`)),
+      Result.inspect((value) => inspections.push(`second: ${value}`)),
+    );
+
+    assertEquals(inspections, ["first: test", "second: test"]);
+    assertEquals(result.unwrap(), "test"); // unchanged
+  });
+});
+
+Deno.test("inspectErr", async (t) => {
+  await t.step("should inspect Err value (curried)", () => {
+    let inspectedError: string | undefined;
+    const err = new Result.Err("network error");
+    const result = pipe(
+      err,
+      Result.inspectErr((error) => {
+        inspectedError = error;
+      }),
+    );
+
+    assertEquals(inspectedError, "network error");
+    assertEquals(result.ok(), false);
+    assertEquals(result.unwrapErr(), "network error"); // unchanged
+  });
+
+  await t.step("should inspect Err value (binary)", () => {
+    let inspectedError: string | undefined;
+    const err = new Result.Err("network error");
+    const result = Result.inspectErr(err, (error) => {
+      inspectedError = error;
+    });
+
+    assertEquals(inspectedError, "network error");
+    assertEquals(result.ok(), false);
+    assertEquals(result.unwrapErr(), "network error"); // unchanged
+  });
+
+  await t.step("should not inspect Ok value", () => {
+    let inspectedError: string | undefined;
+    const ok = new Result.Ok(42);
+    const result = pipe(
+      ok,
+      Result.inspectErr((error) => {
+        inspectedError = error;
+      }),
+    );
+
+    assertEquals(inspectedError, undefined);
+    assertEquals(result.ok(), true);
+    assertEquals(result.unwrap(), 42); // unchanged
+  });
+
+  await t.step("should handle multiple error inspections", () => {
+    const inspections: string[] = [];
+    const err = new Result.Err("validation error");
+    const result = pipe(
+      err,
+      Result.inspectErr((error) => inspections.push(`first: ${error}`)),
+      Result.inspectErr((error) => inspections.push(`second: ${error}`)),
+    );
+
+    assertEquals(inspections, ["first: validation error", "second: validation error"]);
+    assertEquals(result.unwrapErr(), "validation error"); // unchanged
+  });
+});
+
 Deno.test("Integration scenarios", async (t) => {
   await t.step("should handle JSON parsing with validation", () => {
     const json = '{"name": "Alice", "age": 30}';
@@ -454,5 +568,37 @@ Deno.test("Integration scenarios", async (t) => {
 
     assertEquals(result.ok(), true);
     assertEquals(result.unwrap(), 1);
+  });
+
+  await t.step("should handle logging pipeline with inspect", () => {
+    const logs: string[] = [];
+    const result = pipe(
+      new Result.Ok("user data"),
+      Result.inspect((data) => logs.push(`Processing: ${data}`)),
+      Result.map((data) => data.toUpperCase()),
+      Result.inspect((data) => logs.push(`Processed: ${data}`)),
+      Result.andThen((data) => 
+        data.length > 5 ? new Result.Ok(data) : new Result.Err("Too short")
+      ),
+      Result.inspectErr((error) => logs.push(`Error: ${error}`)),
+    );
+
+    assertEquals(logs, ["Processing: user data", "Processed: USER DATA"]);
+    assertEquals(result.ok(), true);
+    assertEquals(result.unwrap(), "USER DATA");
+  });
+
+  await t.step("should handle error logging pipeline with inspectErr", () => {
+    const logs: string[] = [];
+    const result = pipe(
+      new Result.Err("initial error"),
+      Result.inspectErr((error) => logs.push(`Initial error: ${error}`)),
+      Result.orElse((error) => new Result.Err(`Fallback: ${error}`)),
+      Result.inspectErr((error) => logs.push(`Final error: ${error}`)),
+    );
+
+    assertEquals(logs, ["Initial error: initial error", "Final error: Fallback: initial error"]);
+    assertEquals(result.ok(), false);
+    assertEquals(result.unwrapErr(), "Fallback: initial error");
   });
 });

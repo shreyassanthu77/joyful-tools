@@ -589,3 +589,133 @@ export function match<T, E, U>(
     return result instanceof Ok ? ok(result.value) : err(result.error);
   };
 }
+
+/**
+ * Inspects the success value of a Result without changing it.
+ *
+ * This function supports two calling patterns:
+ * 1. Curried: `inspect(fn)(result)` - perfect for pipe composition
+ * 2. Binary: `inspect(result, fn)` - more intuitive for direct calls
+ *
+ * If the Result is Ok, the provided function is applied to the contained value
+ * for side effects (like logging), and the original Result is returned unchanged.
+ * If the Result is Err, it is passed through unchanged.
+ *
+ * This is useful for debugging, logging, or other side effects that should
+ * not affect the flow of the computation.
+ *
+ * @example
+ * ```typescript
+ * const result = new Ok(42);
+ *
+ * // Curried form (great for pipes)
+ * const withLogging = pipe(
+ *   result,
+ *   inspect((value) => console.log("Processing:", value))
+ * );
+ * console.log(withLogging.unwrap()); // 42 (unchanged)
+ *
+ * // Binary form (more direct)
+ * const unchanged = inspect(result, (value) => console.log("Value:", value));
+ * console.log(unchanged.unwrap()); // 42 (unchanged)
+ *
+ * const error = new Err("failed");
+ * const unchangedError = inspect(error, (value) => console.log("Won't run"));
+ * console.log(unchangedError.unwrapErr()); // "failed" (unchanged)
+ * ```
+ */
+export function inspect<T, E>(
+  result: Result<T, E>,
+  fn: (value: T) => void,
+): Result<T, E>;
+export function inspect<T, E>(
+  fn: (value: T) => void,
+): (result: Result<T, E>) => Result<T, E>;
+export function inspect<T, E>(
+  resultOrFn: Result<T, E> | ((value: T) => void),
+  maybeFn?: (value: T) => void,
+): Result<T, E> | ((result: Result<T, E>) => Result<T, E>) {
+  // Binary form: inspect(result, fn)
+  if (maybeFn !== undefined) {
+    const result = resultOrFn as Result<T, E>;
+    const fn = maybeFn;
+    if (result instanceof Ok) {
+      fn(result.value);
+    }
+    return result;
+  }
+
+  // Curried form: inspect(fn)(result)
+  const fn = resultOrFn as (value: T) => void;
+  return (result: Result<T, E>): Result<T, E> => {
+    if (result instanceof Ok) {
+      fn(result.value);
+    }
+    return result;
+  };
+}
+
+/**
+ * Inspects the error value of a Result without changing it.
+ *
+ * This function supports two calling patterns:
+ * 1. Curried: `inspectErr(fn)(result)` - perfect for pipe composition
+ * 2. Binary: `inspectErr(result, fn)` - more intuitive for direct calls
+ *
+ * If the Result is Err, the provided function is applied to the contained error
+ * for side effects (like error logging), and the original Result is returned unchanged.
+ * If the Result is Ok, it is passed through unchanged.
+ *
+ * This is useful for error logging, monitoring, or other error-side effects
+ * that should not affect the flow of the computation.
+ *
+ * @example
+ * ```typescript
+ * const result = new Err("network error");
+ *
+ * // Curried form (great for pipes)
+ * const withErrorLogging = pipe(
+ *   result,
+ *   inspectErr((error) => console.error("Error occurred:", error))
+ * );
+ * console.log(withErrorLogging.unwrapErr()); // "network error" (unchanged)
+ *
+ * // Binary form (more direct)
+ * const unchanged = inspectErr(result, (error) => console.error("Error:", error));
+ * console.log(unchanged.unwrapErr()); // "network error" (unchanged)
+ *
+ * const success = new Ok(42);
+ * const unchangedSuccess = inspectErr(success, (error) => console.error("Won't run"));
+ * console.log(unchangedSuccess.unwrap()); // 42 (unchanged)
+ * ```
+ */
+export function inspectErr<T, E>(
+  result: Result<T, E>,
+  fn: (error: E) => void,
+): Result<T, E>;
+export function inspectErr<T, E>(
+  fn: (error: E) => void,
+): (result: Result<T, E>) => Result<T, E>;
+export function inspectErr<T, E>(
+  resultOrFn: Result<T, E> | ((error: E) => void),
+  maybeFn?: (error: E) => void,
+): Result<T, E> | ((result: Result<T, E>) => Result<T, E>) {
+  // Binary form: inspectErr(result, fn)
+  if (maybeFn !== undefined) {
+    const result = resultOrFn as Result<T, E>;
+    const fn = maybeFn;
+    if (result instanceof Err) {
+      fn(result.error);
+    }
+    return result;
+  }
+
+  // Curried form: inspectErr(fn)(result)
+  const fn = resultOrFn as (error: E) => void;
+  return (result: Result<T, E>): Result<T, E> => {
+    if (result instanceof Err) {
+      fn(result.error);
+    }
+    return result;
+  };
+}

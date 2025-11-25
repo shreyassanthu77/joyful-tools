@@ -684,3 +684,187 @@ export function match<T, E, U>(
     return matchInner(result, ok, err);
   };
 }
+
+/**
+ * Internal helper that inspects the success value of a Result or AsyncResult.
+ * @param result - The Result or AsyncResult to inspect
+ * @param fn - The inspection function (can be sync or async)
+ * @returns Promise that resolves to the original Result
+ */
+async function inspectInner<T, E>(
+  result: Result<T, E> | AsyncResult<T, E>,
+  fn: (value: T) => void | Promise<void>,
+): Promise<Result<T, E>> {
+  const value =
+    result instanceof AsyncResultImpl
+      ? await (result as AsyncResultImpl<T, E>).promise
+      : (result as Result<T, E>);
+  if (value instanceof Ok) {
+    const result = fn(value.value);
+    if (result instanceof Promise) {
+      await result;
+    }
+  }
+  return value;
+}
+
+/**
+ * Inspects the success value of an AsyncResult or Result without changing it.
+ *
+ * This function supports two calling patterns:
+ * 1. Curried: `inspect(fn)(result)` - perfect for pipe composition
+ * 2. Binary: `inspect(result, fn)` - more intuitive for direct calls
+ *
+ * If the Result is Ok, the provided function is applied to the contained value
+ * for side effects (like logging), and the original Result is returned unchanged.
+ * The inspection function can be synchronous or asynchronous. If the Result is Err,
+ * it is passed through unchanged.
+ *
+ * This is useful for debugging, logging, or other side effects that should
+ * not affect the flow of the computation.
+ *
+ * @example
+ * ```typescript
+ * import { AsyncResult, pipe } from "@joyful/result";
+ * 
+ * const result = new AsyncResultImpl(Promise.resolve(new Ok(42)));
+ * 
+ * // Curried form (great for pipes)
+ * const withLogging = pipe(
+ *   result,
+ *   AsyncResult.inspect((value) => console.log("Processing:", value))
+ * );
+ * console.log((await withLogging).unwrap()); // 42 (unchanged)
+ * 
+ * // Binary form (more direct)
+ * const unchanged = AsyncResult.inspect(result, (value) => console.log("Value:", value));
+ * console.log((await unchanged).unwrap()); // 42 (unchanged)
+ * 
+ * // Async inspection function
+ * const withAsyncLogging = await pipe(
+ *   result,
+ *   AsyncResult.inspect(async (value) => {
+ *     await new Promise(resolve => setTimeout(resolve, 100));
+ *     console.log("Async processing:", value);
+ *   })
+ * );
+ * console.log(withAsyncLogging.unwrap()); // 42 (unchanged)
+ * ```
+ */
+export function inspect<T, E>(
+  result: Result<T, E> | AsyncResult<T, E>,
+  fn: (value: T) => void | Promise<void>,
+): AsyncResult<T, E>;
+export function inspect<T, E>(
+  fn: (value: T) => void | Promise<void>,
+): (result: Result<T, E> | AsyncResult<T, E>) => AsyncResult<T, E>;
+export function inspect<T, E>(
+  resultOrFn: Result<T, E> | AsyncResult<T, E> | ((value: T) => void | Promise<void>),
+  maybeFn?: (value: T) => void | Promise<void>,
+):
+  | AsyncResult<T, E>
+  | ((result: Result<T, E> | AsyncResult<T, E>) => AsyncResult<T, E>) {
+  if (maybeFn !== undefined) {
+    const result = resultOrFn as Result<T, E> | AsyncResult<T, E>;
+    const fn = maybeFn;
+    return new AsyncResultImpl(inspectInner(result, fn));
+  }
+
+  return (result: Result<T, E> | AsyncResult<T, E>): AsyncResult<T, E> => {
+    return new AsyncResultImpl(
+      inspectInner(result, resultOrFn as (value: T) => void),
+    );
+  };
+}
+
+/**
+ * Internal helper that inspects the error value of a Result or AsyncResult.
+ * @param result - The Result or AsyncResult to inspect
+ * @param fn - The error inspection function (can be sync or async)
+ * @returns Promise that resolves to the original Result
+ */
+async function inspectErrInner<T, E>(
+  result: Result<T, E> | AsyncResult<T, E>,
+  fn: (error: E) => void | Promise<void>,
+): Promise<Result<T, E>> {
+  const value =
+    result instanceof AsyncResultImpl
+      ? await (result as AsyncResultImpl<T, E>).promise
+      : (result as Result<T, E>);
+  if (value instanceof Err) {
+    const result = fn(value.error);
+    if (result instanceof Promise) {
+      await result;
+    }
+  }
+  return value;
+}
+
+/**
+ * Inspects the error value of an AsyncResult or Result without changing it.
+ *
+ * This function supports two calling patterns:
+ * 1. Curried: `inspectErr(fn)(result)` - perfect for pipe composition
+ * 2. Binary: `inspectErr(result, fn)` - more intuitive for direct calls
+ *
+ * If the Result is Err, the provided function is applied to the contained error
+ * for side effects (like error logging), and the original Result is returned unchanged.
+ * The inspection function can be synchronous or asynchronous. If the Result is Ok,
+ * it is passed through unchanged.
+ *
+ * This is useful for error logging, monitoring, or other error-side effects
+ * that should not affect the flow of the computation.
+ *
+ * @example
+ * ```typescript
+ * import { AsyncResult, pipe } from "@joyful/result";
+ * 
+ * const result = new AsyncResultImpl(Promise.resolve(new Err("network error")));
+ * 
+ * // Curried form (great for pipes)
+ * const withErrorLogging = pipe(
+ *   result,
+ *   AsyncResult.inspectErr((error) => console.error("Error occurred:", error))
+ * );
+ * console.log((await withErrorLogging).unwrapErr()); // "network error" (unchanged)
+ * 
+ * // Binary form (more direct)
+ * const unchanged = AsyncResult.inspectErr(result, (error) => console.error("Error:", error));
+ * console.log((await unchanged).unwrapErr()); // "network error" (unchanged)
+ * 
+ * // Async error inspection
+ * const withAsyncErrorLogging = await pipe(
+ *   result,
+ *   AsyncResult.inspectErr(async (error) => {
+ *     await new Promise(resolve => setTimeout(resolve, 100));
+ *     console.error("Async error logging:", error);
+ *   })
+ * );
+ * console.log(withAsyncErrorLogging.unwrapErr()); // "network error" (unchanged)
+ * ```
+ */
+export function inspectErr<T, E>(
+  result: Result<T, E> | AsyncResult<T, E>,
+  fn: (error: E) => void | Promise<void>,
+): AsyncResult<T, E>;
+export function inspectErr<T, E>(
+  fn: (error: E) => void | Promise<void>,
+): (result: Result<T, E> | AsyncResult<T, E>) => AsyncResult<T, E>;
+export function inspectErr<T, E>(
+  resultOrFn: Result<T, E> | AsyncResult<T, E> | ((error: E) => void | Promise<void>),
+  maybeFn?: (error: E) => void | Promise<void>,
+):
+  | AsyncResult<T, E>
+  | ((result: Result<T, E> | AsyncResult<T, E>) => AsyncResult<T, E>) {
+  if (maybeFn !== undefined) {
+    const result = resultOrFn as Result<T, E> | AsyncResult<T, E>;
+    const fn = maybeFn;
+    return new AsyncResultImpl(inspectErrInner(result, fn));
+  }
+
+  return (result: Result<T, E> | AsyncResult<T, E>): AsyncResult<T, E> => {
+    return new AsyncResultImpl(
+      inspectErrInner(result, resultOrFn as (error: E) => void),
+    );
+  };
+}
