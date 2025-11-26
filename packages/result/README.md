@@ -29,15 +29,15 @@ Inspired by Rust's Result type, this implementation provides type-safe error han
 ### Creating Results
 
 ```typescript
-import { Result } from "@joyful/result";
+import { Result, Ok, Err } from "@joyful/result";
 
 // Create a successful result
-const success = new Result.Ok("Operation succeeded");
+const success = new Ok("Operation succeeded");
 console.log(success.ok()); // true
 console.log(success.unwrap()); // "Operation succeeded"
 
 // Create an error result
-const error = new Result.Err("Something went wrong");
+const error = new Err("Something went wrong");
 console.log(error.err()); // true
 console.log(error.unwrapErr()); // "Something went wrong"
 ```
@@ -45,14 +45,14 @@ console.log(error.unwrapErr()); // "Something went wrong"
 ### Handling Results
 
 ```typescript
-import { Result } from "@joyful/result";
+import { Result, Ok, Err } from "@joyful/result";
 
 function parseNumber(str: string): Result<number, string> {
   const num = parseFloat(str);
   if (isNaN(num)) {
-    return new Result.Err("Invalid number format");
+    return new Err("Invalid number format");
   }
-  return new Result.Ok(num);
+  return new Ok(num);
 }
 
 const result = parseNumber("42");
@@ -77,9 +77,9 @@ The Result type works beautifully with functional programming patterns and can b
 
 ```typescript
 import { pipe } from "@joyful/pipe";
-import { Result } from "@joyful/result";
+import { Result, Ok } from "@joyful/result";
 
-const result = new Result.Ok(5);
+const result = new Ok(5);
 
 // Curried form (great for pipes)
 const doubled = pipe(
@@ -103,21 +103,21 @@ console.log(unchanged.unwrap()); // 5
 ### Chaining Operations with `andThen`
 
 ```typescript
-import { Result } from "@joyful/result";
+import { Result, Ok, Err } from "@joyful/result";
 import { pipe } from "@joyful/pipe";
 
 const parseAge = (str: string): Result<number, string> => {
   const age = parseInt(str, 10);
-  if (isNaN(age)) return new Result.Err("Invalid number");
-  if (age < 0) return new Result.Err("Age cannot be negative");
-  if (age > 150) return new Result.Err("Age too high");
-  return new Result.Ok(age);
+  if (isNaN(age)) return new Err("Invalid number");
+  if (age < 0) return new Err("Age cannot be negative");
+  if (age > 150) return new Err("Age too high");
+  return new Ok(age);
 };
 
 const validateAge = (age: number): Result<string, string> => {
-  if (age < 18) return new Result.Err("Too young to register");
-  if (age > 65) return new Result.Err("Age exceeds limit");
-  return new Result.Ok("Age is valid");
+  if (age < 18) return new Err("Too young to register");
+  if (age > 65) return new Err("Age exceeds limit");
+  return new Ok("Age is valid");
 };
 
 // Curried form (great for pipes)
@@ -136,16 +136,16 @@ console.log(processAge2.unwrap()); // "Age is valid"
 ### Providing Fallbacks with `orElse`
 
 ```typescript
-import { Result } from "@joyful/result";
+import { Result, Ok, Err } from "@joyful/result";
 import { pipe } from "@joyful/pipe";
 
 const fetchFromCache = (id: string): Result<string, string> => {
   // Simulate cache miss
-  return new Result.Err("Not found in cache");
+  return new Err("Not found in cache");
 };
 
 const fetchFromDatabase = (id: string): Result<string, string> => {
-  return new Result.Ok(`Data for ${id} from database`);
+  return new Ok(`Data for ${id} from database`);
 };
 
 // Curried form (great for pipes)
@@ -166,10 +166,10 @@ console.log(result2.unwrap()); // "Data for user123 from database"
 The `inspect` and `inspectErr` functions allow you to perform side effects (like logging) without changing the Result value. This is perfect for debugging, monitoring, or other operations that shouldn't affect the flow of computation.
 
 ```typescript
-import { Result } from "@joyful/result";
+import { Result, Ok, Err } from "@joyful/result";
 import { pipe } from "@joyful/pipe";
 
-const result = new Result.Ok(42);
+const result = new Ok(42);
 
 // Inspect success values (curried form)
 const withLogging = pipe(
@@ -181,11 +181,11 @@ const withLogging = pipe(
 console.log(withLogging.unwrap()); // 84 (unchanged by inspection)
 
 // Inspect error values
-const errorResult = new Result.Err("Network error");
+const errorResult = new Err("Network error");
 const withErrorLogging = pipe(
   errorResult,
   Result.inspectErr((error) => console.error("Error occurred:", error)),
-  Result.orElse(() => new Result.Ok("Default value"))
+  Result.orElse(() => new Ok("Default value"))
 );
 // Logs: "Error occurred: Network error"
 console.log(withErrorLogging.unwrap()); // "Default value"
@@ -200,10 +200,10 @@ console.log(unchanged.unwrap()); // 42 (unchanged)
 ### Pattern Matching with `match`
 
 ```typescript
-import { Result } from "@joyful/result";
+import { Result, Err } from "@joyful/result";
 import { pipe } from "@joyful/pipe";
 
-const result = new Result.Err("Network timeout");
+const result = new Err("Network timeout");
 
 // Curried form (great for pipes)
 const message = pipe(
@@ -238,8 +238,8 @@ const fetchData = () => fetch("/api/data");
 const result = AsyncResult.fromThrowable(fetchData, (e) => e.message);
 
 // Convert a sync Result to AsyncResult
-import { Result } from "@joyful/result";
-const syncResult = new Result.Ok(42);
+import { AsyncResult, Ok } from "@joyful/result";
+const syncResult = new Ok(42);
 const asyncResult = AsyncResult.fromResult(syncResult);
 ```
 
@@ -278,10 +278,10 @@ AsyncResult provides same functional utilities as Result, but with async support
 ### Async Side Effects with `inspect` and `inspectErr`
 
 ```typescript
-import { AsyncResult } from "@joyful/result";
+import { AsyncResult, Ok, Err, Result } from "@joyful/result";
 import { pipe } from "@joyful/pipe";
 
-const result = AsyncResult.fromResult(new Result.Ok("user data"));
+const result = AsyncResult.fromResult(new Ok("user data"));
 
 // Async inspection with logging
 const withAsyncLogging = await pipe(
@@ -299,14 +299,14 @@ const withAsyncLogging = await pipe(
 console.log(withAsyncLogging.unwrap()); // "USER DATA"
 
 // Async error inspection
-const errorResult = AsyncResult.fromResult(new Result.Err("API error"));
+const errorResult = AsyncResult.fromResult(new Err("API error"));
 const withAsyncErrorLogging = await pipe(
   errorResult,
   AsyncResult.inspectErr(async (error) => {
     await logger.error("API call failed", error);
     console.error("Logged error:", error);
   }),
-  AsyncResult.orElse(() => new Result.Ok("Fallback data"))
+  AsyncResult.orElse(() => new Ok("Fallback data"))
 );
 // Logs error asynchronously
 console.log(withAsyncErrorLogging.unwrap()); // "Fallback data"
@@ -364,10 +364,10 @@ Maps the success value of a Result.
 
 ```typescript
 // Binary form (direct)
-const result = Result.map(new Result.Ok(5), x => x * 2);
+const result = Result.map(new Ok(5), x => x * 2);
 
 // Curried form (for pipes)
-const result = pipe(new Result.Ok(5), Result.map(x => x * 2));
+const result = pipe(new Ok(5), Result.map(x => x * 2));
 ```
 
 #### `mapErr<T, U, E>(result: Result<T, E>, f: (error: E) => U): Result<T, U>`

@@ -1,6 +1,13 @@
 {
   "name": "@joyful/option",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "exports": "./src/main.ts",
-  "license": "MIT"
+  "license": "MIT",
+  "publish": {
+    "include": [
+      "LICENSE",
+      "README.md",
+      "src/main.ts"
+    ]
+  }
 }

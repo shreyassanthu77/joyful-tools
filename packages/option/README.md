@@ -32,12 +32,12 @@ npx jsr add @joyful/option
 ### Basic Example
 
 ```typescript
-import { Option, Some, None, fromNullable } from "@joyful/option";
+import { Option, Some, None } from "@joyful/option";
 
 // Creating Options
 const someValue = new Some(42);
 const noValue = None;
-const fromNull = fromNullable(null); // None
+const fromNull = Option.fromNullable(null); // None
 
 // Safe unwrapping
 if (someValue.isSome()) {
@@ -51,14 +51,14 @@ console.log(noValue.unwrapOr(0)); // 0
 ### Functional Transformations
 
 ```typescript
-import { Option } from "@joyful/option";
+import { Option, Some, None } from "@joyful/option";
 import { pipe } from "@joyful/pipe";
 
-const divide = (n: number, d: number): Option.Option<number> =>
+const divide = (n: number, d: number): Option<number> =>
   d === 0 ? None : new Some(n / d);
 
 const result = pipe(
-  new Option.Some(20),
+  new Some(20),
   // Map unwrapped value: 20 -> 10
   Option.map(n => n / 2),
   // Chain operation that might fail

@@ -1,2 +1,2 @@
-export * as Result from "./result.ts";
-export * as AsyncResult from "./async-result.ts";
+export * from "./result.ts";
+export * from "./async-result.ts";
