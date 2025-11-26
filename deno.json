@@ -6,8 +6,8 @@
     "test": "deno test"
   },
   "workspace": [
-    "pipe",
-    "result",
-    "option"
+    "packages/pipe",
+    "packages/result",
+    "packages/option"
   ]
 }
