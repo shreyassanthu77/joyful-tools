@@ -2,11 +2,7 @@
   "version": "5",
   "specifiers": {
     "jsr:@std/assert@*": "1.0.15",
-    "jsr:@std/internal@^1.0.12": "1.0.12",
-    "npm:@standard-community/standard-json@~0.3.5": "0.3.5_@standard-schema+spec@1.0.0_@types+json-schema@7.0.15_arktype@2.1.28_quansync@0.2.11",
-    "npm:@standard-schema/spec@1": "1.0.0",
-    "npm:arktype@^2.1.28": "2.1.28",
-    "npm:hono@^4.10.7": "4.10.7"
+    "jsr:@std/internal@^1.0.12": "1.0.12"
   },
   "jsr": {
     "@std/assert@1.0.15": {
@@ -19,78 +15,9 @@
       "integrity": "972a634fd5bc34b242024402972cd5143eac68d8dffaca5eaa4dba30ce17b027"
     }
   },
-  "npm": {
-    "@ark/schema@0.56.0": {
-      "integrity": "sha512-ECg3hox/6Z/nLajxXqNhgPtNdHWC9zNsDyskwO28WinoFEnWow4IsERNz9AnXRhTZJnYIlAJ4uGn3nlLk65vZA==",
-      "dependencies": [
-        "@ark/util"
-      ]
-    },
-    "@ark/util@0.56.0": {
-      "integrity": "sha512-BghfRC8b9pNs3vBoDJhcta0/c1J1rsoS1+HgVUreMFPdhz/CRAKReAu57YEllNaSy98rWAdY1gE+gFup7OXpgA=="
-    },
-    "@standard-community/standard-json@0.3.5_@standard-schema+spec@1.0.0_@types+json-schema@7.0.15_arktype@2.1.28_quansync@0.2.11": {
-      "integrity": "sha512-4+ZPorwDRt47i+O7RjyuaxHRK/37QY/LmgxlGrRrSTLYoFatEOzvqIc85GTlM18SFZ5E91C+v0o/M37wZPpUHA==",
-      "dependencies": [
-        "@standard-schema/spec",
-        "@types/json-schema",
-        "arktype",
-        "quansync"
-      ],
-      "optionalPeers": [
-        "arktype"
-      ]
-    },
-    "@standard-schema/spec@1.0.0": {
-      "integrity": "sha512-m2bOd0f2RT9k8QJx1JN85cZYyH1RqFBdlwtkSlf4tBDYLCiiZnv1fIIwacK6cqwXavOydf0NPToMQgpKq+dVlA=="
-    },
-    "@types/json-schema@7.0.15": {
-      "integrity": "sha512-5+fP8P8MFNC+AyZCDxrB2pkZFPGzqQWUzpSeuuVLvm8VMcorNYavBqoFcxK8bQz4Qsbn4oUEEem4wDLfcysGHA=="
-    },
-    "arkregex@0.0.4": {
-      "integrity": "sha512-biS/FkvSwQq59TZ453piUp8bxMui11pgOMV9WHAnli1F8o0ayNCZzUwQadL/bGIUic5TkS/QlPcyMuI8ZIwedQ==",
-      "dependencies": [
-        "@ark/util"
-      ]
-    },
-    "arktype@2.1.28": {
-      "integrity": "sha512-LVZqXl2zWRpNFnbITrtFmqeqNkPPo+KemuzbGSY6jvJwCb4v8NsDzrWOLHnQgWl26TkJeWWcUNUeBpq2Mst1/Q==",
-      "dependencies": [
-        "@ark/schema",
-        "@ark/util",
-        "arkregex"
-      ]
-    },
-    "hono@4.10.7": {
-      "integrity": "sha512-icXIITfw/07Q88nLSkB9aiUrd8rYzSweK681Kjo/TSggaGbOX4RRyxxm71v+3PC8C/j+4rlxGeoTRxQDkaJkUw=="
-    },
-    "quansync@0.2.11": {
-      "integrity": "sha512-AifT7QEbW9Nri4tAwR5M/uzpBuqfZf+zwaEM/QkzEjj7NBuFD2rBuy0K3dE+8wltbezDV7JMA0WfnCPYRSYbXA=="
-    }
-  },
   "workspace": {
     "dependencies": [
       "jsr:@std/assert@*"
-    ],
-    "members": {
-      "packages/rpc": {
-        "dependencies": [
-          "npm:@standard-community/standard-json@~0.3.5",
-          "npm:@standard-schema/spec@1",
-          "npm:hono@^4.10.7"
-        ],
-        "packageJson": {
-          "dependencies": [
-            "npm:arktype@^2.1.28"
-          ]
-        }
-      },
-      "packages/workflow": {
-        "dependencies": [
-          "npm:@standard-schema/spec@1",
-          "npm:arktype@^2.1.28"
-        ]
-      }
-    }
+    ]
   }
 }
