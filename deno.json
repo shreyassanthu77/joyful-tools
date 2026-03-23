@@ -8,6 +8,7 @@
   "workspace": [
     "packages/pipe",
     "packages/result",
-    "packages/option"
+    "packages/option",
+    "packages/turboq"
   ]
 }

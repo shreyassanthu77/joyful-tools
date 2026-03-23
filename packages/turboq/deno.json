@@ -1,0 +1,9 @@
+{
+  "name": "@joyful/turboq",
+  "version": "0.0.1",
+  "exports": "./src/main.ts",
+  "license": "MIT",
+  "publish": {
+    "include": ["LICENSE", "README.md", "src/main.ts"]
+  }
+}
