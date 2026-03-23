@@ -1,0 +1,20 @@
+{
+  "name": "@joyful/rpc",
+  "version": "0.0.1",
+  "license": "MIT",
+  "imports": {
+    "@standard-community/standard-json": "npm:@standard-community/standard-json@^0.3.5",
+    "@standard-schema/spec": "npm:@standard-schema/spec@^1.0.0",
+    "hono": "npm:hono@^4.10.7"
+  },
+  "exports": {
+    ".": "./src/main.ts"
+  },
+  "publish": {
+    "include": [
+      "LICENSE",
+      "README.md",
+      "src/main.ts"
+    ]
+  }
+}

@@ -8,6 +8,8 @@
   "workspace": [
     "packages/pipe",
     "packages/result",
-    "packages/option"
+    "packages/option",
+    "packages/workflow",
+    "packages/rpc"
   ]
 }
