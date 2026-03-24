@@ -8,6 +8,11 @@ import { TestStorage } from "./storage/test_storage.ts";
 if (import.meta.main) {
   const storage = new TestStorage();
   const tq = new Turboq(storage);
+
+  tq.addEventListener("done", (e) => {
+    console.log("done", e.detail);
+  });
+
   await Promise.all([
     tq.push("hello"),
     tq.push("world"),
@@ -18,11 +23,15 @@ if (import.meta.main) {
   await Promise.all([
     (async () => {
       const hello = await tq.pop();
-      await tq.ack(hello.id);
+      tq.ack(hello.id);
     })(),
     (async () => {
       const world = await tq.pop();
-      await tq.nack(world.id, "world failed");
+      tq.nack(world.id, "world failed");
+    })(),
+    (async () => {
+      const bang = await tq.pop();
+      tq.ack(bang.id);
     })(),
   ]);
 }

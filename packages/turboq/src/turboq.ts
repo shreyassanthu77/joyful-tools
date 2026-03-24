@@ -1,4 +1,4 @@
-import { Storage } from "./storage.ts";
+import type { Storage } from "./storage.ts";
 
 export type EntryId = string & { readonly __entryId: unique symbol };
 
@@ -26,7 +26,10 @@ export type TurboqOptions = {
   maxRetryCount?: number;
 };
 
-export class Turboq {
+export class Turboq extends (EventTarget as new () => TypedEventTarget<{
+  done: TurboqDoneEvent;
+  error: TurboqErrorEvent;
+}>) {
   interval: number;
   storage: Storage;
   maxRetryCount: number;
@@ -46,6 +49,7 @@ export class Turboq {
   #toConsume: Entry[] = [];
 
   constructor(storage: Storage, options: TurboqOptions = {}) {
+    super();
     this.storage = storage;
     this.interval = options.interval ?? 200;
     this.maxRetryCount = options.maxRetryCount ?? 3;
@@ -145,6 +149,8 @@ export class Turboq {
 
     try {
       const maxRetries = 4;
+
+      const failures = new Array<EntryId>();
       for (let tryCount = 0; tryCount < maxRetries; tryCount++) {
         const existing = await this.storage.get("queue.json");
         const queue: QueueData = existing
@@ -167,7 +173,6 @@ export class Turboq {
 
         let ackedCount = 0;
         let nackedCount = 0;
-
         for (const entry of entries) {
           if (entry.state === "running") {
             if (this.#ackIds.has(entry.id)) {
@@ -182,7 +187,10 @@ export class Turboq {
                 entry.retryCount++;
                 entry.state = "pending";
                 // fall through to pending
-              } else continue;
+              } else {
+                failures.push(entry.id);
+                continue;
+              }
             }
           }
 
@@ -244,10 +252,16 @@ export class Turboq {
         const ack = this.#acks[aId];
         ack.resolve();
       }
+      if (this.#ackIds.size > 0) {
+        this.dispatchEvent(new TurboqDoneEvent([...this.#ackIds]));
+      }
 
       for (let nId = 0; nId < this.#nacks.length; nId++) {
         const nack = this.#nacks[nId];
         nack.resolver.resolve();
+      }
+      if (failures.length > 0) {
+        this.dispatchEvent(new TurboqErrorEvent(failures));
       }
     } catch (e) {
       for (const { resolver } of this.#pendingPushes) {
@@ -280,4 +294,49 @@ export class Turboq {
       this.#nacks.length = 0;
     }
   }
+}
+
+export class TurboqErrorEvent extends CustomEvent<EntryId[]> {
+  constructor(entries: EntryId[]) {
+    super("error", {
+      detail: entries,
+    });
+  }
+}
+
+export class TurboqDoneEvent extends CustomEvent<EntryId[]> {
+  constructor(entries: EntryId[]) {
+    super("done", {
+      detail: entries,
+    });
+  }
+}
+
+interface TypedEventTarget<M extends Record<string, Event>>
+  extends EventTarget {
+  addEventListener<K extends keyof M>(
+    type: K,
+    // deno-lint-ignore no-explicit-any
+    listener: (this: TypedEventTarget<M>, ev: M[K]) => any,
+    options?: boolean | AddEventListenerOptions,
+  ): void;
+  // The original string-based overloads are still available if needed
+  addEventListener(
+    type: string,
+    listener: EventListenerOrEventListenerObject | null,
+    options?: boolean | AddEventListenerOptions,
+  ): void;
+
+  removeEventListener<K extends keyof M>(
+    type: K,
+    // deno-lint-ignore no-explicit-any
+    listener: (this: TypedEventTarget<M>, ev: M[K]) => any,
+    options?: boolean | EventListenerOptions,
+  ): void;
+
+  removeEventListener(
+    type: string,
+    listener: EventListenerOrEventListenerObject | null,
+    options?: boolean | EventListenerOptions,
+  ): void;
 }
