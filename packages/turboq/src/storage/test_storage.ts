@@ -1,4 +1,5 @@
 import type { StorageObj, Storage } from "../storage.ts";
+import { inspect } from "node:util";
 
 export class TestStorage implements Storage {
   data: Record<
@@ -35,7 +36,7 @@ export class TestStorage implements Storage {
       "success:",
       success,
       "data:",
-      Deno.inspect(JSON.parse(value), {
+      inspect(JSON.parse(value), {
         depth: Infinity,
         colors: true,
       }),
