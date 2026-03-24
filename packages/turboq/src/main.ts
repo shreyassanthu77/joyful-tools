@@ -13,6 +13,10 @@ if (import.meta.main) {
     console.log("done", e.detail);
   });
 
+  tq.addEventListener("dead", (e) => {
+    console.log("dead", e.detail);
+  });
+
   await Promise.all([
     tq.push("hello"),
     tq.push("world"),
@@ -34,7 +38,7 @@ if (import.meta.main) {
     (async () => {
       const bang = await tq.pop();
       console.log("bang", bang);
-      tq.ack(bang.id);
+      tq.nack(bang.id, "bang failed", true);
     })(),
   ]);
 }

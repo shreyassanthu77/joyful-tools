@@ -125,9 +125,7 @@ export class Turboq extends TypedEventTarget<TurboqEvents> {
     // round just to discover there's nothing to pop. Unfulfilled pops stay
     // in #pops and get resolved when the next push/ack/nack triggers a commit.
     return (
-      this.#pushes.length > 0 ||
-      this.#acks.size > 0 ||
-      this.#nacks.size > 0
+      this.#pushes.length > 0 || this.#acks.size > 0 || this.#nacks.size > 0
     );
   }
 
@@ -146,7 +144,10 @@ export class Turboq extends TypedEventTarget<TurboqEvents> {
 
     const doneEntries: Entry[] = [];
     const deadEntries: Entry[] = [];
-    const pushResults: Array<{ entry: Entry; resolvers: PromiseWithResolvers<EntryId> }> = [];
+    const pushResults: Array<{
+      entry: Entry;
+      resolvers: PromiseWithResolvers<EntryId>;
+    }> = [];
     const poppedEntries: Entry[] = [];
     const totalPoppers = pops.length;
     const ackResolvers: PromiseWithResolvers<void>[] = [];
@@ -194,6 +195,7 @@ export class Turboq extends TypedEventTarget<TurboqEvents> {
             if (nack.markDead || entry.retryCount >= entry.maxRetryCount) {
               entry.state = "dead";
               deadEntries.push(entry);
+              if (nack.markDead) entry.retryCount -= 1;
             } else if (poppedEntries.length < totalPoppers) {
               poppedEntries.push(entry);
             } else {
@@ -250,7 +252,7 @@ export class Turboq extends TypedEventTarget<TurboqEvents> {
       this.dispatchEvent(new TurboqDoneEvent(doneEntries));
     }
     if (deadEntries.length > 0) {
-      this.dispatchEvent(new TurboqErrorEvent(deadEntries));
+      this.dispatchEvent(new TurboqDeadEvent(deadEntries));
     }
 
     for (const { entry, resolvers } of pushResults) {
@@ -291,13 +293,13 @@ export class Turboq extends TypedEventTarget<TurboqEvents> {
 }
 
 export type TurboqEvents = {
-  error: TurboqErrorEvent;
+  dead: TurboqDeadEvent;
   done: TurboqDoneEvent;
 };
 
-export class TurboqErrorEvent extends CustomEvent<Entry[]> {
+export class TurboqDeadEvent extends CustomEvent<Entry[]> {
   constructor(entries: Entry[]) {
-    super("error", {
+    super("dead", {
       detail: entries,
     });
   }
