@@ -14,7 +14,7 @@ export type StorageObj = {
   etag: string;
 };
 
-export type EntryId = string & { readonly __entryId: unique symbol };
+export type EntryId = number & { readonly __entryId: unique symbol };
 
 // @ts-ignore this some crazy typescript madness dw about it
 export declare class TypedEventTarget<M extends Record<string, Event>> {}
