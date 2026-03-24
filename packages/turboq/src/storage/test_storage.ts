@@ -1,4 +1,4 @@
-import type { Object, Storage } from "../storage.ts";
+import type { StorageObj, Storage } from "../storage.ts";
 
 export class TestStorage implements Storage {
   data: Record<
@@ -9,7 +9,7 @@ export class TestStorage implements Storage {
     }
   > = {};
 
-  get(key: string): Promise<Object | null> {
+  get(key: string): Promise<StorageObj | null> {
     const obj = this.data[key];
     if (!obj) return Promise.resolve(null);
     return Promise.resolve({
@@ -29,7 +29,17 @@ export class TestStorage implements Storage {
       obj.generation++;
       obj.value = value;
     }
-    console.log("[putCAS] key:", key, "success:", success, "data:", value);
+    console.log(
+      "[putCAS] key:",
+      key,
+      "success:",
+      success,
+      "data:",
+      Deno.inspect(JSON.parse(value), {
+        depth: Infinity,
+        colors: true,
+      }),
+    );
     return Promise.resolve(success);
   }
 }

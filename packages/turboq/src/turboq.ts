@@ -8,14 +8,22 @@ export type Entry = {
   data: string;
 };
 
+type QueueData = {
+  generation: number;
+  /** The writeId of the last successful commit, used for dedup on CAS retry */
+  lastWriteId: string;
+  entries: Entry[];
+};
+
 export class Turboq {
   interval = 2000;
   storage: Storage;
 
-  #producers: PromiseWithResolvers<EntryId>[] = [];
-  #writes: Entry[] = [];
+  #pendingPushes: { entry: Entry; resolver: PromiseWithResolvers<EntryId> }[] =
+    [];
   #consumers: PromiseWithResolvers<Entry>[] = [];
-  #acks: Set<EntryId> = new Set();
+  #acks: PromiseWithResolvers<void>[] = [];
+  #ackIds: Set<EntryId> = new Set();
 
   #lastCommit: number = Date.now();
   #waitingForCommit: PromiseWithResolvers<void>[] = [];
@@ -31,12 +39,14 @@ export class Turboq {
   async push(data: string): Promise<EntryId> {
     if (this.#runningCommitPromise) await this.#runningCommitPromise;
 
-    const p = Promise.withResolvers<EntryId>();
-    this.#producers.push(p);
+    const resolver = Promise.withResolvers<EntryId>();
     const id = crypto.randomUUID() as EntryId;
-    this.#writes.push({ id, state: "pending", data });
+    this.#pendingPushes.push({
+      entry: { id, state: "pending", data },
+      resolver,
+    });
     this.commit();
-    return p.promise;
+    return resolver.promise;
   }
 
   async pop(): Promise<Entry> {
@@ -52,7 +62,8 @@ export class Turboq {
     if (this.#runningCommitPromise) await this.#runningCommitPromise;
 
     const p = Promise.withResolvers<void>();
-    this.#acks.add(id);
+    this.#ackIds.add(id);
+    this.#acks.push(p);
     this.commit();
     return p.promise;
   }
@@ -88,17 +99,38 @@ export class Turboq {
   }
 
   async #commit() {
+    // Generate a unique ID for this commit attempt so we can detect
+    // "write succeeded but response was lost" on retry.
+    const writeId = crypto.randomUUID();
+
     try {
       const maxRetries = 4;
       for (let tryCount = 0; tryCount < maxRetries; tryCount++) {
         const existing = await this.storage.get("queue.json");
+        const queue: QueueData = existing
+          ? JSON.parse(existing.data)
+          : {
+              generation: 0,
+              lastWriteId: "",
+              entries: [],
+            };
 
-        const parsed: Entry[] = existing ? JSON.parse(existing.data) : [];
-        parsed.push(...this.#writes);
-        for (const entry of parsed) {
+        // If the queue already contains our writeId, a previous attempt
+        // for this exact commit succeeded but we didn't get the response.
+        // Our mutations are already applied -- just resolve and move on.
+        if (queue.lastWriteId === writeId) break;
+
+        const entries = queue.entries;
+        for (const { entry } of this.#pendingPushes) {
+          entries.push(entry);
+        }
+
+        let ackedCount = 0;
+        for (const entry of entries) {
           if (entry.state === "running") {
-            if (this.#acks.has(entry.id)) {
+            if (this.#ackIds.has(entry.id)) {
               entry.state = "done";
+              ackedCount++;
               continue;
             }
           } else if (entry.state === "pending") {
@@ -109,13 +141,18 @@ export class Turboq {
           }
 
           if (
-            this.#acks.size === 0 &&
+            this.#ackIds.size === ackedCount &&
             this.#toConsume.length === this.#consumers.length
           ) {
             break;
           }
         }
-        const result = parsed.filter((entry) => entry.state !== "done");
+
+        const result: QueueData = {
+          generation: queue.generation + 1,
+          lastWriteId: writeId,
+          entries: entries.filter((entry) => entry.state !== "done"),
+        };
         const success = await this.storage.putCAS(
           "queue.json",
           JSON.stringify(result),
@@ -124,31 +161,36 @@ export class Turboq {
         if (!success) {
           this.#toConsume.length = 0;
 
-          if (tryCount === 3) {
-            throw new Error("Failed to commit");
+          if (tryCount === maxRetries - 1) {
+            throw new Error(
+              "Failed to commit after " + maxRetries + " retries",
+            );
           }
 
           continue; // retry the commit
         }
 
-        for (let pId = 0; pId < this.#producers.length; pId++) {
-          const producer = this.#producers[pId];
-          const entryId = this.#writes[pId].id;
-          producer.resolve(entryId);
-        }
-
-        for (let cId = 0; cId < this.#toConsume.length; cId++) {
-          const consumer = this.#consumers[cId];
-          const entry = this.#toConsume[cId];
-          consumer.resolve(entry);
-        }
-
         break;
       }
+
+      // Resolve all pending promises on success
+      for (const { entry, resolver } of this.#pendingPushes) {
+        resolver.resolve(entry.id);
+      }
+
+      for (let cId = 0; cId < this.#toConsume.length; cId++) {
+        const consumer = this.#consumers[cId];
+        const entry = this.#toConsume[cId];
+        consumer.resolve(entry);
+      }
+
+      for (let aId = 0; aId < this.#acks.length; aId++) {
+        const ack = this.#acks[aId];
+        ack.resolve();
+      }
     } catch (e) {
-      for (let pId = 0; pId < this.#producers.length; pId++) {
-        const producer = this.#producers[pId];
-        producer.reject(e);
+      for (const { resolver } of this.#pendingPushes) {
+        resolver.reject(e);
       }
 
       for (let cId = 0; cId < this.#consumers.length; cId++) {
@@ -156,11 +198,17 @@ export class Turboq {
         consumer.reject(e);
       }
 
+      for (let aId = 0; aId < this.#acks.length; aId++) {
+        const ack = this.#acks[aId];
+        ack.reject(e);
+      }
+
       throw e;
     } finally {
-      this.#writes.length = 0;
+      this.#pendingPushes.length = 0;
       this.#toConsume.length = 0;
-      this.#acks.clear();
+      this.#ackIds.clear();
+      this.#acks.length = 0;
     }
   }
 }
