@@ -1,4 +1,4 @@
-import type { StorageObj, Storage } from "../storage.ts";
+import type { StorageObj, Storage } from "../types.ts";
 import { inspect } from "node:util";
 
 export class TestStorage implements Storage {
@@ -19,28 +19,22 @@ export class TestStorage implements Storage {
     });
   }
 
-  putCAS(key: string, value: string, etag?: string): Promise<boolean> {
+  putCAS(key: string, value: string, etag?: string): Promise<string | null> {
     const obj = this.data[key];
-    let success = false;
+    let generation: string | null = null;
     if (!obj) {
       this.data[key] = { generation: 0, value };
-      success = true;
+      generation = "0";
     } else if (obj.generation.toString() === etag) {
-      success = true;
       obj.generation++;
       obj.value = value;
+      generation = obj.generation.toString();
     }
     console.log(
-      "[putCAS] key:",
+      "[putCAS]",
       key,
-      "success:",
-      success,
-      "data:",
-      inspect(JSON.parse(value), {
-        depth: Infinity,
-        colors: true,
-      }),
+      inspect(JSON.parse(value), { depth: Infinity, colors: true }),
     );
-    return Promise.resolve(success);
+    return Promise.resolve(generation);
   }
 }
