@@ -3,7 +3,6 @@ import { TypedEventTarget } from "./types.ts";
 
 export type TurboqOptions = {
   maxRetryCount?: number;
-  compactionThreshold?: number;
 };
 
 export type Entry = {
@@ -17,14 +16,12 @@ export type Entry = {
 
 export class Turboq extends TypedEventTarget<TurboqEvents> {
   maxRetryCount: number;
-  compactionThreshold: number;
   storage: Storage;
 
   constructor(storage: Storage, options: TurboqOptions = {}) {
     super();
     this.storage = storage;
     this.maxRetryCount = options.maxRetryCount ?? 5;
-    this.compactionThreshold = options.compactionThreshold ?? 1000;
   }
 
   #pushes: PushOp[] = [];
@@ -85,7 +82,7 @@ export class Turboq extends TypedEventTarget<TurboqEvents> {
 
       let nextId = queue.lastId + 1;
 
-      const firstPush = queue.entries.length;
+      const pushedIds: EntryId[] = [];
       for (const op of pushes) {
         const entry: Entry = {
           id: nextId++ as EntryId,
@@ -96,6 +93,7 @@ export class Turboq extends TypedEventTarget<TurboqEvents> {
           lastError: null,
         };
         queue.entries.push(entry);
+        pushedIds.push(entry.id);
       }
 
       const poppedEntries: Entry[] = [];
@@ -162,8 +160,7 @@ export class Turboq extends TypedEventTarget<TurboqEvents> {
       if (!result) continue casRetry;
 
       for (let i = 0; i < pushes.length; i++) {
-        const entry = queue.entries[firstPush + i];
-        pushes[i].resolvers.resolve(entry.id);
+        pushes[i].resolvers.resolve(pushedIds[i]);
       }
 
       for (let i = 0; i < pops.length; i++) {
@@ -186,9 +183,8 @@ export class Turboq extends TypedEventTarget<TurboqEvents> {
         this.dispatchEvent(new TurboqDeadEvent(deadEntries));
       }
 
-      break casRetry;
+      return;
     }
-
     // error: CAS failed, another broker/writer is online.
     for (const op of pushes) {
       op.resolvers.reject(new TurboqWriteError("CAS failed"));
