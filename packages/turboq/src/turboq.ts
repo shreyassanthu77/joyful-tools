@@ -163,8 +163,8 @@ export class Turboq extends TypedEventTarget<TurboqEvents> {
             if (nack && ack) {
               ack.reject(new Error("cannot ack/nack entry twice"));
               nack.resolvers.reject(new Error("cannot ack/nack entry twice"));
-              this.#acks.delete(entry.id);
-              this.#nacks.delete(entry.id);
+              acks.delete(entry.id);
+              nacks.delete(entry.id);
             } else if (ack) {
               entry.state = "done";
               doneEntries.push(entry);
