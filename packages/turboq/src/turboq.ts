@@ -64,30 +64,62 @@ export class Turboq extends TypedEventTarget<TurboqEvents> {
   }
 
   #acks: Map<EntryId, AckOp> = new Map();
+  #acksInFlight: Map<EntryId, AckOp> | null = null;
   ack(entryId: EntryId): Promise<void> {
     const resolvers = Promise.withResolvers<void>();
-    this.#acks.set(entryId, resolvers);
-    this.#scheduleCommit();
+
+    const existingAck =
+      this.#acks.get(entryId) ?? this.#acksInFlight?.get(entryId);
+    const existingNack =
+      this.#nacks.get(entryId) ?? this.#nacksInFlight?.get(entryId);
+    if (existingNack) {
+      resolvers.reject(new TurboqError("DoubleAck"));
+    } else if (existingAck) {
+      existingAck.promise.then(resolvers.resolve, resolvers.reject);
+    } else {
+      this.#acks.set(entryId, resolvers);
+      this.#scheduleCommit();
+    }
     return resolvers.promise;
   }
 
   #nacks: Map<EntryId, NackOp> = new Map();
+  #nacksInFlight: Map<EntryId, NackOp> | null = null;
   nack(
     entryId: EntryId,
     error: string,
     markDead: boolean = false,
   ): Promise<void> {
     const resolvers = Promise.withResolvers<void>();
-    this.#nacks.set(entryId, { error, markDead, resolvers });
-    this.#scheduleCommit();
+    const existingAck =
+      this.#acks.get(entryId) ?? this.#acksInFlight?.get(entryId);
+    const existingNack =
+      this.#nacks.get(entryId) ?? this.#nacksInFlight?.get(entryId);
+    if (existingAck) {
+      resolvers.reject(new TurboqError("DoubleAck"));
+    } else if (existingNack) {
+      existingNack.error = error;
+      existingNack.markDead ||= markDead;
+      existingNack.resolvers.promise.then(resolvers.resolve, resolvers.reject);
+    } else {
+      this.#nacks.set(entryId, { error, markDead, resolvers });
+      this.#scheduleCommit();
+    }
     return resolvers.promise;
   }
 
   #heartbeats: Map<EntryId, HeartbeatOp> = new Map();
+  #heartbeatsInFlight: Map<EntryId, HeartbeatOp> | null = null;
   heartbeat(entryId: EntryId): Promise<void> {
     const resolvers = Promise.withResolvers<void>();
-    this.#heartbeats.set(entryId, resolvers);
-    this.#scheduleCommit();
+    const existingHeartbeat =
+      this.#heartbeats.get(entryId) ?? this.#heartbeatsInFlight?.get(entryId);
+    if (existingHeartbeat) {
+      existingHeartbeat.promise.then(resolvers.resolve, resolvers.reject);
+    } else {
+      this.#heartbeats.set(entryId, resolvers);
+      this.#scheduleCommit();
+    }
     return resolvers.promise;
   }
 
@@ -100,202 +132,257 @@ export class Turboq extends TypedEventTarget<TurboqEvents> {
     this.#pops = [];
     const acks = this.#acks;
     this.#acks = new Map();
+    this.#acksInFlight = acks;
     const nacks = this.#nacks;
     this.#nacks = new Map();
+    this.#nacksInFlight = nacks;
     const heartbeats = this.#heartbeats;
     this.#heartbeats = new Map();
+    this.#heartbeatsInFlight = heartbeats;
 
-    const maxCasRetries = 10;
-    casRetry: for (let i = 0; i < maxCasRetries; i++) {
-      const queueJSON = await this.storage.get("queue.json");
-      const queue: QueueData = queueJSON
-        ? JSON.parse(queueJSON.data)
-        : { entries: [], lastId: 0 };
+    try {
+      const maxCasRetries = 10;
+      casRetry: for (let i = 0; i < maxCasRetries; i++) {
+        const queueJSON = await this.storage.get("queue.json");
+        const queue: QueueData = queueJSON
+          ? JSON.parse(queueJSON.data)
+          : { entries: [], lastId: 0 };
 
-      let nextId = queue.lastId + 1;
+        let nextId = queue.lastId + 1;
 
-      const pushedIds: EntryId[] = [];
-      for (const op of pushes) {
-        const entry: Entry = {
-          id: nextId++ as EntryId,
-          state: "pending",
-          retryCount: 0,
-          maxRetryCount: op.maxRetryCount,
-          heartbeatTimeout: op.heartbeatTimeout,
-          lastHeartbeat: null,
-          availableAt: op.availableAt,
-          data: op.data,
-          lastError: null,
-        };
-        queue.entries.push(entry);
-        pushedIds.push(entry.id);
-      }
+        const pushedIds: EntryId[] = [];
+        for (const op of pushes) {
+          const entry: Entry = {
+            id: nextId++ as EntryId,
+            state: "pending",
+            retryCount: 0,
+            maxRetryCount: op.maxRetryCount,
+            heartbeatTimeout: op.heartbeatTimeout,
+            lastHeartbeat: null,
+            availableAt: op.availableAt,
+            data: op.data,
+            lastError: null,
+          };
+          queue.entries.push(entry);
+          pushedIds.push(entry.id);
+        }
 
-      const poppedEntries: Entry[] = [];
-      const doneEntries: Entry[] = [];
-      const deadEntries: Entry[] = [];
-      const timedOutEntries: Entry[] = [];
-      const ackAndNackResolvers: PromiseWithResolvers<void>[] = [];
-      const now = Date.now();
-      let earliestWake: number | null = null;
+        const poppedEntries: Entry[] = [];
+        const ackedEntries: Entry[] = [];
+        const nackedEntries: Entry[] = [];
+        const deadEntries: Entry[] = [];
+        const heartbeatedEntries: Entry[] = [];
+        const timedOutEntries: Entry[] = [];
+        const ackAndNackResolvers: PromiseWithResolvers<void>[] = [];
+        const now = Date.now();
+        let earliestWake: number | null = null;
 
-      for (const entry of queue.entries) {
-        switch (entry.state) {
-          case "pending": {
-            const isAvailable =
-              entry.availableAt === null || entry.availableAt <= now;
-            if (isAvailable && poppedEntries.length < pops.length) {
-              entry.state = "running";
-              entry.lastHeartbeat = now;
-              poppedEntries.push(entry);
-            } else if (!isAvailable) {
-              // Deferred entry — track when it becomes available
-              if (earliestWake === null || entry.availableAt! < earliestWake) {
-                earliestWake = entry.availableAt!;
-              }
-            }
-            break;
-          }
-          case "running": {
-            const ack = acks.get(entry.id);
-            const nack = nacks.get(entry.id);
-            const hb = heartbeats.get(entry.id);
-            if (nack && ack) {
-              ack.reject(new Error("cannot ack/nack entry twice"));
-              nack.resolvers.reject(new Error("cannot ack/nack entry twice"));
-              acks.delete(entry.id);
-              nacks.delete(entry.id);
-            } else if (ack) {
-              entry.state = "done";
-              doneEntries.push(entry);
-              ackAndNackResolvers.push(ack);
-            } else if (nack) {
-              const canRetry = entry.retryCount < entry.maxRetryCount;
-              if (nack.markDead || !canRetry) {
-                entry.state = "dead";
-                deadEntries.push(entry);
-              } else {
-                entry.state = "pending";
-                entry.retryCount++;
-                entry.lastHeartbeat = null;
-              }
-              ackAndNackResolvers.push(nack.resolvers);
-            } else if (hb) {
-              // Worker sent a heartbeat — update timestamp
-              entry.lastHeartbeat = now;
-              ackAndNackResolvers.push(hb);
-            } else {
-              // No explicit operation on this running entry — check for timeout
-              const lastHb = entry.lastHeartbeat ?? 0;
-              const expiresAt = lastHb + entry.heartbeatTimeout;
-              if (now >= expiresAt) {
-                // Heartbeat expired — re-queue as pending
-                entry.state = "pending";
-                entry.retryCount++;
-                entry.lastHeartbeat = null;
-                timedOutEntries.push(entry);
-              } else {
-                // Still running — track when it will expire
-                if (earliestWake === null || expiresAt < earliestWake) {
-                  earliestWake = expiresAt;
+        for (const entry of queue.entries) {
+          switch (entry.state) {
+            case "pending": {
+              const isAvailable =
+                entry.availableAt === null || entry.availableAt <= now;
+              if (isAvailable && poppedEntries.length < pops.length) {
+                entry.state = "running";
+                entry.lastHeartbeat = now;
+                poppedEntries.push(entry);
+              } else if (!isAvailable) {
+                // Deferred entry — track when it becomes available
+                if (
+                  earliestWake === null ||
+                  entry.availableAt! < earliestWake
+                ) {
+                  earliestWake = entry.availableAt!;
                 }
               }
+              break;
             }
-            break;
-          }
-          case "done": {
-            doneEntries.push(entry);
-            break;
-          }
-          case "dead": {
-            deadEntries.push(entry);
-            break;
+            case "running": {
+              const ack = acks.get(entry.id);
+              const nack = nacks.get(entry.id);
+              const hb = heartbeats.get(entry.id);
+              if (nack && ack) {
+                ack.reject(new TurboqError("DoubleAck"));
+                nack.resolvers.reject(new TurboqError("DoubleAck"));
+                acks.delete(entry.id);
+                nacks.delete(entry.id);
+              } else if (ack) {
+                entry.state = "done";
+                ackedEntries.push(entry);
+                ackAndNackResolvers.push(ack);
+              } else if (nack) {
+                entry.lastError = nack.error;
+                const canRetry = entry.retryCount < entry.maxRetryCount;
+                if (nack.markDead || !canRetry) {
+                  entry.state = "dead";
+                  deadEntries.push(entry);
+                } else {
+                  entry.state = "pending";
+                  entry.retryCount++;
+                  entry.lastHeartbeat = null;
+                }
+                nackedEntries.push(entry);
+                ackAndNackResolvers.push(nack.resolvers);
+              } else if (hb) {
+                // Worker sent a heartbeat — update timestamp
+                entry.lastHeartbeat = now;
+                heartbeatedEntries.push(entry);
+                ackAndNackResolvers.push(hb);
+              } else {
+                // No explicit operation on this running entry — check for timeout
+                const lastHb = entry.lastHeartbeat ?? 0;
+                const expiresAt = lastHb + entry.heartbeatTimeout;
+                if (now >= expiresAt) {
+                  // Heartbeat expired — re-queue as pending
+                  entry.state = "pending";
+                  entry.retryCount++;
+                  entry.lastHeartbeat = null;
+                  timedOutEntries.push(entry);
+                } else {
+                  // Still running — track when it will expire
+                  if (earliestWake === null || expiresAt < earliestWake) {
+                    earliestWake = expiresAt;
+                  }
+                }
+              }
+              break;
+            }
+            case "done": {
+              ackedEntries.push(entry);
+              break;
+            }
+            case "dead": {
+              deadEntries.push(entry);
+              break;
+            }
           }
         }
-      }
 
-      queue.entries = queue.entries.filter(
-        (entry) => entry.state !== "dead" && entry.state !== "done",
-      );
-      queue.lastId = nextId - 1;
-      const result = await this.storage.putCAS(
-        "queue.json",
-        JSON.stringify(queue),
-        queueJSON?.etag,
-      );
-      if (!result) {
-        // CAS failed — merge any new ops that arrived during this attempt
-        pushes.push(...this.#pushes);
-        pops.push(...this.#pops);
-        for (const [id, op] of this.#acks) acks.set(id, op);
-        for (const [id, op] of this.#nacks) nacks.set(id, op);
-        for (const [id, op] of this.#heartbeats) heartbeats.set(id, op);
+        queue.entries = queue.entries.filter(
+          (entry) => entry.state !== "dead" && entry.state !== "done",
+        );
+        queue.lastId = nextId - 1;
+        const result = await this.storage.putCAS(
+          "queue.json",
+          JSON.stringify(queue),
+          queueJSON?.etag,
+        );
+        if (!result) {
+          // CAS failed — merge any new ops that arrived during this attempt
+          pushes.push(...this.#pushes);
+          pops.push(...this.#pops);
+          for (const [id, op] of this.#acks) {
+            const existingAck = acks.get(id);
+            if (existingAck) {
+              existingAck.promise.then(op.resolve, op.reject);
+            } else {
+              acks.set(id, op);
+            }
+          }
+          for (const [id, op] of this.#nacks) {
+            const existingNack = nacks.get(id);
+            if (existingNack) {
+              existingNack.error = op.error;
+              existingNack.markDead ||= op.markDead;
+              const res = op.resolvers;
+              existingNack.resolvers.promise.then(res.resolve, res.reject);
+            } else {
+              nacks.set(id, op);
+            }
+          }
 
-        // Clear globals for next iteration
-        this.#pushes = [];
-        this.#pops = [];
-        this.#acks = new Map();
-        this.#nacks = new Map();
-        this.#heartbeats = new Map();
-        continue casRetry;
-      }
+          for (const [id, op] of this.#heartbeats) {
+            const existingHeartbeat = heartbeats.get(id);
+            if (existingHeartbeat) {
+              existingHeartbeat.promise.then(op.resolve, op.reject);
+            } else {
+              heartbeats.set(id, op);
+            }
+          }
 
-      for (let i = 0; i < pushes.length; i++) {
-        pushes[i].resolvers.resolve(pushedIds[i]);
-      }
-
-      for (let i = 0; i < poppedEntries.length; i++) {
-        const pop = pops[i];
-        const poppedEntry = poppedEntries[i];
-        pop.resolve(poppedEntry);
-      }
-      if (pops.length > poppedEntries.length) {
-        for (let i = poppedEntries.length; i < pops.length; i++) {
-          this.#pops.push(pops[i]);
+          // Clear globals for next iteration
+          this.#pushes = [];
+          this.#pops = [];
+          this.#acks = new Map();
+          this.#nacks = new Map();
+          this.#heartbeats = new Map();
+          continue casRetry;
         }
+
+        for (let i = 0; i < pushes.length; i++) {
+          pushes[i].resolvers.resolve(pushedIds[i]);
+        }
+
+        for (let i = 0; i < poppedEntries.length; i++) {
+          const pop = pops[i];
+          const poppedEntry = poppedEntries[i];
+          pop.resolve(poppedEntry);
+        }
+        if (pops.length > poppedEntries.length) {
+          for (let i = poppedEntries.length; i < pops.length; i++) {
+            this.#pops.push(pops[i]);
+          }
+        }
+
+        for (const r of ackAndNackResolvers) r.resolve();
+
+        for (const ackedEntry of ackedEntries) acks.delete(ackedEntry.id);
+        for (const [, ack] of acks) ack.reject(new TurboqError("InvalidEntry"));
+
+        for (const nackedEntry of nackedEntries) nacks.delete(nackedEntry.id);
+        for (const [, nack] of nacks)
+          nack.resolvers.reject(new TurboqError("InvalidEntry"));
+
+        for (const heartbeatedEntry of heartbeatedEntries)
+          heartbeats.delete(heartbeatedEntry.id);
+        for (const [, hb] of heartbeats)
+          hb.reject(new TurboqError("InvalidEntry"));
+
+        if (ackedEntries.length > 0) {
+          this.dispatchEvent(new TurboqDoneEvent(ackedEntries));
+        }
+        if (deadEntries.length > 0) {
+          this.dispatchEvent(new TurboqDeadEvent(deadEntries));
+        }
+        if (timedOutEntries.length > 0) {
+          this.dispatchEvent(new TurboqTimeoutEvent(timedOutEntries));
+        }
+
+        // Schedule wake for earliest timeout
+        if (this.#wakeTimer) {
+          clearTimeout(this.#wakeTimer);
+          this.#wakeTimer = null;
+        }
+        if (earliestWake !== null) {
+          const delay = Math.max(0, earliestWake - Date.now());
+          this.#wakeTimer = setTimeout(() => {
+            this.#scheduleCommit();
+          }, delay);
+        }
+
+        return;
       }
 
-      for (const r of ackAndNackResolvers) r.resolve();
-
-      if (doneEntries.length > 0) {
-        this.dispatchEvent(new TurboqDoneEvent(doneEntries));
+      // error: CAS failed, another broker/writer is online.
+      for (const op of pushes) {
+        op.resolvers.reject(new TurboqError("CommitFailed"));
       }
-      if (deadEntries.length > 0) {
-        this.dispatchEvent(new TurboqDeadEvent(deadEntries));
+      for (const op of pops) {
+        op.reject(new TurboqError("CommitFailed"));
       }
-      if (timedOutEntries.length > 0) {
-        this.dispatchEvent(new TurboqTimeoutEvent(timedOutEntries));
+      for (const op of acks.values()) {
+        op.reject(new TurboqError("CommitFailed"));
       }
-
-      // Schedule wake for earliest timeout
-      if (this.#wakeTimer) {
-        clearTimeout(this.#wakeTimer);
-        this.#wakeTimer = null;
+      for (const op of nacks.values()) {
+        op.resolvers.reject(new TurboqError("CommitFailed"));
       }
-      if (earliestWake !== null) {
-        const delay = Math.max(0, earliestWake - Date.now());
-        this.#wakeTimer = setTimeout(() => {
-          this.#scheduleCommit();
-        }, delay);
+      for (const op of heartbeats.values()) {
+        op.reject(new TurboqError("CommitFailed"));
       }
-
-      return;
-    }
-    // error: CAS failed, another broker/writer is online.
-    for (const op of pushes) {
-      op.resolvers.reject(new TurboqWriteError("CAS failed"));
-    }
-    for (const op of pops) {
-      op.reject(new TurboqWriteError("CAS failed"));
-    }
-    for (const op of acks.values()) {
-      op.reject(new TurboqWriteError("CAS failed"));
-    }
-    for (const op of nacks.values()) {
-      op.resolvers.reject(new TurboqWriteError("CAS failed"));
-    }
-    for (const op of heartbeats.values()) {
-      op.reject(new TurboqWriteError("CAS failed"));
+    } finally {
+      this.#acksInFlight = null;
+      this.#nacksInFlight = null;
+      this.#heartbeatsInFlight = null;
     }
   }
 
@@ -379,9 +466,15 @@ export class TurboqTimeoutEvent extends CustomEvent<Entry[]> {
   }
 }
 
-export class TurboqWriteError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "TurboqWriteError";
+export const TurboqErrors = {
+  CommitFailed: "Failed to commit the write operation to the storage backend",
+  DoubleAck: "Cannot ack/nack entry twice",
+  InvalidEntry: "Cannot ack/nack/heartbeat non existent entry",
+};
+
+export class TurboqError<T extends keyof typeof TurboqErrors> extends Error {
+  constructor(type: T) {
+    super(TurboqErrors[type]);
+    this.name = type;
   }
 }
