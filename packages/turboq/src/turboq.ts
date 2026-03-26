@@ -18,6 +18,8 @@ export type Entry = {
   lastHeartbeat: number | null;
   /** Timestamp (ms since epoch) when entry becomes available for claiming. null = immediately available */
   availableAt: number | null;
+  /** Timestamp (ms since epoch) when entry expires and becomes dead. null = never expires */
+  expiresAt: number | null;
   lastError: string | null;
   data: string;
 };
@@ -48,6 +50,8 @@ export class Turboq extends TypedEventTarget<TurboqEvents> {
       maxRetryCount?: number;
       heartbeatTimeout?: number;
       availableAt?: number;
+      /** Time-to-live in milliseconds. Entry expires and becomes dead after this duration. */
+      ttl?: number;
     },
   ): Promise<EntryId> {
     if (this.#closed) {
@@ -59,6 +63,7 @@ export class Turboq extends TypedEventTarget<TurboqEvents> {
       maxRetryCount: options?.maxRetryCount ?? this.maxRetryCount,
       heartbeatTimeout: options?.heartbeatTimeout ?? this.heartbeatTimeout,
       availableAt: options?.availableAt ?? null,
+      expiresAt: options?.ttl != null ? Date.now() + options.ttl : null,
       resolvers,
     });
     this.#scheduleCommit();
@@ -220,6 +225,7 @@ export class Turboq extends TypedEventTarget<TurboqEvents> {
             heartbeatTimeout: op.heartbeatTimeout,
             lastHeartbeat: null,
             availableAt: op.availableAt,
+            expiresAt: op.expiresAt,
             data: op.data,
             lastError: null,
           };
@@ -238,6 +244,19 @@ export class Turboq extends TypedEventTarget<TurboqEvents> {
         let earliestWake: number | null = null;
 
         for (const entry of queue.entries) {
+          // Check TTL expiry for all non-terminal states
+          if (
+            entry.expiresAt !== null &&
+            now >= entry.expiresAt &&
+            entry.state !== "done" &&
+            entry.state !== "dead"
+          ) {
+            entry.state = "dead";
+            entry.lastError = "TTL expired";
+            deadEntries.push(entry);
+            continue;
+          }
+
           switch (entry.state) {
             case "pending": {
               const isAvailable =
@@ -253,6 +272,12 @@ export class Turboq extends TypedEventTarget<TurboqEvents> {
                   entry.availableAt! < earliestWake
                 ) {
                   earliestWake = entry.availableAt!;
+                }
+              }
+              // Track TTL expiry
+              if (entry.expiresAt !== null) {
+                if (earliestWake === null || entry.expiresAt < earliestWake) {
+                  earliestWake = entry.expiresAt;
                 }
               }
               break;
@@ -291,8 +316,8 @@ export class Turboq extends TypedEventTarget<TurboqEvents> {
               } else {
                 // No explicit operation on this running entry — check for timeout
                 const lastHb = entry.lastHeartbeat ?? 0;
-                const expiresAt = lastHb + entry.heartbeatTimeout;
-                if (now >= expiresAt) {
+                const hbExpiresAt = lastHb + entry.heartbeatTimeout;
+                if (now >= hbExpiresAt) {
                   const canRetry = entry.retryCount < entry.maxRetryCount;
                   if (canRetry) {
                     // Heartbeat expired — re-queue as pending
@@ -306,9 +331,14 @@ export class Turboq extends TypedEventTarget<TurboqEvents> {
                     deadEntries.push(entry);
                   }
                 } else {
-                  // Still running — track when it will expire
-                  if (earliestWake === null || expiresAt < earliestWake) {
-                    earliestWake = expiresAt;
+                  // Still running — track when heartbeat or TTL will expire
+                  if (earliestWake === null || hbExpiresAt < earliestWake) {
+                    earliestWake = hbExpiresAt;
+                  }
+                  if (entry.expiresAt !== null) {
+                    if (earliestWake === null || entry.expiresAt < earliestWake) {
+                      earliestWake = entry.expiresAt;
+                    }
                   }
                 }
               }
@@ -495,6 +525,7 @@ type PushOp = {
   maxRetryCount: number;
   heartbeatTimeout: number;
   availableAt: number | null;
+  expiresAt: number | null;
   resolvers: PromiseWithResolvers<EntryId>;
 };
 type PopOp = PromiseWithResolvers<Entry>;
