@@ -22,6 +22,11 @@ export type Entry = {
   data: string;
 };
 
+export type DoneEntry = Entry & { state: "done" };
+export type DeadEntry = Entry & { state: "dead" };
+export type RunningEntry = Entry & { state: "running"; lastHeartbeat: number };
+export type PendingEntry = Entry & { state: "pending"; lastHeartbeat: null };
+
 export class Turboq extends TypedEventTarget<TurboqEvents> {
   maxRetryCount: number;
   heartbeatTimeout: number;
@@ -349,10 +354,10 @@ export class Turboq extends TypedEventTarget<TurboqEvents> {
           hb.reject(new TurboqError("InvalidEntry"));
 
         if (ackedEntries.length > 0) {
-          this.dispatchEvent(new TurboqDoneEvent(ackedEntries));
+          this.dispatchEvent(new TurboqDoneEvent(ackedEntries as DoneEntry[]));
         }
         if (deadEntries.length > 0) {
-          this.dispatchEvent(new TurboqDeadEvent(deadEntries));
+          this.dispatchEvent(new TurboqDeadEvent(deadEntries as DeadEntry[]));
         }
         if (timedOutEntries.length > 0) {
           this.dispatchEvent(new TurboqTimeoutEvent(timedOutEntries));
@@ -457,14 +462,14 @@ export type TurboqEvents = {
   timeout: TurboqTimeoutEvent;
 };
 
-export class TurboqDeadEvent extends CustomEvent<Entry[]> {
-  constructor(entries: Entry[]) {
+export class TurboqDeadEvent extends CustomEvent<DeadEntry[]> {
+  constructor(entries: DeadEntry[]) {
     super("dead", { detail: entries });
   }
 }
 
-export class TurboqDoneEvent extends CustomEvent<Entry[]> {
-  constructor(entries: Entry[]) {
+export class TurboqDoneEvent extends CustomEvent<DoneEntry[]> {
+  constructor(entries: DoneEntry[]) {
     super("done", { detail: entries });
   }
 }
