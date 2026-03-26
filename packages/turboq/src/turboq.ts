@@ -415,7 +415,6 @@ export class Turboq extends TypedEventTarget<TurboqEvents> {
     do {
       this.#commitPending = false;
       await this.#commit();
-      await Promise.resolve();
     } while (
       this.#commitPending ||
       this.#pushes.length > 0 ||
