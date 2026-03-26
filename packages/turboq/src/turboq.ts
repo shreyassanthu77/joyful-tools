@@ -215,6 +215,7 @@ export class Turboq extends TypedEventTarget<TurboqEvents> {
       }
 
       for (let i = 0; i < pops.length; i++) {
+      for (let i = 0; i < poppedEntries.length; i++) {
         const pop = pops[i];
         const poppedEntry = poppedEntries[i];
         pop.resolve(poppedEntry);
