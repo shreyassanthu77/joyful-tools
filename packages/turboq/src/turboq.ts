@@ -5,6 +5,8 @@ export type TurboqOptions = {
   maxRetryCount?: number;
   /** Default heartbeat timeout in milliseconds. Per-entry override via push(). Default: 30_000 (30s) */
   heartbeatTimeout?: number;
+  /** Queue depth threshold for emitting backpressure events. Default: null (disabled) */
+  backpressureThreshold?: number | null;
 };
 
 export type Entry = {
@@ -32,6 +34,7 @@ export type PendingEntry = Entry & { state: "pending"; lastHeartbeat: null };
 export class Turboq extends TypedEventTarget<TurboqEvents> {
   maxRetryCount: number;
   heartbeatTimeout: number;
+  backpressureThreshold: number | null;
   storage: Storage;
 
   #closed = false;
@@ -41,6 +44,7 @@ export class Turboq extends TypedEventTarget<TurboqEvents> {
     this.storage = storage;
     this.maxRetryCount = options.maxRetryCount ?? 5;
     this.heartbeatTimeout = options.heartbeatTimeout ?? 30_000;
+    this.backpressureThreshold = options.backpressureThreshold ?? null;
   }
 
   #pushes: PushOp[] = [];
@@ -215,9 +219,9 @@ export class Turboq extends TypedEventTarget<TurboqEvents> {
 
         let nextId = queue.lastId + 1;
 
-        const pushedIds: EntryId[] = [];
+        const pushedEntries: PendingEntry[] = [];
         for (const op of pushes) {
-          const entry: Entry = {
+          const entry: PendingEntry = {
             id: nextId++ as EntryId,
             state: "pending",
             retryCount: 0,
@@ -230,7 +234,7 @@ export class Turboq extends TypedEventTarget<TurboqEvents> {
             lastError: null,
           };
           queue.entries.push(entry);
-          pushedIds.push(entry.id);
+          pushedEntries.push(entry);
         }
 
         const poppedEntries: Entry[] = [];
@@ -239,6 +243,8 @@ export class Turboq extends TypedEventTarget<TurboqEvents> {
         const deadEntries: Entry[] = [];
         const heartbeatedEntries: Entry[] = [];
         const timedOutEntries: Entry[] = [];
+        const retryEntries: Entry[] = [];
+        const becameAvailableEntries: Entry[] = [];
         const ackAndNackResolvers: PromiseWithResolvers<void>[] = [];
         const now = Date.now();
         let earliestWake: number | null = null;
@@ -259,12 +265,17 @@ export class Turboq extends TypedEventTarget<TurboqEvents> {
 
           switch (entry.state) {
             case "pending": {
+              const wasDeferred = entry.availableAt !== null;
               const isAvailable =
                 entry.availableAt === null || entry.availableAt <= now;
               if (isAvailable && poppedEntries.length < pops.length) {
                 entry.state = "running";
                 entry.lastHeartbeat = now;
                 poppedEntries.push(entry);
+                // Track if this was a deferred entry that just became available
+                if (wasDeferred) {
+                  becameAvailableEntries.push(entry);
+                }
               } else if (!isAvailable) {
                 // Deferred entry — track when it becomes available
                 if (
@@ -305,6 +316,7 @@ export class Turboq extends TypedEventTarget<TurboqEvents> {
                   entry.state = "pending";
                   entry.retryCount++;
                   entry.lastHeartbeat = null;
+                  retryEntries.push(entry);
                 }
                 nackedEntries.push(entry);
                 ackAndNackResolvers.push(nack.resolvers);
@@ -325,6 +337,7 @@ export class Turboq extends TypedEventTarget<TurboqEvents> {
                     entry.retryCount++;
                     entry.lastHeartbeat = null;
                     timedOutEntries.push(entry);
+                    retryEntries.push(entry);
                   } else {
                     // Heartbeat expired — mark as dead
                     entry.state = "dead";
@@ -412,7 +425,7 @@ export class Turboq extends TypedEventTarget<TurboqEvents> {
         }
 
         for (let i = 0; i < pushes.length; i++) {
-          pushes[i].resolvers.resolve(pushedIds[i]);
+          pushes[i].resolvers.resolve(pushedEntries[i].id);
         }
 
         for (let i = 0; i < poppedEntries.length; i++) {
@@ -447,6 +460,53 @@ export class Turboq extends TypedEventTarget<TurboqEvents> {
         if (timedOutEntries.length > 0) {
           this.dispatchEvent(new TurboqTimeoutEvent(timedOutEntries));
         }
+        if (pushedEntries.length > 0) {
+          this.dispatchEvent(new TurboqPushEvent(pushedEntries));
+        }
+        if (poppedEntries.length > 0) {
+          this.dispatchEvent(
+            new TurboqClaimedEvent(poppedEntries as RunningEntry[]),
+          );
+        }
+        if (retryEntries.length > 0) {
+          this.dispatchEvent(
+            new TurboqRetryEvent(retryEntries as PendingEntry[]),
+          );
+        }
+        if (nackedEntries.length > 0) {
+          this.dispatchEvent(new TurboqNackEvent(nackedEntries));
+        }
+        if (heartbeatedEntries.length > 0) {
+          this.dispatchEvent(
+            new TurboqHeartbeatEvent(heartbeatedEntries as RunningEntry[]),
+          );
+        }
+        if (becameAvailableEntries.length > 0) {
+          this.dispatchEvent(
+            new TurboqAvailableEvent(becameAvailableEntries as PendingEntry[]),
+          );
+        }
+
+        // Check for drain (queue is empty after processing)
+        const pendingCount = queue.entries.filter(
+          (e) => e.state === "pending" || e.state === "running",
+        ).length;
+        if (pendingCount === 0 && (ackedEntries.length > 0 || deadEntries.length > 0)) {
+          this.dispatchEvent(new TurboqDrainEvent());
+        }
+
+        // Check for backpressure
+        if (
+          this.backpressureThreshold !== null &&
+          queue.entries.length >= this.backpressureThreshold
+        ) {
+          this.dispatchEvent(
+            new TurboqBackpressureEvent(
+              queue.entries.length,
+              this.backpressureThreshold,
+            ),
+          );
+        }
 
         // Schedule wake for earliest timeout
         if (this.#wakeTimer) {
@@ -464,6 +524,15 @@ export class Turboq extends TypedEventTarget<TurboqEvents> {
       }
 
       // error: CAS failed, another broker/writer is online.
+      this.dispatchEvent(
+        new TurboqCommitFailedEvent({
+          pushCount: pushes.length,
+          popCount: pops.length,
+          ackCount: acks.size,
+          nackCount: nacks.size,
+          heartbeatCount: heartbeats.size,
+        }),
+      );
       for (const op of pushes) {
         op.resolvers.reject(new TurboqError("CommitFailed"));
       }
@@ -546,6 +615,15 @@ export type TurboqEvents = {
   dead: TurboqDeadEvent;
   done: TurboqDoneEvent;
   timeout: TurboqTimeoutEvent;
+  push: TurboqPushEvent;
+  claimed: TurboqClaimedEvent;
+  retry: TurboqRetryEvent;
+  nack: TurboqNackEvent;
+  heartbeat: TurboqHeartbeatEvent;
+  available: TurboqAvailableEvent;
+  drain: TurboqDrainEvent;
+  backpressure: TurboqBackpressureEvent;
+  commitFailed: TurboqCommitFailedEvent;
 };
 
 export class TurboqDeadEvent extends CustomEvent<DeadEntry[]> {
@@ -563,6 +641,60 @@ export class TurboqDoneEvent extends CustomEvent<DoneEntry[]> {
 export class TurboqTimeoutEvent extends CustomEvent<Entry[]> {
   constructor(entries: Entry[]) {
     super("timeout", { detail: entries });
+  }
+}
+
+export class TurboqPushEvent extends CustomEvent<PendingEntry[]> {
+  constructor(entries: PendingEntry[]) {
+    super("push", { detail: entries });
+  }
+}
+
+export class TurboqClaimedEvent extends CustomEvent<RunningEntry[]> {
+  constructor(entries: RunningEntry[]) {
+    super("claimed", { detail: entries });
+  }
+}
+
+export class TurboqRetryEvent extends CustomEvent<PendingEntry[]> {
+  constructor(entries: PendingEntry[]) {
+    super("retry", { detail: entries });
+  }
+}
+
+export class TurboqNackEvent extends CustomEvent<Entry[]> {
+  constructor(entries: Entry[]) {
+    super("nack", { detail: entries });
+  }
+}
+
+export class TurboqHeartbeatEvent extends CustomEvent<RunningEntry[]> {
+  constructor(entries: RunningEntry[]) {
+    super("heartbeat", { detail: entries });
+  }
+}
+
+export class TurboqAvailableEvent extends CustomEvent<PendingEntry[]> {
+  constructor(entries: PendingEntry[]) {
+    super("available", { detail: entries });
+  }
+}
+
+export class TurboqDrainEvent extends CustomEvent<void> {
+  constructor() {
+    super("drain");
+  }
+}
+
+export class TurboqBackpressureEvent extends CustomEvent<{ depth: number; threshold: number }> {
+  constructor(depth: number, threshold: number) {
+    super("backpressure", { detail: { depth, threshold } });
+  }
+}
+
+export class TurboqCommitFailedEvent extends CustomEvent<{ pushCount: number; popCount: number; ackCount: number; nackCount: number; heartbeatCount: number }> {
+  constructor(counts: { pushCount: number; popCount: number; ackCount: number; nackCount: number; heartbeatCount: number }) {
+    super("commitFailed", { detail: counts });
   }
 }
 
