@@ -32,6 +32,8 @@ export class Turboq extends TypedEventTarget<TurboqEvents> {
   heartbeatTimeout: number;
   storage: Storage;
 
+  #closed = false;
+
   constructor(storage: Storage, options: TurboqOptions = {}) {
     super();
     this.storage = storage;
@@ -48,6 +50,9 @@ export class Turboq extends TypedEventTarget<TurboqEvents> {
       availableAt?: number;
     },
   ): Promise<EntryId> {
+    if (this.#closed) {
+      return Promise.reject(new TurboqError("Closed"));
+    }
     const resolvers = Promise.withResolvers<EntryId>();
     this.#pushes.push({
       data,
@@ -62,6 +67,9 @@ export class Turboq extends TypedEventTarget<TurboqEvents> {
 
   #pops: PopOp[] = [];
   pop(): Promise<Entry> {
+    if (this.#closed) {
+      return Promise.reject(new TurboqError("Closed"));
+    }
     const resolvers = Promise.withResolvers<Entry>();
     this.#pops.push(resolvers);
     this.#scheduleCommit();
@@ -71,6 +79,9 @@ export class Turboq extends TypedEventTarget<TurboqEvents> {
   #acks: Map<EntryId, AckOp> = new Map();
   #acksInFlight: Map<EntryId, AckOp> | null = null;
   ack(entryId: EntryId): Promise<void> {
+    if (this.#closed) {
+      return Promise.reject(new TurboqError("Closed"));
+    }
     const resolvers = Promise.withResolvers<void>();
 
     const existingAck =
@@ -95,6 +106,9 @@ export class Turboq extends TypedEventTarget<TurboqEvents> {
     error: string,
     markDead: boolean = false,
   ): Promise<void> {
+    if (this.#closed) {
+      return Promise.reject(new TurboqError("Closed"));
+    }
     const resolvers = Promise.withResolvers<void>();
     const existingAck =
       this.#acks.get(entryId) ?? this.#acksInFlight?.get(entryId);
@@ -116,6 +130,9 @@ export class Turboq extends TypedEventTarget<TurboqEvents> {
   #heartbeats: Map<EntryId, HeartbeatOp> = new Map();
   #heartbeatsInFlight: Map<EntryId, HeartbeatOp> | null = null;
   heartbeat(entryId: EntryId): Promise<void> {
+    if (this.#closed) {
+      return Promise.reject(new TurboqError("Closed"));
+    }
     const resolvers = Promise.withResolvers<void>();
     const existingHeartbeat =
       this.#heartbeats.get(entryId) ?? this.#heartbeatsInFlight?.get(entryId);
@@ -126,6 +143,44 @@ export class Turboq extends TypedEventTarget<TurboqEvents> {
       this.#scheduleCommit();
     }
     return resolvers.promise;
+  }
+
+  /**
+   * Gracefully closes the queue.
+   * - Flushes all pending pushes, acks, nacks, and heartbeats
+   * - Rejects all pending pops (they'd wait forever anyway)
+   * - Rejects any new operations after close is called
+   */
+  async close(): Promise<void> {
+    if (this.#closed) return;
+    this.#closed = true;
+
+    // Clear wake timer
+    if (this.#wakeTimer) {
+      clearTimeout(this.#wakeTimer);
+      this.#wakeTimer = null;
+    }
+
+    // Reject all pending pops - they'd wait forever
+    for (const pop of this.#pops) {
+      pop.reject(new TurboqError("Closed"));
+    }
+    this.#pops = [];
+
+    // Wait for in-flight commit to finish, which will flush pushes/acks/nacks/heartbeats
+    if (this.#running) {
+      await this.#running;
+    }
+
+    // If there are still pending pushes/acks/nacks/heartbeats, do one final commit
+    if (
+      this.#pushes.length > 0 ||
+      this.#acks.size > 0 ||
+      this.#nacks.size > 0 ||
+      this.#heartbeats.size > 0
+    ) {
+      await this.#commit();
+    }
   }
 
   #wakeTimer: ReturnType<typeof setTimeout> | null = null;
@@ -484,6 +539,7 @@ export const TurboqErrors = {
   CommitFailed: "Failed to commit the write operation to the storage backend",
   DoubleAck: "Cannot ack/nack entry twice",
   InvalidEntry: "Cannot ack/nack/heartbeat non existent entry",
+  Closed: "Queue has been closed",
 };
 
 export class TurboqError<T extends keyof typeof TurboqErrors> extends Error {
