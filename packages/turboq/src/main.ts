@@ -9,36 +9,11 @@ if (import.meta.main) {
   const storage = new TestStorage();
   const tq = new Turboq(storage);
 
-  tq.addEventListener("done", (e) => {
-    console.log("done", e.detail);
-  });
-
-  tq.addEventListener("dead", (e) => {
-    console.log("dead", e.detail);
-  });
-
-  await Promise.all([
-    tq.push("hello"),
-    tq.push("world"),
-    tq.push("!"),
-    tq.push("!"),
+  const res = await Promise.allSettled([
+    tq.push("hello", {
+      availableAt: Date.now() + 2000,
+    }),
+    tq.pop(),
   ]);
-
-  await Promise.all([
-    (async () => {
-      const hello = await tq.pop();
-      console.log("hello", hello);
-      tq.ack(hello.id);
-    })(),
-    (async () => {
-      const world = await tq.pop();
-      console.log("world", world);
-      tq.nack(world.id, "world failed");
-    })(),
-    (async () => {
-      const bang = await tq.pop();
-      console.log("bang", bang);
-      tq.nack(bang.id, "bang failed", true);
-    })(),
-  ]);
+  console.log(res);
 }

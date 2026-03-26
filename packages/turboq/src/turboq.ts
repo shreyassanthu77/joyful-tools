@@ -16,6 +16,8 @@ export type Entry = {
   heartbeatTimeout: number;
   /** Timestamp (ms since epoch) of last heartbeat, set when claimed and updated by heartbeat() */
   lastHeartbeat: number | null;
+  /** Timestamp (ms since epoch) when entry becomes available for claiming. null = immediately available */
+  availableAt: number | null;
   lastError: string | null;
   data: string;
 };
@@ -35,13 +37,14 @@ export class Turboq extends TypedEventTarget<TurboqEvents> {
   #pushes: PushOp[] = [];
   push(
     data: string,
-    options?: { maxRetryCount?: number; heartbeatTimeout?: number },
+    options?: { maxRetryCount?: number; heartbeatTimeout?: number; availableAt?: number },
   ): Promise<EntryId> {
     const resolvers = Promise.withResolvers<EntryId>();
     this.#pushes.push({
       data,
       maxRetryCount: options?.maxRetryCount ?? this.maxRetryCount,
       heartbeatTimeout: options?.heartbeatTimeout ?? this.heartbeatTimeout,
+      availableAt: options?.availableAt ?? null,
       resolvers,
     });
     this.#scheduleCommit();
@@ -116,6 +119,7 @@ export class Turboq extends TypedEventTarget<TurboqEvents> {
           maxRetryCount: op.maxRetryCount,
           heartbeatTimeout: op.heartbeatTimeout,
           lastHeartbeat: null,
+          availableAt: op.availableAt,
           data: op.data,
           lastError: null,
         };
@@ -134,10 +138,16 @@ export class Turboq extends TypedEventTarget<TurboqEvents> {
       for (const entry of queue.entries) {
         switch (entry.state) {
           case "pending": {
-            if (poppedEntries.length < pops.length) {
+            const isAvailable = entry.availableAt === null || entry.availableAt <= now;
+            if (isAvailable && poppedEntries.length < pops.length) {
               entry.state = "running";
               entry.lastHeartbeat = now;
               poppedEntries.push(entry);
+            } else if (!isAvailable) {
+              // Deferred entry — track when it becomes available
+              if (earliestWake === null || entry.availableAt! < earliestWake) {
+                earliestWake = entry.availableAt!;
+              }
             }
             break;
           }
@@ -214,7 +224,6 @@ export class Turboq extends TypedEventTarget<TurboqEvents> {
         pushes[i].resolvers.resolve(pushedIds[i]);
       }
 
-      for (let i = 0; i < pops.length; i++) {
       for (let i = 0; i < poppedEntries.length; i++) {
         const pop = pops[i];
         const poppedEntry = poppedEntries[i];
@@ -309,6 +318,7 @@ type PushOp = {
   data: string;
   maxRetryCount: number;
   heartbeatTimeout: number;
+  availableAt: number | null;
   resolvers: PromiseWithResolvers<EntryId>;
 };
 type PopOp = PromiseWithResolvers<Entry>;
