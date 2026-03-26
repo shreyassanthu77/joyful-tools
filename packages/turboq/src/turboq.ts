@@ -84,6 +84,8 @@ export class Turboq extends TypedEventTarget<TurboqEvents> {
     return resolvers.promise;
   }
 
+  #wakeTimer: ReturnType<typeof setTimeout> | null = null;
+
   async #commit() {
     const pushes = this.#pushes;
     this.#pushes = [];
@@ -127,6 +129,7 @@ export class Turboq extends TypedEventTarget<TurboqEvents> {
       const timedOutEntries: Entry[] = [];
       const ackAndNackResolvers: PromiseWithResolvers<void>[] = [];
       const now = Date.now();
+      let earliestWake: number | null = null;
 
       for (const entry of queue.entries) {
         switch (entry.state) {
@@ -169,12 +172,18 @@ export class Turboq extends TypedEventTarget<TurboqEvents> {
             } else {
               // No explicit operation on this running entry — check for timeout
               const lastHb = entry.lastHeartbeat ?? 0;
-              if (now - lastHb > entry.heartbeatTimeout) {
+              const expiresAt = lastHb + entry.heartbeatTimeout;
+              if (now >= expiresAt) {
                 // Heartbeat expired — re-queue as pending
                 entry.state = "pending";
                 entry.retryCount++;
                 entry.lastHeartbeat = null;
                 timedOutEntries.push(entry);
+              } else {
+                // Still running — track when it will expire
+                if (earliestWake === null || expiresAt < earliestWake) {
+                  earliestWake = expiresAt;
+                }
               }
             }
             break;
@@ -226,6 +235,18 @@ export class Turboq extends TypedEventTarget<TurboqEvents> {
       }
       if (timedOutEntries.length > 0) {
         this.dispatchEvent(new TurboqTimeoutEvent(timedOutEntries));
+      }
+
+      // Schedule wake for earliest timeout
+      if (this.#wakeTimer) {
+        clearTimeout(this.#wakeTimer);
+        this.#wakeTimer = null;
+      }
+      if (earliestWake !== null) {
+        const delay = Math.max(0, earliestWake - Date.now());
+        this.#wakeTimer = setTimeout(() => {
+          this.#scheduleCommit();
+        }, delay);
       }
 
       return;
