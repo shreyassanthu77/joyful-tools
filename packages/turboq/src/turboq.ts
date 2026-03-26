@@ -313,6 +313,11 @@ export class Turboq extends TypedEventTarget<TurboqEvents> {
           this.#acks = new Map();
           this.#nacks = new Map();
           this.#heartbeats = new Map();
+
+          // Exponential backoff before retry (50ms, 100ms, 200ms, ... capped at 1s)
+          await new Promise((r) =>
+            setTimeout(r, Math.min(1000, 50 * 2 ** i)),
+          );
           continue casRetry;
         }
 
