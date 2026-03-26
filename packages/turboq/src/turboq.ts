@@ -233,11 +233,18 @@ export class Turboq extends TypedEventTarget<TurboqEvents> {
                 const lastHb = entry.lastHeartbeat ?? 0;
                 const expiresAt = lastHb + entry.heartbeatTimeout;
                 if (now >= expiresAt) {
-                  // Heartbeat expired — re-queue as pending
-                  entry.state = "pending";
-                  entry.retryCount++;
-                  entry.lastHeartbeat = null;
-                  timedOutEntries.push(entry);
+                  const canRetry = entry.retryCount < entry.maxRetryCount;
+                  if (canRetry) {
+                    // Heartbeat expired — re-queue as pending
+                    entry.state = "pending";
+                    entry.retryCount++;
+                    entry.lastHeartbeat = null;
+                    timedOutEntries.push(entry);
+                  } else {
+                    // Heartbeat expired — mark as dead
+                    entry.state = "dead";
+                    deadEntries.push(entry);
+                  }
                 } else {
                   // Still running — track when it will expire
                   if (earliestWake === null || expiresAt < earliestWake) {
@@ -319,9 +326,7 @@ export class Turboq extends TypedEventTarget<TurboqEvents> {
           pop.resolve(poppedEntry);
         }
         if (pops.length > poppedEntries.length) {
-          for (let i = poppedEntries.length; i < pops.length; i++) {
-            this.#pops.push(pops[i]);
-          }
+          this.#pops = pops.slice(poppedEntries.length).concat(this.#pops);
         }
 
         for (const r of ackAndNackResolvers) r.resolve();
