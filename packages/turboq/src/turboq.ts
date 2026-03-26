@@ -37,7 +37,11 @@ export class Turboq extends TypedEventTarget<TurboqEvents> {
   #pushes: PushOp[] = [];
   push(
     data: string,
-    options?: { maxRetryCount?: number; heartbeatTimeout?: number; availableAt?: number },
+    options?: {
+      maxRetryCount?: number;
+      heartbeatTimeout?: number;
+      availableAt?: number;
+    },
   ): Promise<EntryId> {
     const resolvers = Promise.withResolvers<EntryId>();
     this.#pushes.push({
@@ -138,7 +142,8 @@ export class Turboq extends TypedEventTarget<TurboqEvents> {
       for (const entry of queue.entries) {
         switch (entry.state) {
           case "pending": {
-            const isAvailable = entry.availableAt === null || entry.availableAt <= now;
+            const isAvailable =
+              entry.availableAt === null || entry.availableAt <= now;
             if (isAvailable && poppedEntries.length < pops.length) {
               entry.state = "running";
               entry.lastHeartbeat = now;
@@ -212,13 +217,28 @@ export class Turboq extends TypedEventTarget<TurboqEvents> {
       queue.entries = queue.entries.filter(
         (entry) => entry.state !== "dead" && entry.state !== "done",
       );
-      queue.lastId = nextId;
+      queue.lastId = nextId - 1;
       const result = await this.storage.putCAS(
         "queue.json",
         JSON.stringify(queue),
         queueJSON?.etag,
       );
-      if (!result) continue casRetry;
+      if (!result) {
+        // CAS failed — merge any new ops that arrived during this attempt
+        pushes.push(...this.#pushes);
+        pops.push(...this.#pops);
+        for (const [id, op] of this.#acks) acks.set(id, op);
+        for (const [id, op] of this.#nacks) nacks.set(id, op);
+        for (const [id, op] of this.#heartbeats) heartbeats.set(id, op);
+
+        // Clear globals for next iteration
+        this.#pushes = [];
+        this.#pops = [];
+        this.#acks = new Map();
+        this.#nacks = new Map();
+        this.#heartbeats = new Map();
+        continue casRetry;
+      }
 
       for (let i = 0; i < pushes.length; i++) {
         pushes[i].resolvers.resolve(pushedIds[i]);
