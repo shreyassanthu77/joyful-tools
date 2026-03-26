@@ -3,6 +3,8 @@ import { TypedEventTarget } from "./types.ts";
 
 export type TurboqOptions = {
   maxRetryCount?: number;
+  /** Default heartbeat timeout in milliseconds. Per-entry override via push(). Default: 30_000 (30s) */
+  heartbeatTimeout?: number;
 };
 
 export type Entry = {
@@ -10,27 +12,38 @@ export type Entry = {
   state: "pending" | "running" | "done" | "dead";
   retryCount: number;
   maxRetryCount: number;
+  /** Heartbeat timeout in milliseconds for this entry */
+  heartbeatTimeout: number;
+  /** Timestamp (ms since epoch) of last heartbeat, set when claimed and updated by heartbeat() */
+  lastHeartbeat: number | null;
   lastError: string | null;
   data: string;
 };
 
 export class Turboq extends TypedEventTarget<TurboqEvents> {
   maxRetryCount: number;
+  heartbeatTimeout: number;
   storage: Storage;
 
   constructor(storage: Storage, options: TurboqOptions = {}) {
     super();
     this.storage = storage;
     this.maxRetryCount = options.maxRetryCount ?? 5;
+    this.heartbeatTimeout = options.heartbeatTimeout ?? 30_000;
   }
 
   #pushes: PushOp[] = [];
   push(
     data: string,
-    maxRetryCount: number = this.maxRetryCount,
+    options?: { maxRetryCount?: number; heartbeatTimeout?: number },
   ): Promise<EntryId> {
     const resolvers = Promise.withResolvers<EntryId>();
-    this.#pushes.push({ data, maxRetryCount, resolvers });
+    this.#pushes.push({
+      data,
+      maxRetryCount: options?.maxRetryCount ?? this.maxRetryCount,
+      heartbeatTimeout: options?.heartbeatTimeout ?? this.heartbeatTimeout,
+      resolvers,
+    });
     this.#scheduleCommit();
     return resolvers.promise;
   }
@@ -63,6 +76,14 @@ export class Turboq extends TypedEventTarget<TurboqEvents> {
     return resolvers.promise;
   }
 
+  #heartbeats: Map<EntryId, HeartbeatOp> = new Map();
+  heartbeat(entryId: EntryId): Promise<void> {
+    const resolvers = Promise.withResolvers<void>();
+    this.#heartbeats.set(entryId, resolvers);
+    this.#scheduleCommit();
+    return resolvers.promise;
+  }
+
   async #commit() {
     const pushes = this.#pushes;
     this.#pushes = [];
@@ -72,6 +93,8 @@ export class Turboq extends TypedEventTarget<TurboqEvents> {
     this.#acks = new Map();
     const nacks = this.#nacks;
     this.#nacks = new Map();
+    const heartbeats = this.#heartbeats;
+    this.#heartbeats = new Map();
 
     const maxCasRetries = 10;
     casRetry: for (let i = 0; i < maxCasRetries; i++) {
@@ -89,6 +112,8 @@ export class Turboq extends TypedEventTarget<TurboqEvents> {
           state: "pending",
           retryCount: 0,
           maxRetryCount: op.maxRetryCount,
+          heartbeatTimeout: op.heartbeatTimeout,
+          lastHeartbeat: null,
           data: op.data,
           lastError: null,
         };
@@ -99,13 +124,16 @@ export class Turboq extends TypedEventTarget<TurboqEvents> {
       const poppedEntries: Entry[] = [];
       const doneEntries: Entry[] = [];
       const deadEntries: Entry[] = [];
+      const timedOutEntries: Entry[] = [];
       const ackAndNackResolvers: PromiseWithResolvers<void>[] = [];
+      const now = Date.now();
 
       for (const entry of queue.entries) {
         switch (entry.state) {
           case "pending": {
             if (poppedEntries.length < pops.length) {
               entry.state = "running";
+              entry.lastHeartbeat = now;
               poppedEntries.push(entry);
             }
             break;
@@ -113,6 +141,7 @@ export class Turboq extends TypedEventTarget<TurboqEvents> {
           case "running": {
             const ack = acks.get(entry.id);
             const nack = nacks.get(entry.id);
+            const hb = heartbeats.get(entry.id);
             if (nack && ack) {
               ack.reject(new Error("cannot ack/nack entry twice"));
               nack.resolvers.reject(new Error("cannot ack/nack entry twice"));
@@ -130,10 +159,23 @@ export class Turboq extends TypedEventTarget<TurboqEvents> {
               } else {
                 entry.state = "pending";
                 entry.retryCount++;
+                entry.lastHeartbeat = null;
               }
               ackAndNackResolvers.push(nack.resolvers);
+            } else if (hb) {
+              // Worker sent a heartbeat — update timestamp
+              entry.lastHeartbeat = now;
+              ackAndNackResolvers.push(hb);
             } else {
-              // todo: handle heartbeats
+              // No explicit operation on this running entry — check for timeout
+              const lastHb = entry.lastHeartbeat ?? 0;
+              if (now - lastHb > entry.heartbeatTimeout) {
+                // Heartbeat expired — re-queue as pending
+                entry.state = "pending";
+                entry.retryCount++;
+                entry.lastHeartbeat = null;
+                timedOutEntries.push(entry);
+              }
             }
             break;
           }
@@ -182,6 +224,9 @@ export class Turboq extends TypedEventTarget<TurboqEvents> {
       if (deadEntries.length > 0) {
         this.dispatchEvent(new TurboqDeadEvent(deadEntries));
       }
+      if (timedOutEntries.length > 0) {
+        this.dispatchEvent(new TurboqTimeoutEvent(timedOutEntries));
+      }
 
       return;
     }
@@ -197,6 +242,9 @@ export class Turboq extends TypedEventTarget<TurboqEvents> {
     }
     for (const op of nacks.values()) {
       op.resolvers.reject(new TurboqWriteError("CAS failed"));
+    }
+    for (const op of heartbeats.values()) {
+      op.reject(new TurboqWriteError("CAS failed"));
     }
   }
 
@@ -229,7 +277,8 @@ export class Turboq extends TypedEventTarget<TurboqEvents> {
       this.#commitPending ||
       this.#pushes.length > 0 ||
       this.#acks.size > 0 ||
-      this.#nacks.size > 0
+      this.#nacks.size > 0 ||
+      this.#heartbeats.size > 0
     );
   }
 }
@@ -237,6 +286,7 @@ export class Turboq extends TypedEventTarget<TurboqEvents> {
 type PushOp = {
   data: string;
   maxRetryCount: number;
+  heartbeatTimeout: number;
   resolvers: PromiseWithResolvers<EntryId>;
 };
 type PopOp = PromiseWithResolvers<Entry>;
@@ -246,6 +296,7 @@ type NackOp = {
   markDead: boolean;
   resolvers: PromiseWithResolvers<void>;
 };
+type HeartbeatOp = PromiseWithResolvers<void>;
 
 type QueueData = {
   entries: Entry[];
@@ -255,6 +306,7 @@ type QueueData = {
 export type TurboqEvents = {
   dead: TurboqDeadEvent;
   done: TurboqDoneEvent;
+  timeout: TurboqTimeoutEvent;
 };
 
 export class TurboqDeadEvent extends CustomEvent<Entry[]> {
@@ -266,6 +318,12 @@ export class TurboqDeadEvent extends CustomEvent<Entry[]> {
 export class TurboqDoneEvent extends CustomEvent<Entry[]> {
   constructor(entries: Entry[]) {
     super("done", { detail: entries });
+  }
+}
+
+export class TurboqTimeoutEvent extends CustomEvent<Entry[]> {
+  constructor(entries: Entry[]) {
+    super("timeout", { detail: entries });
   }
 }
 
