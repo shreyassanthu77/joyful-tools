@@ -203,6 +203,21 @@ Deno.test("AsyncResult.inspectErr", async () => {
   assertEquals(value, 2);
 });
 
+Deno.test("AsyncResult.wrap", async () => {
+  assertEquals(
+    await AsyncResult.wrap(Promise.resolve(2), () => "boom"),
+    Result.ok(2),
+  );
+
+  assertEquals(
+    await AsyncResult.wrap(
+      Promise.reject(new Error("boom")),
+      (error) => error instanceof Error ? error.message : String(error),
+    ),
+    Result.err("boom"),
+  );
+});
+
 Deno.test("AsyncResult.run", async () => {
   assertEquals(
     await Result.run(async function* () {

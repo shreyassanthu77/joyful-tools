@@ -101,6 +101,44 @@ Deno.test("Result.inspectErr", () => {
   assertEquals(value, 2);
 });
 
+Deno.test("Result.wrap", async () => {
+  assertEquals(
+    Result.wrap({
+      try: () => 2,
+      catch: () => "boom",
+    }),
+    Result.ok(2),
+  );
+
+  assertEquals(
+    Result.wrap({
+      try: (): number => {
+        throw new Error("boom");
+      },
+      catch: (error) =>
+        error instanceof Error ? error.message : String(error),
+    }),
+    Result.err("boom"),
+  );
+
+  assertEquals(
+    await Result.wrap({
+      try: () => Promise.resolve(2),
+      catch: () => "boom",
+    }),
+    Result.ok(2),
+  );
+
+  assertEquals(
+    await Result.wrap({
+      try: () => Promise.reject(new Error("boom")),
+      catch: (error) =>
+        error instanceof Error ? error.message : String(error),
+    }),
+    Result.err("boom"),
+  );
+});
+
 Deno.test("Result.run", () => {
   assertEquals(
     Result.run(function* () {

@@ -45,6 +45,30 @@ export class AsyncResult<T, E = unknown> implements PromiseLike<Result<T, E>> {
   }
 
   /**
+   * Wraps a promise and converts rejections into an error result.
+   *
+   * @param promise Promise for the success value.
+   * @param catcher Function that maps a rejection reason to the error type.
+   * @returns An async result that resolves to `Ok` on success or `Err` on rejection.
+   *
+   * @example
+   * ```typescript
+   * const result = await AsyncResult.wrap(
+   *   fetch("/api/user").then((response) => response.json()),
+   *   (error) => error instanceof Error ? error.message : String(error),
+   * );
+   * ```
+   */
+  static wrap<T, E>(
+    promise: Promise<T>,
+    catcher: (e: unknown) => E,
+  ): AsyncResult<T, E> {
+    return new AsyncResult(
+      promise.then((value) => new Ok(value)).catch((e) => new Err(catcher(e))),
+    );
+  }
+
+  /**
    * Makes `AsyncResult` awaitable and compatible with promise chains.
    *
    * @param onfulfilled Called when the underlying promise resolves.

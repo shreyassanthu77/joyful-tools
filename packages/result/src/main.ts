@@ -8,10 +8,11 @@
  *
  * Use the {@link Result.ok} and {@link Result.err} helpers to construct values,
  * then compose them with methods like `map`, `andThen`, `orElse`, and
- * `unwrapOr`. When the computation is asynchronous, use {@link AsyncResult} or
- * call `result.async()` to keep the same style of composition. For
- * generator-based composition, use {@link Result.run} with `yield*` on
- * `Result` and `AsyncResult` values.
+ * `unwrapOr`. Use {@link Result.wrap} when you want to convert throwing code or
+ * rejecting promises into result values. When the computation is asynchronous,
+ * use {@link AsyncResult} or call `result.async()` to keep the same style of
+ * composition. For generator-based composition, use {@link Result.run} with
+ * `yield*` on `Result` and `AsyncResult` values.
  *
  * @example
  * ```typescript
@@ -90,6 +91,75 @@ export namespace Result {
    */
   export function err<E, T = never>(err: E): Result<T, E> {
     return new Err(err);
+  }
+
+  /**
+   * Options for {@link Result.wrap}.
+   *
+   * Provide the code to run in `try`, and a `catch` mapper that converts any
+   * thrown or rejected value into your desired error type.
+   */
+  export interface WrapOptions<T, E> {
+    /** Function to execute and capture as a result. */
+    try: () => T;
+    /** Converts a thrown or rejected value into the result error type. */
+    catch: (e: unknown) => E;
+  }
+
+  /**
+   * Wraps an async computation and converts promise rejections into an error result.
+   *
+   * This overload is selected when `try` returns a `Promise`.
+   *
+   * @param options Async operation and error-mapping callback.
+   * @returns An {@link AsyncResult} that resolves to `Ok` on success or `Err` on rejection.
+   *
+   * @example
+   * ```typescript
+   * const user = await Result.wrap({
+   *   try: async () => {
+   *     const response = await fetch("/api/user");
+   *     return response.json();
+   *   },
+   *   catch: (error) =>
+   *     error instanceof Error ? error.message : String(error),
+   * });
+   * ```
+   */
+  export function wrap<T, E>(
+    options: WrapOptions<Promise<T>, E>,
+  ): AsyncResult<T, E>;
+
+  /**
+   * Wraps a synchronous computation and converts thrown exceptions into an error result.
+   *
+   * Use this when you need to integrate existing throw-based code into a
+   * `Result` flow without leaving errors as exceptions.
+   *
+   * @param options Operation and error-mapping callback.
+   * @returns An {@link Ok} on success or an {@link Err} if `try` throws.
+   *
+   * @example
+   * ```typescript
+   * const parsed = Result.wrap({
+   *   try: () => JSON.parse('{"port":3000}') as { port: number },
+   *   catch: () => "invalid json",
+   * });
+   * ```
+   */
+  export function wrap<T, E>(options: WrapOptions<T, E>): Result<T, E>;
+  export function wrap<T, E>(
+    options: WrapOptions<T, E>,
+  ): Result<T, E> | AsyncResult<T, E> {
+    try {
+      const value = options.try();
+      if (value instanceof Promise) {
+        return AsyncResult.wrap(value, options.catch);
+      }
+      return new Ok(value);
+    } catch (e) {
+      return new Err(options.catch(e));
+    }
   }
 
   /** Extracts the success type from an {@link Ok} value. */

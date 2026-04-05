@@ -30,6 +30,7 @@ npx jsr add @joyful/result
 - Avoid exception-heavy control flow for expected failures.
 - Transform success and error values with `map()` and `mapErr()`.
 - Chain dependent operations with `andThen()` and recover with `orElse()`.
+- Wrap throwing or rejecting code with `Result.wrap()`.
 - Compose complex flows with `Result.run()` and `yield*`.
 - Use the same model for async code with `AsyncResult`.
 
@@ -151,6 +152,35 @@ const value = Result.err("missing value").orElse((error) =>
 // Ok("default")
 ```
 
+### Wrapping throwing code with `Result.wrap()`
+
+`Result.wrap()` is useful when you need to integrate exception-based code into a
+result flow. It runs a callback, returns `Ok` for success, and maps thrown
+errors with your `catch` function.
+
+```typescript
+import { Result } from "@joyful/result";
+
+const parsed = Result.wrap({
+  try: () => JSON.parse('{"port":3000}') as { port: number },
+  catch: () => "invalid json",
+});
+
+// Ok({ port: 3000 })
+```
+
+Thrown values become `Err` results:
+
+```typescript
+const parsed = Result.wrap({
+  try: () => JSON.parse("not json"),
+  catch: (error) =>
+    error instanceof Error ? error.message : String(error),
+});
+
+// Err("Unexpected token 'o', \"not json\" is not valid JSON")
+```
+
 ## Generator Composition With `Result.run`
 
 `Result.run()` lets you write sequential result logic with `yield*` instead of
@@ -225,6 +255,29 @@ const value = await Result.ok(2)
 
 ### Wrapping async work
 
+When you already have a promise-producing function and want to capture
+rejections as data, `Result.wrap()` can return an `AsyncResult` directly:
+
+```typescript
+import { Result } from "@joyful/result";
+
+const config = await Result.wrap({
+  try: async () => {
+    const response = await fetch("https://example.com/config.json");
+    if (!response.ok) {
+      throw new Error(`request failed: ${response.status}`);
+    }
+
+    return response.json();
+  },
+  catch: (error) =>
+    error instanceof Error ? error.message : String(error),
+});
+```
+
+You can still build an `AsyncResult` manually when you need to work at the
+`Promise<Result<T, E>>` level:
+
 ```typescript
 import { AsyncResult, Result } from "@joyful/result";
 
@@ -289,6 +342,7 @@ const result = await Result.run(async function* () {
 - `Result<T, E>`: union type of `Ok<T, E>` and `Err<T, E>`.
 - `Result.ok(value)`: create a successful result.
 - `Result.err(error)`: create a failed result.
+- `Result.wrap(options)`: convert throwing or rejecting code into a result.
 - `Ok` and `Err`: concrete classes with `.value` and `.error` fields.
 - `map()` and `mapErr()`: transform success and error values.
 - `andThen()` and `orElse()`: compose additional result-returning operations.
