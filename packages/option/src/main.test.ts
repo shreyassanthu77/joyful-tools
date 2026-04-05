@@ -1,4 +1,4 @@
-import { assert, assertEquals, assertThrows } from "assert";
+import { assert, assertEquals, assertThrows } from "std/assert";
 import { pipe } from "@joyful/pipe";
 import { Option, Some, None } from "@joyful/option";
 

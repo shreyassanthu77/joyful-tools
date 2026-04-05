@@ -1,6 +1,6 @@
 import { pipe } from "@joyful/pipe";
 import { Result, Ok, Err } from "@joyful/result";
-import { assertEquals, assertThrows } from "assert";
+import { assertEquals, assertThrows } from "std/assert";
 
 Deno.test("Core", async (t) => {
   await t.step("ok and err", () => {
@@ -354,8 +354,7 @@ Deno.test("Error messages", async (t) => {
 
 Deno.test("Type narrowing", async (t) => {
   await t.step("should narrow type after ok() check", () => {
-    const result =
-      Math.random() > 0.5 ? new Ok("success") : new Err(404);
+    const result = Math.random() > 0.5 ? new Ok("success") : new Err(404);
 
     if (result.ok()) {
       assertEquals(typeof result.unwrap(), "string");
@@ -367,8 +366,7 @@ Deno.test("Type narrowing", async (t) => {
   });
 
   await t.step("should narrow type after err() check", () => {
-    const result =
-      Math.random() > 0.5 ? new Ok(42) : new Err("error");
+    const result = Math.random() > 0.5 ? new Ok(42) : new Err("error");
 
     if (result.err()) {
       assertEquals(typeof result.unwrapErr(), "string");
@@ -407,9 +405,7 @@ Deno.test("Complex chaining", async (t) => {
     const result = pipe(
       new Ok("hello"),
       Result.map((s) => s.length),
-      Result.andThen((n) =>
-        n > 3 ? new Ok(n * 2) : new Err("Too short"),
-      ),
+      Result.andThen((n) => (n > 3 ? new Ok(n * 2) : new Err("Too short"))),
       Result.mapErr((e) => `Error: ${e}`),
     );
 
@@ -527,7 +523,10 @@ Deno.test("inspectErr", async (t) => {
       Result.inspectErr((error) => inspections.push(`second: ${error}`)),
     );
 
-    assertEquals(inspections, ["first: validation error", "second: validation error"]);
+    assertEquals(inspections, [
+      "first: validation error",
+      "second: validation error",
+    ]);
     assertEquals(result.unwrapErr(), "validation error"); // unchanged
   });
 });
@@ -577,8 +576,8 @@ Deno.test("Integration scenarios", async (t) => {
       Result.inspect((data) => logs.push(`Processing: ${data}`)),
       Result.map((data) => data.toUpperCase()),
       Result.inspect((data) => logs.push(`Processed: ${data}`)),
-      Result.andThen((data) => 
-        data.length > 5 ? new Ok(data) : new Err("Too short")
+      Result.andThen((data) =>
+        data.length > 5 ? new Ok(data) : new Err("Too short"),
       ),
       Result.inspectErr((error) => logs.push(`Error: ${error}`)),
     );
@@ -597,7 +596,10 @@ Deno.test("Integration scenarios", async (t) => {
       Result.inspectErr((error) => logs.push(`Final error: ${error}`)),
     );
 
-    assertEquals(logs, ["Initial error: initial error", "Final error: Fallback: initial error"]);
+    assertEquals(logs, [
+      "Initial error: initial error",
+      "Final error: Fallback: initial error",
+    ]);
     assertEquals(result.ok(), false);
     assertEquals(result.unwrapErr(), "Fallback: initial error");
   });

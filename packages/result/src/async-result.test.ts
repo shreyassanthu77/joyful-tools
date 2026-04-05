@@ -1,6 +1,6 @@
 import { pipe } from "@joyful/pipe";
 import { AsyncResult, Result, Ok, Err } from "@joyful/result";
-import { assertEquals, assertInstanceOf } from "assert";
+import { assertEquals, assertInstanceOf } from "std/assert";
 
 Deno.test("AsyncResult", async (t) => {
   await t.step("fromResult", async () => {
@@ -652,53 +652,62 @@ Deno.test("AsyncResult error handling", async (t) => {
     assertEquals(result.unwrap(), "Recovered from: Mapped: Original error");
   });
 
-  await t.step("should handle async logging pipeline with inspect", async () => {
-    const logs: string[] = [];
-    const result = await pipe(
-      AsyncResult.fromResult(new Ok("user data")),
-      AsyncResult.inspect((data) => {
-        logs.push(`Processing: ${data}`);
-      }),
-      AsyncResult.map(async (data) => {
-        await new Promise((resolve) => setTimeout(resolve, 1));
-        return data.toUpperCase();
-      }),
-      AsyncResult.inspect((data) => {
-        logs.push(`Processed: ${data}`);
-      }),
-      AsyncResult.andThen(async (data) => {
-        await new Promise((resolve) => setTimeout(resolve, 1));
-        return data.length > 5 ? new Ok(data) : new Err("Too short");
-      }),
-      AsyncResult.inspectErr((error) => {
-        logs.push(`Error: ${error}`);
-      }),
-    );
+  await t.step(
+    "should handle async logging pipeline with inspect",
+    async () => {
+      const logs: string[] = [];
+      const result = await pipe(
+        AsyncResult.fromResult(new Ok("user data")),
+        AsyncResult.inspect((data) => {
+          logs.push(`Processing: ${data}`);
+        }),
+        AsyncResult.map(async (data) => {
+          await new Promise((resolve) => setTimeout(resolve, 1));
+          return data.toUpperCase();
+        }),
+        AsyncResult.inspect((data) => {
+          logs.push(`Processed: ${data}`);
+        }),
+        AsyncResult.andThen(async (data) => {
+          await new Promise((resolve) => setTimeout(resolve, 1));
+          return data.length > 5 ? new Ok(data) : new Err("Too short");
+        }),
+        AsyncResult.inspectErr((error) => {
+          logs.push(`Error: ${error}`);
+        }),
+      );
 
-    assertEquals(logs, ["Processing: user data", "Processed: USER DATA"]);
-    assertEquals(result.ok(), true);
-    assertEquals(result.unwrap(), "USER DATA");
-  });
+      assertEquals(logs, ["Processing: user data", "Processed: USER DATA"]);
+      assertEquals(result.ok(), true);
+      assertEquals(result.unwrap(), "USER DATA");
+    },
+  );
 
-  await t.step("should handle async error logging pipeline with inspectErr", async () => {
-    const logs: string[] = [];
-    const result = await pipe(
-      AsyncResult.fromResult(new Err("initial async error")),
-      AsyncResult.inspectErr(async (error) => {
-        await new Promise((resolve) => setTimeout(resolve, 1));
-        logs.push(`Initial error: ${error}`);
-      }),
-      AsyncResult.orElse(async (error) => {
-        await new Promise((resolve) => setTimeout(resolve, 1));
-        return new Err(`Fallback: ${error}`);
-      }),
-      AsyncResult.inspectErr((error) => {
-        logs.push(`Final error: ${error}`);
-      }),
-    );
+  await t.step(
+    "should handle async error logging pipeline with inspectErr",
+    async () => {
+      const logs: string[] = [];
+      const result = await pipe(
+        AsyncResult.fromResult(new Err("initial async error")),
+        AsyncResult.inspectErr(async (error) => {
+          await new Promise((resolve) => setTimeout(resolve, 1));
+          logs.push(`Initial error: ${error}`);
+        }),
+        AsyncResult.orElse(async (error) => {
+          await new Promise((resolve) => setTimeout(resolve, 1));
+          return new Err(`Fallback: ${error}`);
+        }),
+        AsyncResult.inspectErr((error) => {
+          logs.push(`Final error: ${error}`);
+        }),
+      );
 
-    assertEquals(logs, ["Initial error: initial async error", "Final error: Fallback: initial async error"]);
-    assertEquals(result.ok(), false);
-    assertEquals(result.unwrapErr(), "Fallback: initial async error");
-  });
+      assertEquals(logs, [
+        "Initial error: initial async error",
+        "Final error: Fallback: initial async error",
+      ]);
+      assertEquals(result.ok(), false);
+      assertEquals(result.unwrapErr(), "Fallback: initial async error");
+    },
+  );
 });

@@ -1,5 +1,5 @@
 import { pipe } from "@joyful/pipe";
-import { assertEquals } from "assert";
+import { assertEquals } from "std/assert";
 
 const double = (value: number) => value * 2;
 const square = (value: number) => value * value;
