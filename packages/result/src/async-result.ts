@@ -1,4 +1,5 @@
-import { Err, Ok, type Result } from "./result.ts";
+import type { Result } from "./main.ts";
+import { Err, Ok } from "./result.ts";
 
 /**
  * Promise-like wrapper around a {@link Result}.

@@ -1,5 +1,5 @@
 import { assertEquals, assertThrows } from "std/assert";
-import { Result } from "./result.ts";
+import { Result } from "./main.ts";
 
 Deno.test("Result Core", () => {
   assertEquals(Result.ok(2).isOk(), true);

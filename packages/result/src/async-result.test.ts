@@ -1,6 +1,6 @@
 import { assertEquals, assertRejects } from "std/assert";
 import { AsyncResult } from "./async-result.ts";
-import { Result } from "./result.ts";
+import { Result } from "./main.ts";
 
 Deno.test("AsyncResult Core", async () => {
   assertEquals(
@@ -112,7 +112,7 @@ Deno.test("AsyncResult.mapErr", async () => {
 Deno.test("AsyncResult.andThen", async () => {
   assertEquals(
     await new AsyncResult(Promise.resolve(Result.ok(2))).andThen((x) =>
-      Result.ok(x + 1),
+      Result.ok(x + 1)
     ),
     Result.ok(3),
   );
@@ -127,7 +127,7 @@ Deno.test("AsyncResult.andThen", async () => {
   assertEquals(
     // deno-lint-ignore require-await
     await new AsyncResult(Promise.resolve(Result.ok(2))).andThen(async (x) =>
-      Result.ok(x + 1),
+      Result.ok(x + 1)
     ),
     Result.ok(3),
   );
@@ -143,7 +143,7 @@ Deno.test("AsyncResult.andThen", async () => {
 Deno.test("AsyncResult.orElse", async () => {
   assertEquals(
     await new AsyncResult(Promise.resolve(Result.ok(2))).orElse((x) =>
-      Result.ok(x + 1),
+      Result.ok(x + 1)
     ),
     Result.ok(2),
   );

@@ -88,9 +88,7 @@ import { Result } from "@joyful/result";
 
 function parseNumber(input: string): Result<number, string> {
   const value = Number(input);
-  return Number.isNaN(value)
-    ? Result.err("invalid number")
-    : Result.ok(value);
+  return Number.isNaN(value) ? Result.err("invalid number") : Result.ok(value);
 }
 
 const result = parseNumber("42");
@@ -128,15 +126,11 @@ import { Result } from "@joyful/result";
 
 function parseNumber(input: string): Result<number, string> {
   const value = Number(input);
-  return Number.isNaN(value)
-    ? Result.err("invalid number")
-    : Result.ok(value);
+  return Number.isNaN(value) ? Result.err("invalid number") : Result.ok(value);
 }
 
 function requirePositive(value: number): Result<number, string> {
-  return value > 0
-    ? Result.ok(value)
-    : Result.err("value must be positive");
+  return value > 0 ? Result.ok(value) : Result.err("value must be positive");
 }
 
 const result = parseNumber("42").andThen(requirePositive);
@@ -164,14 +158,14 @@ const value = Result.err("missing value").orElse((error) =>
 - `inspect(fn)` runs `fn` on the success value and returns the same result.
 - `inspectErr(fn)` runs `fn` on the error value and returns the same result.
 
-`expect()` and `expectErr()` are best reserved for tests or states that should be
-impossible in normal execution.
+`expect()` and `expectErr()` are best reserved for tests or states that should
+be impossible in normal execution.
 
 ## AsyncResult
 
-`AsyncResult<T, E>` is a promise-like wrapper around `Promise<Result<T, E>>`.
-It lets you keep using result-style composition in async code without dropping
-back to exceptions or manual branching at every step.
+`AsyncResult<T, E>` is a promise-like wrapper around `Promise<Result<T, E>>`. It
+lets you keep using result-style composition in async code without dropping back
+to exceptions or manual branching at every step.
 
 ### Converting a sync result with `.async()`
 
@@ -204,7 +198,7 @@ function fetchJson(url: string): AsyncResult<unknown, string> {
       })
       .catch((error) =>
         Result.err(error instanceof Error ? error.message : String(error))
-      )
+      ),
   );
 }
 

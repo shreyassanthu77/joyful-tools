@@ -32,3 +32,55 @@
 
 export * from "./result.ts";
 export * from "./async-result.ts";
+
+import { Err, Ok } from "./result.ts";
+/**
+ * A value that is either a successful {@link Ok} or a failed {@link Err}.
+ *
+ * `Result` makes failure explicit in the type system. Callers can branch with
+ * `isOk()` and `isErr()`, transform values with `map()` and `mapErr()`, and
+ * chain operations with `andThen()` and `orElse()`.
+ *
+ * @example
+ * ```typescript
+ * function parseNumber(input: string): Result<number, string> {
+ *   const value = Number(input);
+ *   return Number.isNaN(value)
+ *     ? Result.err("invalid number")
+ *     : Result.ok(value);
+ * }
+ *
+ * const parsed = parseNumber("42");
+ *
+ * if (parsed.isOk()) {
+ *   console.log(parsed.value);
+ * } else {
+ *   console.log(parsed.error);
+ * }
+ * ```
+ */
+export type Result<T, E = unknown> = Ok<T, E> | Err<T, E>;
+
+/** Namespace helpers for constructing {@link Result} values. */
+// deno-lint-ignore no-namespace
+export namespace Result {
+  /**
+   * Creates a successful {@link Result}.
+   *
+   * @param value The success value to store.
+   * @returns An {@link Ok} containing `value`.
+   */
+  export function ok<T, E = never>(value: T): Result<T, E> {
+    return new Ok(value);
+  }
+
+  /**
+   * Creates a failed {@link Result}.
+   *
+   * @param err The error value to store.
+   * @returns An {@link Err} containing `err`.
+   */
+  export function err<E, T = never>(err: E): Result<T, E> {
+    return new Err(err);
+  }
+}
