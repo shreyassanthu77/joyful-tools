@@ -1,606 +1,102 @@
-import { pipe } from "@joyful/pipe";
-import { Result, Ok, Err } from "@joyful/result";
 import { assertEquals, assertThrows } from "std/assert";
+import { Result } from "./result.ts";
 
-Deno.test("Core", async (t) => {
-  await t.step("ok and err", () => {
-    const ok = new Ok("hello");
-    assertEquals(ok.ok(), true);
-    assertEquals(ok.err(), false);
-
-    const err = new Err("hello");
-    assertEquals(err.ok(), false);
-    assertEquals(err.err(), true);
-  });
-
-  await t.step("unwrap and unwrapErr", () => {
-    const ok = new Ok("hello");
-    assertEquals(ok.unwrap(), "hello");
-    assertThrows(() => ok.unwrapErr());
-
-    const err = new Err("hello");
-    assertThrows(() => err.unwrap());
-    assertEquals(err.unwrapErr(), "hello");
-  });
-
-  await t.step("unwrapOr", () => {
-    const ok = new Ok("hello");
-    assertEquals(ok.unwrapOr("world"), "hello");
-
-    const err = new Err<string, string>("hello");
-    assertEquals(err.unwrapOr("world"), "world");
-  });
+Deno.test("Result Core", () => {
+  assertEquals(Result.ok(2).isOk(), true);
+  assertEquals(Result.ok(2).isErr(), false);
+  assertEquals(Result.err(2).isOk(), false);
+  assertEquals(Result.err(2).isErr(), true);
 });
 
-Deno.test("map", async (t) => {
-  await t.step("should map an Ok value (curried)", () => {
-    const ok = new Ok(1);
-    const mapped = pipe(
-      ok,
-      Result.map((value) => value + 1),
-    );
-
-    assertEquals(mapped.ok(), true);
-    assertEquals(mapped.unwrap(), 2);
-  });
-
-  await t.step("should map an Ok value (binary)", () => {
-    const ok = new Ok(1);
-    const mapped = Result.map(ok, (value) => value + 1);
-
-    assertEquals(mapped.ok(), true);
-    assertEquals(mapped.unwrap(), 2);
-  });
-
-  await t.step("should not map an Err value (curried)", () => {
-    const err = new Err(1);
-    const mapped = pipe(
-      err,
-      Result.map((value) => value + 1),
-    );
-    assertEquals(mapped.ok(), false);
-    assertEquals(mapped.unwrapErr(), 1);
-  });
-
-  await t.step("should not map an Err value (binary)", () => {
-    const err = new Err(1);
-    const mapped = Result.map(err, (value) => value + 1);
-    assertEquals(mapped.ok(), false);
-    assertEquals(mapped.unwrapErr(), 1);
-  });
+Deno.test("Result.unwrapOr", () => {
+  assertEquals(Result.ok(2).unwrapOr(1), 2);
+  assertEquals(Result.err<void, number>(undefined).unwrapOr(1), 1);
 });
 
-Deno.test("mapErr", async (t) => {
-  await t.step("should map an Err value (curried)", () => {
-    const err = new Err(1);
-    const mapped = pipe(
-      err,
-      Result.mapErr((error) => error + 1),
-    );
-    assertEquals(mapped.ok(), false);
-    assertEquals(mapped.unwrapErr(), 2);
-  });
+Deno.test("Result.expect", () => {
+  assertEquals(Result.ok(2).expect("error"), 2);
 
-  await t.step("should map an Err value (binary)", () => {
-    const err = new Err(1);
-    const mapped = Result.mapErr(err, (error) => error + 1);
-    assertEquals(mapped.ok(), false);
-    assertEquals(mapped.unwrapErr(), 2);
-  });
-
-  await t.step("should not map an Ok value (curried)", () => {
-    const ok = new Ok(1);
-    const mapped = pipe(
-      ok,
-      Result.mapErr((error) => error + 1),
-    );
-    assertEquals(mapped.ok(), true);
-    assertEquals(mapped.unwrap(), 1);
-  });
-
-  await t.step("should not map an Ok value (binary)", () => {
-    const ok = new Ok(1);
-    const mapped = Result.mapErr(ok, (error) => error + 1);
-    assertEquals(mapped.ok(), true);
-    assertEquals(mapped.unwrap(), 1);
-  });
+  assertThrows(() => Result.err(undefined).expect("error"), Error, "error");
 });
 
-Deno.test("andThen", async (t) => {
-  await t.step("Ok + Ok1 => Ok1 (curried)", () => {
-    const ok = new Ok(1);
-    const mapped = pipe(
-      ok,
-      Result.andThen((value) => new Ok(value + 1)),
-    );
-    assertEquals(mapped.ok(), true);
-    assertEquals(mapped.unwrap(), 2);
-  });
+Deno.test("Result.expectErr", () => {
+  assertThrows(() => Result.ok(2).expectErr("error"), Error, "error");
 
-  await t.step("Ok + Ok1 => Ok1 (binary)", () => {
-    const ok = new Ok(1);
-    const mapped = Result.andThen(ok, (value) => new Ok(value + 1));
-    assertEquals(mapped.ok(), true);
-    assertEquals(mapped.unwrap(), 2);
-  });
-
-  await t.step("Ok + Err => Err (curried)", () => {
-    const ok = new Ok(1);
-    const mapped = pipe(
-      ok,
-      Result.andThen((value) => new Err(value + 1)),
-    );
-    assertEquals(mapped.ok(), false);
-    assertEquals(mapped.unwrapErr(), 2);
-  });
-
-  await t.step("Ok + Err => Err (binary)", () => {
-    const ok = new Ok(1);
-    const mapped = Result.andThen(ok, (value) => new Err(value + 1));
-    assertEquals(mapped.ok(), false);
-    assertEquals(mapped.unwrapErr(), 2);
-  });
-
-  await t.step("Err + Ok => Err (curried)", () => {
-    const err = new Err(1);
-    const mapped = pipe(
-      err,
-      Result.andThen((value) => new Ok(value + 1)),
-    );
-    assertEquals(mapped.ok(), false);
-    assertEquals(mapped.unwrapErr(), 1);
-  });
-
-  await t.step("Err + Ok => Err (binary)", () => {
-    const err = new Err(1);
-    const mapped = Result.andThen(err, (value) => new Ok(value + 1));
-    assertEquals(mapped.ok(), false);
-    assertEquals(mapped.unwrapErr(), 1);
-  });
-
-  await t.step("Err + Err1 => Err (curried)", () => {
-    const err = new Err(1);
-    const mapped = pipe(
-      err,
-      Result.andThen((value) => new Err(value + 1)),
-    );
-    assertEquals(mapped.ok(), false);
-    assertEquals(mapped.unwrapErr(), 1);
-  });
-
-  await t.step("Err + Err1 => Err (binary)", () => {
-    const err = new Err(1);
-    const mapped = Result.andThen(err, (value) => new Err(value + 1));
-    assertEquals(mapped.ok(), false);
-    assertEquals(mapped.unwrapErr(), 1);
-  });
+  assertEquals(Result.err(undefined).expectErr("error"), undefined);
 });
 
-Deno.test("orElse", async (t) => {
-  await t.step("Ok + Ok1 => Ok (curried)", () => {
-    const ok = new Ok(1);
-    const mapped = pipe(
-      ok,
-      Result.orElse((error) => new Ok(error + 1)),
-    );
-    assertEquals(mapped.ok(), true);
-    assertEquals(mapped.unwrap(), 1);
-  });
-
-  await t.step("Ok + Ok1 => Ok (binary)", () => {
-    const ok = new Ok(1);
-    const mapped = Result.orElse(ok, (error) => new Ok(error + 1));
-    assertEquals(mapped.ok(), true);
-    assertEquals(mapped.unwrap(), 1);
-  });
-
-  await t.step("Ok + Err => Ok (curried)", () => {
-    const ok = new Ok(1);
-    const mapped = pipe(
-      ok,
-      Result.orElse((error) => new Err(error + 1)),
-    );
-    assertEquals(mapped.ok(), true);
-    assertEquals(mapped.unwrap(), 1);
-  });
-
-  await t.step("Ok + Err => Ok (binary)", () => {
-    const ok = new Ok(1);
-    const mapped = Result.orElse(ok, (error) => new Err(error + 1));
-    assertEquals(mapped.ok(), true);
-    assertEquals(mapped.unwrap(), 1);
-  });
-
-  await t.step("Err + Ok => Ok (curried)", () => {
-    const err = new Err(1);
-    const mapped = pipe(
-      err,
-      Result.orElse((error) => new Ok(error + 1)),
-    );
-    assertEquals(mapped.ok(), true);
-    assertEquals(mapped.unwrap(), 2);
-  });
-
-  await t.step("Err + Ok => Ok (binary)", () => {
-    const err = new Err(1);
-    const mapped = Result.orElse(err, (error) => new Ok(error + 1));
-    assertEquals(mapped.ok(), true);
-    assertEquals(mapped.unwrap(), 2);
-  });
-
-  await t.step("Err + Err1 => Err1 (curried)", () => {
-    const err = new Err(1);
-    const mapped = pipe(
-      err,
-      Result.orElse((error) => new Err(error + 1)),
-    );
-    assertEquals(mapped.ok(), false);
-    assertEquals(mapped.unwrapErr(), 2);
-  });
-
-  await t.step("Err + Err1 => Err1 (binary)", () => {
-    const err = new Err(1);
-    const mapped = Result.orElse(err, (error) => new Err(error + 1));
-    assertEquals(mapped.ok(), false);
-    assertEquals(mapped.unwrapErr(), 2);
-  });
-});
-
-Deno.test("match", async (t) => {
-  await t.step("should match Ok (curried)", () => {
-    const ok = new Ok(1);
-    const matched = pipe(
-      ok,
-      Result.match(
-        (value) => value + 1,
-        (error) => error + 2,
-      ),
-    );
-    assertEquals(matched, 2);
-  });
-
-  await t.step("should match Ok (binary)", () => {
-    const ok = new Ok(1);
-    const matched = Result.match(
-      ok,
-      (value) => value + 1,
-      (error) => error + 2,
-    );
-    assertEquals(matched, 2);
-  });
-
-  await t.step("should match Err (curried)", () => {
-    const err = new Err(1);
-    const matched = pipe(
-      err,
-      Result.match(
-        (value) => value + 1,
-        (error) => error + 2,
-      ),
-    );
-    assertEquals(matched, 3);
-  });
-
-  await t.step("should match Err (binary)", () => {
-    const err = new Err(1);
-    const matched = Result.match(
-      err,
-      (value) => value + 1,
-      (error) => error + 2,
-    );
-    assertEquals(matched, 3);
-  });
-});
-
-Deno.test("fromThrowable", async (t) => {
-  await t.step("should return Ok when function succeeds", () => {
-    const result = Result.fromThrowable(
-      () => 42,
-      (e) => String(e),
-    );
-    assertEquals(result.ok(), true);
-    assertEquals(result.unwrap(), 42);
-  });
-
-  await t.step("should return Err when function throws", () => {
-    const result = Result.fromThrowable(
-      () => {
-        throw new Error("test error");
-      },
-      (e) => (e as Error).message,
-    );
-    assertEquals(result.ok(), false);
-    assertEquals(result.unwrapErr(), "test error");
-  });
-
-  await t.step("should handle different error types", () => {
-    const result = Result.fromThrowable(
-      () => {
-        throw "string error";
-      },
-      (e) => String(e),
-    );
-    assertEquals(result.ok(), false);
-    assertEquals(result.unwrapErr(), "string error");
-  });
-
-  await t.step("should work with complex return types", () => {
-    const result = Result.fromThrowable(
-      () => ({ name: "test", value: 123 }),
-      (e) => String(e),
-    );
-    assertEquals(result.ok(), true);
-    assertEquals(result.unwrap(), { name: "test", value: 123 });
-  });
-});
-
-Deno.test("Error messages", async (t) => {
-  await t.step(
-    "should throw correct error message when calling unwrap on Err",
-    () => {
-      const err = new Err("test error");
-      assertThrows(() => err.unwrap(), "called `unwrap` on an `Err` value");
-    },
+Deno.test("Result.map", () => {
+  assertEquals(
+    Result.ok(2).map((x) => x + 1),
+    Result.ok(3),
   );
 
-  await t.step(
-    "should throw correct error message when calling unwrapErr on Ok",
-    () => {
-      const ok = new Ok("test value");
-      assertThrows(() => ok.unwrapErr(), "called `unwrapErr` on an `Ok` value");
-    },
+  assertEquals(
+    Result.err<void, number>(undefined).map((x) => x + 1),
+    Result.err(undefined),
   );
 });
 
-Deno.test("Type narrowing", async (t) => {
-  await t.step("should narrow type after ok() check", () => {
-    const result = Math.random() > 0.5 ? new Ok("success") : new Err(404);
+Deno.test("Result.mapErr", () => {
+  assertEquals(
+    Result.ok<void, number>(undefined).mapErr((x) => x + 1),
+    Result.ok(undefined),
+  );
 
-    if (result.ok()) {
-      assertEquals(typeof result.unwrap(), "string");
-      assertEquals(result.unwrap(), "success");
-    } else {
-      assertEquals(typeof result.unwrapErr(), "number");
-      assertEquals(result.unwrapErr(), 404);
-    }
-  });
-
-  await t.step("should narrow type after err() check", () => {
-    const result = Math.random() > 0.5 ? new Ok(42) : new Err("error");
-
-    if (result.err()) {
-      assertEquals(typeof result.unwrapErr(), "string");
-      assertEquals(result.unwrapErr(), "error");
-    } else {
-      assertEquals(typeof result.unwrap(), "number");
-      assertEquals(result.unwrap(), 42);
-    }
-  });
+  assertEquals(
+    Result.err<number, void>(2).mapErr((x) => x + 1),
+    Result.err(3),
+  );
 });
 
-Deno.test("Complex chaining", async (t) => {
-  await t.step("should chain multiple operations", () => {
-    const result = pipe(
-      new Ok(42),
-      Result.map((n) => n * 2),
-      Result.andThen((n) => new Ok(n + 10)),
-    );
+Deno.test("Result.andThen", () => {
+  assertEquals(
+    Result.ok(2).andThen((x) => Result.ok(x + 1)),
+    Result.ok(3),
+  );
 
-    assertEquals(result.ok(), true);
-    assertEquals(result.unwrap(), 94);
-  });
-
-  await t.step("should short-circuit on errors", () => {
-    const result = pipe(
-      new Err("initial error"),
-      Result.map((n) => n * 2),
-      Result.andThen((n) => new Ok(n + 10)),
-    );
-
-    assertEquals(result.ok(), false);
-    assertEquals(result.unwrapErr(), "initial error");
-  });
-
-  await t.step("should handle mixed map and andThen operations", () => {
-    const result = pipe(
-      new Ok("hello"),
-      Result.map((s) => s.length),
-      Result.andThen((n) => (n > 3 ? new Ok(n * 2) : new Err("Too short"))),
-      Result.mapErr((e) => `Error: ${e}`),
-    );
-
-    assertEquals(result.ok(), true);
-    assertEquals(result.unwrap(), 10);
-  });
+  assertEquals(
+    Result.err<void, number>(undefined).andThen((x) => Result.ok(x + 1)),
+    Result.err(undefined),
+  );
 });
 
-Deno.test("inspect", async (t) => {
-  await t.step("should inspect Ok value (curried)", () => {
-    let inspectedValue: number | undefined;
-    const ok = new Ok(42);
-    const result = pipe(
-      ok,
-      Result.inspect((value) => {
-        inspectedValue = value;
-      }),
-    );
+Deno.test("Result.orElse", () => {
+  assertEquals(
+    Result.ok(2).orElse((x) => Result.ok(x + 1)),
+    Result.ok(2),
+  );
 
-    assertEquals(inspectedValue, 42);
-    assertEquals(result.ok(), true);
-    assertEquals(result.unwrap(), 42); // unchanged
-  });
-
-  await t.step("should inspect Ok value (binary)", () => {
-    let inspectedValue: number | undefined;
-    const ok = new Ok(42);
-    const result = Result.inspect(ok, (value) => {
-      inspectedValue = value;
-    });
-
-    assertEquals(inspectedValue, 42);
-    assertEquals(result.ok(), true);
-    assertEquals(result.unwrap(), 42); // unchanged
-  });
-
-  await t.step("should not inspect Err value", () => {
-    let inspectedValue: number | undefined;
-    const err = new Err("error");
-    const result = pipe(
-      err,
-      Result.inspect((value) => {
-        inspectedValue = value;
-      }),
-    );
-
-    assertEquals(inspectedValue, undefined);
-    assertEquals(result.ok(), false);
-    assertEquals(result.unwrapErr(), "error"); // unchanged
-  });
-
-  await t.step("should handle multiple inspections", () => {
-    const inspections: string[] = [];
-    const ok = new Ok("test");
-    const result = pipe(
-      ok,
-      Result.inspect((value) => inspections.push(`first: ${value}`)),
-      Result.inspect((value) => inspections.push(`second: ${value}`)),
-    );
-
-    assertEquals(inspections, ["first: test", "second: test"]);
-    assertEquals(result.unwrap(), "test"); // unchanged
-  });
+  assertEquals(
+    Result.err<number, void>(2).orElse((x) => Result.ok(x + 1)),
+    Result.ok(3),
+  );
 });
 
-Deno.test("inspectErr", async (t) => {
-  await t.step("should inspect Err value (curried)", () => {
-    let inspectedError: string | undefined;
-    const err = new Err("network error");
-    const result = pipe(
-      err,
-      Result.inspectErr((error) => {
-        inspectedError = error;
-      }),
-    );
-
-    assertEquals(inspectedError, "network error");
-    assertEquals(result.ok(), false);
-    assertEquals(result.unwrapErr(), "network error"); // unchanged
+Deno.test("Result.inspect", () => {
+  let value = 0;
+  Result.ok(2).inspect((x) => {
+    value = x;
   });
+  assertEquals(value, 2);
 
-  await t.step("should inspect Err value (binary)", () => {
-    let inspectedError: string | undefined;
-    const err = new Err("network error");
-    const result = Result.inspectErr(err, (error) => {
-      inspectedError = error;
-    });
-
-    assertEquals(inspectedError, "network error");
-    assertEquals(result.ok(), false);
-    assertEquals(result.unwrapErr(), "network error"); // unchanged
+  value = 0;
+  Result.err<void, number>(undefined).inspect((x) => {
+    value = x;
   });
-
-  await t.step("should not inspect Ok value", () => {
-    let inspectedError: string | undefined;
-    const ok = new Ok(42);
-    const result = pipe(
-      ok,
-      Result.inspectErr((error) => {
-        inspectedError = error;
-      }),
-    );
-
-    assertEquals(inspectedError, undefined);
-    assertEquals(result.ok(), true);
-    assertEquals(result.unwrap(), 42); // unchanged
-  });
-
-  await t.step("should handle multiple error inspections", () => {
-    const inspections: string[] = [];
-    const err = new Err("validation error");
-    const result = pipe(
-      err,
-      Result.inspectErr((error) => inspections.push(`first: ${error}`)),
-      Result.inspectErr((error) => inspections.push(`second: ${error}`)),
-    );
-
-    assertEquals(inspections, [
-      "first: validation error",
-      "second: validation error",
-    ]);
-    assertEquals(result.unwrapErr(), "validation error"); // unchanged
-  });
+  assertEquals(value, 0);
 });
 
-Deno.test("Integration scenarios", async (t) => {
-  await t.step("should handle JSON parsing with validation", () => {
-    const json = '{"name": "Alice", "age": 30}';
-    const result = pipe(
-      Result.fromThrowable(
-        () => JSON.parse(json),
-        (e) => `Invalid JSON: ${(e as Error).message}`,
-      ),
-      Result.andThen((obj) =>
-        !obj.name || typeof obj.name !== "string"
-          ? new Err("Missing or invalid name")
-          : !obj.age || typeof obj.age !== "number"
-            ? new Err("Missing or invalid age")
-            : new Ok({ name: obj.name, age: obj.age }),
-      ),
-    );
-
-    assertEquals(result.ok(), true);
-    assertEquals(result.unwrap(), { name: "Alice", age: 30 });
+Deno.test("Result.inspectErr", () => {
+  let value = 0;
+  Result.ok<void, number>(undefined).inspectErr((x) => {
+    value = x;
   });
+  assertEquals(value, 0);
 
-  await t.step("should handle file processing workflow", () => {
-    const result = pipe(
-      new Ok("file content") as Result<string, string>,
-      Result.andThen((content) => {
-        const lines = content.split("\n").filter((line) => line.trim());
-        if (lines.length === 0) return new Err("INVALID_FORMAT");
-        return new Ok(
-          lines.map((line, i) => ({ line: i + 1, content: line.trim() })),
-        );
-      }),
-      Result.andThen((data) => new Ok(data.length)),
-    );
-
-    assertEquals(result.ok(), true);
-    assertEquals(result.unwrap(), 1);
+  value = 0;
+  Result.err(2).inspectErr((x) => {
+    value = x;
   });
-
-  await t.step("should handle logging pipeline with inspect", () => {
-    const logs: string[] = [];
-    const result = pipe(
-      new Ok("user data"),
-      Result.inspect((data) => logs.push(`Processing: ${data}`)),
-      Result.map((data) => data.toUpperCase()),
-      Result.inspect((data) => logs.push(`Processed: ${data}`)),
-      Result.andThen((data) =>
-        data.length > 5 ? new Ok(data) : new Err("Too short"),
-      ),
-      Result.inspectErr((error) => logs.push(`Error: ${error}`)),
-    );
-
-    assertEquals(logs, ["Processing: user data", "Processed: USER DATA"]);
-    assertEquals(result.ok(), true);
-    assertEquals(result.unwrap(), "USER DATA");
-  });
-
-  await t.step("should handle error logging pipeline with inspectErr", () => {
-    const logs: string[] = [];
-    const result = pipe(
-      new Err("initial error"),
-      Result.inspectErr((error) => logs.push(`Initial error: ${error}`)),
-      Result.orElse((error) => new Err(`Fallback: ${error}`)),
-      Result.inspectErr((error) => logs.push(`Final error: ${error}`)),
-    );
-
-    assertEquals(logs, [
-      "Initial error: initial error",
-      "Final error: Fallback: initial error",
-    ]);
-    assertEquals(result.ok(), false);
-    assertEquals(result.unwrapErr(), "Fallback: initial error");
-  });
+  assertEquals(value, 2);
 });

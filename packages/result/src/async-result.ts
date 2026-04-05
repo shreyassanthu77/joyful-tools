@@ -1,79 +1,54 @@
+import { Err, Ok, type Result } from "./result.ts";
+
 /**
- * Async utilities for working with Result types.
+ * Promise-like wrapper around a {@link Result}.
  *
- * This module provides async-compatible versions of the Result utilities,
- * allowing you to work with operations that return Promises and Results.
- * It includes functions for converting promises to AsyncResults and
- * functional composition utilities that work with both sync and async operations.
- *
- * The AsyncResult type extends PromiseLike to enable seamless integration
- * with async/await syntax and Promise chaining.
+ * `AsyncResult` lets you keep using result-style composition when the
+ * underlying computation is asynchronous. You can `await` it directly to get
+ * the wrapped {@link Result}, or call methods like `map`, `andThen`, and
+ * `unwrapOr` without leaving the result model.
  *
  * @example
  * ```typescript
- * import { AsyncResult } from "@joyful/result";
- * 
- * // Convert a promise that might throw to an AsyncResult
- * const fetchData = () => fetch("/api/data");
- * const result = AsyncResult.fromThrowable(fetchData, (e) => e.message);
- * 
- * // Use with async/await
- * const data = await result;
- * if (data.ok()) {
- *   console.log("Success:", data.unwrap());
- * } else {
- *   console.log("Error:", data.unwrapErr());
+ * import { AsyncResult, Result } from "@joyful/result";
+ *
+ * function fetchUserName(): AsyncResult<string, string> {
+ *   return new AsyncResult(
+ *     fetch("/api/user")
+ *       .then(async (response) => {
+ *         if (!response.ok) {
+ *           return Result.err(`request failed: ${response.status}`);
+ *         }
+ *
+ *         const user = await response.json() as { name: string };
+ *         return Result.ok(user.name);
+ *       })
+ *       .catch((error) =>
+ *         Result.err(error instanceof Error ? error.message : String(error))
+ *       )
+ *   );
  * }
- * 
- * // Functional composition with async operations
- * import { pipe } from "@joyful/pipe";
- * const processed = await pipe(
- *   result,
- *   AsyncResult.map((response) => response.json()),
- *   AsyncResult.andThen(validateData)
- * );
  * ```
- *
- * @module
  */
+export class AsyncResult<T, E = unknown> implements PromiseLike<Result<T, E>> {
+  /** The underlying promise that resolves to a {@link Result}. */
+  promise: Promise<Result<T, E>>;
 
-import { Ok, Err, type Result } from "./result.ts";
-
-/**
- * Represents an async Result that can be awaited or chained with Promise methods.
- *
- * AsyncResult extends PromiseLike to enable seamless integration with async/await
- * syntax and Promise chaining while maintaining the Result type safety.
- *
- * @template T - The type of the success value
- * @template E - The type of the error value
- */
-export interface AsyncResult<T, E = unknown> extends PromiseLike<Result<T, E>> {
-  /** The underlying Promise that resolves to a Result */
-  readonly promise: Promise<Result<T, E>>;
-}
-
-/**
- * Internal implementation of AsyncResult.
- *
- * This class wraps a Promise<Result<T, E>> and implements the PromiseLike
- * interface to enable async/await syntax and Promise chaining.
- *
- * @template T - The type of the success value
- * @template E - The type of the error value
- */
-class AsyncResultImpl<T, E = unknown> implements AsyncResult<T, E> {
   /**
-   * Creates a new AsyncResultImpl from a Promise that resolves to a Result.
-   * @param promise - The promise that resolves to a Result
+   * Creates an async wrapper around a result-bearing promise.
+   *
+   * @param promise A promise that resolves to a {@link Result}.
    */
-  constructor(public promise: Promise<Result<T, E>>) {}
+  constructor(promise: Promise<Result<T, E>>) {
+    this.promise = promise;
+  }
 
   /**
-   * Implements the PromiseLike.then method for Promise chaining.
-   * @param onfulfilled - Optional callback for when the promise resolves
-   * @param onrejected - Optional callback for when the promise rejects
-   * @returns A new promise for the result of the callbacks
+   * Makes `AsyncResult` awaitable and compatible with promise chains.
+   *
+   * @param onfulfilled Called when the underlying promise resolves.
+   * @param onrejected Called when the underlying promise rejects.
+   * @returns A promise-like value for the chained computation.
    */
   then<P, Q>(
     onfulfilled?: (value: Result<T, E>) => P | PromiseLike<P>,
@@ -81,793 +56,163 @@ class AsyncResultImpl<T, E = unknown> implements AsyncResult<T, E> {
   ): PromiseLike<P | Q> {
     return this.promise.then(onfulfilled, onrejected);
   }
-}
 
-/**
- * Default error handler that simply casts the error to type E.
- * @param error - The error to cast
- * @returns The error cast to type E
- */
-function onErrorNoop<E>(error: unknown): E {
-  return error as E;
-}
-
-/**
- * Internal helper that converts a promise factory to a Result.
- * @param promiseFactory - Function that returns a value or Promise
- * @param onError - Function to transform caught errors
- * @returns Promise that resolves to a Result
- */
-async function fromPromise<T, E>(
-  promiseFactory: () => T | Promise<T>,
-  onError: (error: unknown) => E = onErrorNoop,
-): Promise<Result<T, E>> {
-  try {
-    const promise = promiseFactory();
-    if (promise instanceof Promise) {
-      const result = await promise;
-      return new Ok(result);
-    } else {
-      return new Ok(promise);
-    }
-  } catch (e) {
-    return new Err(onError(e));
+  /** Resolves to `true` when the wrapped result is successful. */
+  async isOk(): Promise<boolean> {
+    const result = await this;
+    return result.isOk();
   }
-}
 
-/**
- * Internal helper that maps the success value of a Result or AsyncResult.
- * @param result - The Result or AsyncResult to map
- * @param f - The mapping function (can be sync or async)
- * @returns Promise that resolves to a Result with the mapped value
- */
-async function mapInner<T, U, E>(
-  result: Result<T, E> | AsyncResult<T, E>,
-  f: (value: T) => U | Promise<U>,
-): Promise<Result<U, E>> {
-  const value =
-    result instanceof AsyncResultImpl
-      ? await (result as AsyncResultImpl<T, E>).promise
-      : (result as Result<T, E>);
-  if (value instanceof Err) return value as Err<E, never>;
-  const mapped = f(value.value);
-  if (mapped instanceof Promise) {
-    return new Ok(await mapped);
-  }
-  return new Ok(mapped);
-}
-
-/**
- * Internal helper that maps the error value of a Result or AsyncResult.
- * @param result - The Result or AsyncResult to map
- * @param f - The error mapping function (can be sync or async)
- * @returns Promise that resolves to a Result with the mapped error
- */
-async function mapErrInner<T, U, E>(
-  result: Result<T, E> | AsyncResult<T, E>,
-  f: (error: E) => U | Promise<U>,
-): Promise<Result<T, U>> {
-  const value =
-    result instanceof AsyncResultImpl
-      ? await (result as AsyncResultImpl<T, E>).promise
-      : (result as Result<T, E>);
-  if (value instanceof Ok) return value as Ok<T, never>;
-  const mapped = f(value.error);
-  if (mapped instanceof Promise) {
-    return new Err(await mapped);
-  }
-  return new Err(mapped);
-}
-
-/**
- * Internal helper that chains operations returning Results or AsyncResults.
- * @param result - The Result or AsyncResult to chain
- * @param f - Function that returns a Result, AsyncResult, or Promise of either
- * @returns Promise that resolves to the chained Result
- */
-async function andThenInner<T1, T2, E1, E2>(
-  result: Result<T1, E1> | AsyncResult<T1, E1>,
-  f: (value: T1) => Result<T2, E2> | AsyncResult<T2, E2> | Promise<Result<T2, E2> | AsyncResult<T2, E2>>,
-): Promise<Result<T2, E1 | E2>> {
-  const value =
-    result instanceof AsyncResultImpl
-      ? await (result as AsyncResultImpl<T1, E1>).promise
-      : (result as Result<T1, E1>);
-  if (value instanceof Err) return value as Err<E1, never>;
-  const mapped = f(value.value);
-  const awaited = mapped instanceof Promise ? await mapped : mapped;
-  
-  if (awaited instanceof AsyncResultImpl) {
-    return awaited.promise;
-  } else {
-    return Promise.resolve(awaited);
-  }
-}
-
-/**
- * Internal helper that provides fallback behavior for Results or AsyncResults.
- * @param result - The Result or AsyncResult to provide fallback for
- * @param f - Function that returns a Result, AsyncResult, or Promise of either
- * @returns Promise that resolves to fallback Result
- */
-async function orElseInner<T1, T2, E1, E2>(
-  result: Result<T1, E1> | AsyncResult<T1, E1>,
-  f: (error: E1) => Result<T2, E2> | AsyncResult<T2, E2> | Promise<Result<T2, E2> | AsyncResult<T2, E2>>,
-): Promise<Result<T1 | T2, E2>> {
-  const value =
-    result instanceof AsyncResultImpl
-      ? await (result as AsyncResultImpl<T1, E1>).promise
-      : (result as Result<T1, E1>);
-  if (value instanceof Ok) return value as Ok<T1, never>;
-  const mapped = f(value.error);
-  const awaited = mapped instanceof Promise ? await mapped : mapped;
-  
-  if (awaited instanceof AsyncResultImpl) {
-    return awaited.promise;
-  } else {
-    return Promise.resolve(awaited);
-  }
-}
-
-/**
- * Internal helper that pattern matches on a Result or AsyncResult.
- * @param result - The Result or AsyncResult to match on
- * @param ok - Handler for Ok values (can be sync or async)
- * @param err - Handler for Err values (can be sync or async)
- * @returns Promise that resolves to the result of the appropriate handler
- */
-async function matchInner<T, E, U>(
-  result: Result<T, E> | AsyncResult<T, E>,
-  ok: (value: T) => U | Promise<U>,
-  err: (error: E) => U | Promise<U>,
-): Promise<U> {
-  const value =
-    result instanceof AsyncResultImpl
-      ? await (result as AsyncResultImpl<T, E>).promise
-      : (result as Result<T, E>);
-  if (value instanceof Ok) {
-    const result = ok(value.value);
-    return result instanceof Promise ? await result : result;
-  } else {
-    const result = err(value.error);
-    return result instanceof Promise ? await result : result;
-  }
-}
-
-/**
- * Internal helper that inspects the success value of a Result or AsyncResult.
- * @param result - The Result or AsyncResult to inspect
- * @param fn - The inspection function (can be sync or async)
- * @returns Promise that resolves to the original Result
- */
-async function inspectInner<T, E>(
-  result: Result<T, E> | AsyncResult<T, E>,
-  fn: (value: T) => void | Promise<void>,
-): Promise<Result<T, E>> {
-  const value =
-    result instanceof AsyncResultImpl
-      ? await (result as AsyncResultImpl<T, E>).promise
-      : (result as Result<T, E>);
-  if (value instanceof Ok) {
-    const result = fn(value.value);
-    if (result instanceof Promise) {
-      await result;
-    }
-  }
-  return value;
-}
-
-/**
- * Internal helper that inspects the error value of a Result or AsyncResult.
- * @param result - The Result or AsyncResult to inspect
- * @param fn - The error inspection function (can be sync or async)
- * @returns Promise that resolves to the original Result
- */
-async function inspectErrInner<T, E>(
-  result: Result<T, E> | AsyncResult<T, E>,
-  fn: (error: E) => void | Promise<void>,
-): Promise<Result<T, E>> {
-  const value =
-    result instanceof AsyncResultImpl
-      ? await (result as AsyncResultImpl<T, E>).promise
-      : (result as Result<T, E>);
-  if (value instanceof Err) {
-    const result = fn(value.error);
-    if (result instanceof Promise) {
-      await result;
-    }
-  }
-  return value;
-}
-
-// deno-lint-ignore no-namespace
-export namespace AsyncResult {
-  /**
-   * Converts a synchronous Result to an AsyncResult.
-   *
-   * This function wraps a Result in a Promise, allowing it to be used
-   * with async utilities and awaited like any other AsyncResult.
-   *
-   * @param result - The Result to convert to an AsyncResult
-   * @returns An AsyncResult that resolves to the provided Result
-   *
-   * @example
-   * ```typescript
-   * import { AsyncResult, Result, Ok } from "@joyful/result";
-   * 
-   * const syncResult = new Ok(42);
-   * const asyncResult = AsyncResult.fromResult(syncResult);
-   * 
-   * // Can now be awaited
-   * const result = await asyncResult;
-   * console.log(result.unwrap()); // 42
-   * ```
-   */
-  export function fromResult<T, E>(result: Result<T, E>): AsyncResult<T, E> {
-    return new AsyncResultImpl(Promise.resolve(result));
+  /** Resolves to `true` when the wrapped result is an error. */
+  async isErr(): Promise<boolean> {
+    const result = await this;
+    return result.isErr();
   }
 
   /**
-   * Wraps a throwable function (sync or async) in an AsyncResult.
+   * Resolves to the success value or a fallback value.
    *
-   * This function executes the provided function and returns an AsyncResult
-   * that resolves to Ok containing the result if successful, or Err containing
-   * the transformed error if an exception is thrown.
-   *
-   * @param fn - The function that might throw an exception (sync or async)
-   * @param onError - Optional function to transform the caught error into an error value
-   * @returns An AsyncResult that resolves to either the success value or the transformed error
-   *
-   * @example
-   * ```typescript
-   * import { AsyncResult } from "@joyful/result";
-   * 
-   * // Sync function that might throw
-   * const parseJson = (json: string) => AsyncResult.fromThrowable(
-   *   () => JSON.parse(json),
-   *   (e) => `Invalid JSON: ${e.message}`
-   * );
-   * 
-   * // Async function that might throw
-   * const fetchData = () => AsyncResult.fromThrowable(
-   *   async () => {
-   *     const response = await fetch("/api/data");
-   *     return response.json();
-   *   },
-   *   (e) => `Network error: ${e.message}`
-   * );
-   * 
-   * const result = await parseJson('{"name": "Alice"}');
-   * // Returns: Ok({name: "Alice"})
-   * 
-   * const badResult = await parseJson('invalid json');
-   * // Returns: Err("Invalid JSON: Unexpected token...")
-   * ```
+   * @param defaultValue Value to use when the wrapped result is an error.
+   * @returns The success value or `defaultValue`.
    */
-  export function fromThrowable<T, E>(
-    fn: () => T | Promise<T>,
-    onError?: (error: unknown) => E,
-  ): AsyncResult<T, E> {
-    return new AsyncResultImpl(fromPromise(fn, onError));
+  async unwrapOr(defaultValue: T): Promise<T> {
+    const result = await this;
+    return result.unwrapOr(defaultValue);
   }
 
   /**
-   * Maps the success value of an AsyncResult or Result.
+   * Resolves to the success value or throws an `Error`.
    *
-   * This function supports two calling patterns:
-   * 1. Curried: `map(fn)(result)` - perfect for pipe composition
-   * 2. Binary: `map(result, fn)` - more intuitive for direct calls
-   *
-   * If the Result is Ok, the mapping function is applied to the contained value.
-   * The mapping function can be synchronous or asynchronous. If the Result is Err,
-   * it is passed through unchanged.
-   *
-   * @example
-   * ```typescript
-   * import { AsyncResult, pipe, Ok } from "@joyful/result";
-   * 
-   * const result = AsyncResult.fromResult(new Ok(5));
-   * 
-   * // Curried form (great for pipes)
-   * const doubled = pipe(
-   *   result,
-   *   AsyncResult.map((x: number) => x * 2)
-   * );
-   * console.log((await doubled).unwrap()); // 10
-   * 
-   * // Binary form (more direct)
-   * const doubled2 = AsyncResult.map(result, (x: number) => x * 2);
-   * console.log((await doubled2).unwrap()); // 10
-   * 
-   * // Async mapping function
-   * const withAsync = await pipe(
-   *   result,
-   *   AsyncResult.map(async (x: number) => {
-   *     await new Promise(resolve => setTimeout(resolve, 100));
-   *     return x * 3;
-   *   })
-   * );
-   * console.log(withAsync.unwrap()); // 15
-   * ```
+   * @param message Error message to use if the wrapped result is an error.
+   * @returns The success value.
+   * @throws {Error}
    */
-  export function map<T, U, E>(
-    result: Result<T, E> | AsyncResult<T, E>,
-    f: (value: T) => U | Promise<U>,
-  ): AsyncResult<U, E>;
-  export function map<T, U, E>(
-    f: (value: T) => U | Promise<U>,
-  ): (result: Result<T, E> | AsyncResult<T, E>) => AsyncResult<U, E>;
-  export function map<T, U, E>(
-    resultOrFn: Result<T, E> | AsyncResult<T, E> | ((value: T) => U | Promise<U>),
-    maybeFn?: (value: T) => U | Promise<U>,
-  ):
-    | AsyncResult<U, E>
-    | ((result: Result<T, E> | AsyncResult<T, E>) => AsyncResult<U, E>) {
-    if (maybeFn !== undefined) {
-      const result = resultOrFn as AsyncResult<T, E>;
-      const f = maybeFn;
-      return new AsyncResultImpl(mapInner(result, f));
-    }
-
-    return (result: Result<T, E> | AsyncResult<T, E>): AsyncResult<U, E> => {
-      return new AsyncResultImpl(mapInner(result, resultOrFn as (value: T) => U));
-    };
+  async expect(message: string): Promise<T> {
+    const result = await this;
+    return result.expect(message);
   }
 
   /**
-   * Maps the error value of an AsyncResult or Result.
+   * Resolves to the error value or throws an `Error`.
    *
-   * This function supports two calling patterns:
-   * 1. Curried: `mapErr(fn)(result)` - perfect for pipe composition
-   * 2. Binary: `mapErr(result, fn)` - more intuitive for direct calls
-   *
-   * If the Result is Err, the mapping function is applied to the contained error.
-   * The mapping function can be synchronous or asynchronous. If the Result is Ok,
-   * it is passed through unchanged.
-   *
-   * @example
-   * ```typescript
-   * import { AsyncResult, pipe, Err } from "@joyful/result";
-   * 
-   * const result = AsyncResult.fromResult(new Err("network error"));
-   * 
-   * // Curried form (great for pipes)
-   * const withCode = pipe(
-   *   result,
-   *   AsyncResult.mapErr((msg: string) => `ERROR: ${msg}`)
-   * );
-   * console.log((await withCode).unwrapErr()); // "ERROR: network error"
-   * 
-   * // Binary form (more direct)
-   * const withCode2 = AsyncResult.mapErr(result, (msg: string) => `ERROR: ${msg}`);
-   * console.log((await withCode2).unwrapErr()); // "ERROR: network error"
-   * 
-   * // Async error mapping
-   * const withAsync = await pipe(
-   *   result,
-   *   AsyncResult.mapErr(async (msg: string) => {
-   *     await new Promise(resolve => setTimeout(resolve, 100));
-   *     return `ASYNC_ERROR: ${msg}`;
-   *   })
-   * );
-   * console.log(withAsync.unwrapErr()); // "ASYNC_ERROR: network error"
-   * ```
+   * @param message Error message to use if the wrapped result is successful.
+   * @returns The error value.
+   * @throws {Error}
    */
-  export function mapErr<T, U, E>(
-    result: Result<T, E> | AsyncResult<T, E>,
-    f: (error: E) => U | Promise<U>,
-  ): AsyncResult<T, U>;
-  export function mapErr<T, U, E>(
-    f: (error: E) => U | Promise<U>,
-  ): (result: Result<T, E> | AsyncResult<T, E>) => AsyncResult<T, U>;
-  export function mapErr<T, U, E>(
-    resultOrFn: Result<T, E> | AsyncResult<T, E> | ((error: E) => U | Promise<U>),
-    maybeFn?: (error: E) => U | Promise<U>,
-  ):
-    | AsyncResult<T, U>
-    | ((result: Result<T, E> | AsyncResult<T, E>) => AsyncResult<T, U>) {
-    if (maybeFn !== undefined) {
-      const result = resultOrFn as Result<T, E> | AsyncResult<T, E>;
-      const f = maybeFn;
-      return new AsyncResultImpl(mapErrInner(result, f));
-    }
-
-    return (result: Result<T, E> | AsyncResult<T, E>): AsyncResult<T, U> => {
-      return new AsyncResultImpl(
-        mapErrInner(result, resultOrFn as (error: E) => U),
-      );
-    };
+  async expectErr(message: string): Promise<E> {
+    const result = await this;
+    return result.expectErr(message);
   }
 
   /**
-   * Chains operations that return Results or AsyncResults.
+   * Maps the success value with a synchronous or asynchronous callback.
    *
-   * This function supports two calling patterns:
-   * 1. Curried: `andThen(fn)(result)` - perfect for pipe composition
-   * 2. Binary: `andThen(result, fn)` - more intuitive for direct calls
-   *
-   * If the input Result is Ok, the provided function is applied to the contained
-   * value and its Result/AsyncResult is returned. If the input Result is Err,
-   * it is passed through unchanged (short-circuiting the chain).
-   *
-   * The provided function can return a Result, AsyncResult, or a Promise of either.
-   * This is equivalent to the "bind" or "flatMap" operation in functional programming.
-   *
-   * @example
-   * ```typescript
-   * import { AsyncResult, Result, pipe, Ok, Err } from "@joyful/result";
-   * 
-   * const parseAge = (str: string): Result<number, string> => {
-   *   const age = parseInt(str, 10);
-   *   if (isNaN(age)) return new Err("Invalid number");
-   *   if (age < 0) return new Err("Age cannot be negative");
-   *   return new Ok(age);
-   * };
-   * 
-   * const validateAge = async (age: number): Promise<Result<string, string>> => {
-   *   if (age < 18) return new Err("Too young to register");
-   *   if (age > 65) return new Err("Age exceeds limit");
-   *   return new Ok("Age is valid");
-   * };
-   * 
-   * const result = AsyncResult.fromResult(new Ok("25"));
-   * 
-   * // Curried form (great for pipes)
-   * const final = pipe(
-   *   result,
-   *   AsyncResult.andThen(parseAge),
-   *   AsyncResult.andThen(validateAge)
-   * );
-   * console.log((await final).unwrap()); // "Age is valid"
-   * 
-   * // Binary form (more direct)
-   * const final2 = AsyncResult.andThen(
-   *   await AsyncResult.andThen(result, parseAge),
-   *   validateAge
-   * );
-   * console.log((await final2).unwrap()); // "Age is valid"
-   * ```
+   * @param f Function that transforms the success value.
+   * @returns A new async result containing the mapped value.
    */
-  export function andThen<T1, T2, E1, E2>(
-    result: Result<T1, E1> | AsyncResult<T1, E1>,
-    f: (value: T1) => Result<T2, E2> | AsyncResult<T2, E2> | Promise<Result<T2, E2> | AsyncResult<T2, E2>>,
-  ): AsyncResult<T2, E1 | E2>;
-  export function andThen<T1, T2, E1, E2>(
-    f: (value: T1) => Result<T2, E2> | AsyncResult<T2, E2> | Promise<Result<T2, E2> | AsyncResult<T2, E2>>,
-  ): (result: Result<T1, E1> | AsyncResult<T1, E1>) => AsyncResult<T2, E1 | E2>;
-  export function andThen<T1, T2, E1, E2>(
-    resultOrFn:
-      | Result<T1, E1>
-      | AsyncResult<T1, E1>
-      | ((value: T1) => Result<T2, E2> | AsyncResult<T2, E2> | Promise<Result<T2, E2> | AsyncResult<T2, E2>>),
-    maybeFn?: (value: T1) => Result<T2, E2> | AsyncResult<T2, E2> | Promise<Result<T2, E2> | AsyncResult<T2, E2>>,
-  ):
-    | AsyncResult<T2, E1 | E2>
-    | ((
-        result: Result<T1, E1> | AsyncResult<T1, E1>,
-      ) => AsyncResult<T2, E1 | E2>) {
-    if (maybeFn !== undefined) {
-      const result = resultOrFn as Result<T1, E1> | AsyncResult<T1, E1>;
-      const f = maybeFn;
-      return new AsyncResultImpl(andThenInner(result, f));
-    }
-
-    return (
-      result: Result<T1, E1> | AsyncResult<T1, E1>,
-    ): AsyncResult<T2, E1 | E2> => {
-      return new AsyncResultImpl(
-        andThenInner(result, resultOrFn as (value: T1) => Result<T2, E2> | AsyncResult<T2, E2> | Promise<Result<T2, E2> | AsyncResult<T2, E2>>),
-      );
-    };
+  map<U>(f: (value: T) => U | Promise<U>): AsyncResult<U, E> {
+    return new AsyncResult(
+      this.promise.then(async (result) => {
+        // @ts-expect-error - we know the value is an error so we can safely cast to a result with a different Value type
+        if (result instanceof Err) return result as Err<U, E>;
+        const mapped = f((result as Ok<T, never>).value);
+        if (mapped instanceof Promise) {
+          return new Ok(await mapped);
+        }
+        return new Ok(mapped);
+      }),
+    );
   }
 
   /**
-   * Provides fallback behavior for AsyncResults or Results.
+   * Maps the error value with a synchronous or asynchronous callback.
    *
-   * This function supports two calling patterns:
-   * 1. Curried: `orElse(fn)(result)` - perfect for pipe composition
-   * 2. Binary: `orElse(result, fn)` - more intuitive for direct calls
-   *
-   * If the input Result is Err, the provided function is applied
-   * to the error value and its Result/AsyncResult is returned. If the input
-   * Result is Ok, it is passed through unchanged.
-   *
-   * The provided function can return a Result, AsyncResult, or a Promise of either.
-   * This is useful for providing default values or alternative recovery strategies.
-   *
-   * @example
-   * ```typescript
-   * import { AsyncResult, Result, pipe, Ok, Err } from "@joyful/result";
-   * 
-   * const fetchFromCache = (id: string): AsyncResult<string, string> => {
-   *   // Simulate cache miss
-   *   return AsyncResult.fromResult(new Err("Not found in cache"));
-   * };
-   * 
-   * const fetchFromDB = async (id: string): Promise<Result<string, string>> => {
-   *   // Simulate database fetch
-   *   await new Promise(resolve => setTimeout(resolve, 100));
-   *   return new Ok(`Data for ${id} from database`);
-   * };
-   * 
-   * const result = AsyncResult.fromResult(new Err("Not found in cache"));
-   * 
-   * // Curried form (great for pipes)
-   * const fallback = pipe(
-   *   result,
-   *   AsyncResult.orElse(fetchFromDB)
-   * );
-   * console.log((await fallback).unwrap()); // "Data for [id] from database"
-   * 
-   * // Binary form (more direct)
-   * const fallback2 = AsyncResult.orElse(result, fetchFromDB);
-   * console.log((await fallback2).unwrap()); // "Data for [id] from database"
-   * 
-   * const success = AsyncResult.fromResult(new Ok("Already have data"));
-   * const unchanged = await AsyncResult.orElse(success, fetchFromDB);
-   * console.log(unchanged.unwrap()); // "Already have data"
-   * ```
+   * @param f Function that transforms the error value.
+   * @returns A new async result containing the mapped error.
    */
-  export function orElse<T1, T2, E1, E2>(
-    result: Result<T1, E1> | AsyncResult<T1, E1>,
-    f: (error: E1) => Result<T2, E2> | AsyncResult<T2, E2> | Promise<Result<T2, E2> | AsyncResult<T2, E2>>,
-  ): AsyncResult<T1 | T2, E2>;
-  export function orElse<T1, T2, E1, E2>(
-    f: (error: E1) => Result<T2, E2> | AsyncResult<T2, E2> | Promise<Result<T2, E2> | AsyncResult<T2, E2>>,
-  ): (result: Result<T1, E1> | AsyncResult<T1, E1>) => AsyncResult<T1 | T2, E2>;
-  export function orElse<T1, T2, E1, E2>(
-    resultOrFn:
-      | Result<T1, E1>
-      | AsyncResult<T1, E1>
-      | ((error: E1) => Result<T2, E2> | AsyncResult<T2, E2> | Promise<Result<T2, E2> | AsyncResult<T2, E2>>),
-    maybeFn?: (error: E1) => Result<T2, E2> | AsyncResult<T2, E2> | Promise<Result<T2, E2> | AsyncResult<T2, E2>>,
-  ):
-    | AsyncResult<T1 | T2, E2>
-    | ((
-        result: Result<T1, E1> | AsyncResult<T1, E1>,
-      ) => AsyncResult<T1 | T2, E2>) {
-    if (maybeFn !== undefined) {
-      const result = resultOrFn as Result<T1, E1> | AsyncResult<T1, E1>;
-      const f = maybeFn;
-      return new AsyncResultImpl(orElseInner(result, f));
-    }
-
-    return (
-      result: Result<T1, E1> | AsyncResult<T1, E1>,
-    ): AsyncResult<T1 | T2, E2> => {
-      return new AsyncResultImpl(
-        orElseInner(result, resultOrFn as (error: E1) => Result<T2, E2> | AsyncResult<T2, E2> | Promise<Result<T2, E2> | AsyncResult<T2, E2>>),
-      );
-    };
+  mapErr<F>(f: (err: E) => F | Promise<F>): AsyncResult<T, F> {
+    return new AsyncResult(
+      this.promise.then(async (result) => {
+        // @ts-expect-error - we know the value is an error so we can safely cast to a result with a different Value type
+        if (result instanceof Ok) return result as Ok<T, F>;
+        const mapped = f((result as Err<T, never>).error);
+        if (mapped instanceof Promise) {
+          return new Err(await mapped);
+        }
+        return new Err(mapped);
+      }),
+    );
   }
 
   /**
-   * Pattern matches on an AsyncResult or Result.
+   * Chains another result-returning operation onto the success path.
    *
-   * This function supports two calling patterns:
-   * 1. Curried: `match(okFn, errFn)(result)` - perfect for pipe composition
-   * 2. Binary: `match(result, okFn, errFn)` - more intuitive for direct calls
+   * The callback may return a synchronous {@link Result}, an {@link AsyncResult},
+   * or a promise of a `Result`.
    *
-   * This function provides a way to handle both success and error cases
-   * in a single expression. It takes two handler functions - one for Ok
-   * values and one for Err values - and applies the appropriate handler
-   * based on the Result variant.
-   *
-   * The handler functions can be synchronous or asynchronous. This is similar
-   * to pattern matching in languages like Rust or Haskell.
-   *
-   * @example
-   * ```typescript
-   * import { AsyncResult, Result, pipe, Ok, Err } from "@joyful/result";
-   * 
-   * const result = AsyncResult.fromResult(new Ok(42));
-   * 
-   * // Curried form (great for pipes)
-   * const message = pipe(
-   *   result,
-   *   AsyncResult.match(
-   *     (value: number) => `✅ Success: ${value}`,
-   *     (error: string) => `❌ Error: ${error}`
-   *   )
-   * );
-   * console.log(await message); // "✅ Success: 42"
-   * 
-   * // Binary form (more direct)
-   * const message2 = AsyncResult.match(
-   *   result,
-   *   (value: number) => `✅ Success: ${value}`,
-   *   (error: string) => `❌ Error: ${error}`
-   * );
-   * console.log(await message2); // "✅ Success: 42"
-   * 
-   * // Async handlers
-   * const asyncMessage = await pipe(
-   *   result,
-   *   AsyncResult.match(
-   *     async (value: number) => {
-   *       await new Promise(resolve => setTimeout(resolve, 100));
-   *       return `✅ Async Success: ${value}`;
-   *     },
-   *     async (error: string) => {
-   *       await new Promise(resolve => setTimeout(resolve, 100));
-   *       return `❌ Async Error: ${error}`;
-   *     }
-   *   )
-   * );
-   * console.log(asyncMessage); // "✅ Async Success: 42"
-   * 
-   * const error = AsyncResult.fromResult(new Err("Something went wrong"));
-   * const errorMsg = await AsyncResult.match(
-   *   error,
-   *   (value: number) => `✅ Success: ${value}`,
-   *   (error: string) => `❌ Error: ${error}`
-   * );
-   * console.log(errorMsg); // "❌ Error: Something went wrong"
-   * ```
+   * @param f Function that receives the success value and returns the next result.
+   * @returns A new async result for the chained computation.
    */
-  export function match<T, E, U>(
-    result: Result<T, E> | AsyncResult<T, E>,
-    ok: (value: T) => U | Promise<U>,
-    err: (error: E) => U | Promise<U>,
-  ): Promise<U>;
-  export function match<T, E, U>(
-    ok: (value: T) => U | Promise<U>,
-    err: (error: E) => U | Promise<U>,
-  ): (result: Result<T, E> | AsyncResult<T, E>) => Promise<U>;
-  export function match<T, E, U>(
-    okOrResult: ((value: T) => U | Promise<U>) | Result<T, E> | AsyncResult<T, E>,
-    errOrOk?: ((error: E) => U | Promise<U>) | ((value: T) => U | Promise<U>),
-    maybeErr?: (error: E) => U | Promise<U>,
-  ): Promise<U> | ((result: Result<T, E> | AsyncResult<T, E>) => Promise<U>) {
-    if (maybeErr !== undefined) {
-      const result = okOrResult as Result<T, E> | AsyncResult<T, E>;
-      const ok = errOrOk as (value: T) => U | Promise<U>;
-      const err = maybeErr;
-      return matchInner(result, ok, err);
-    }
-
-    const ok = okOrResult as (value: T) => U | Promise<U>;
-    const err = errOrOk as (error: E) => U | Promise<U>;
-    return (result: Result<T, E> | AsyncResult<T, E>): Promise<U> => {
-      return matchInner(result, ok, err);
-    };
+  andThen<U, F>(
+    f: (value: T) => Result<U, F> | AsyncResult<U, F> | Promise<Result<U, F>>,
+  ): AsyncResult<U, E | F> {
+    return new AsyncResult(
+      this.promise.then(async (result) => {
+        // @ts-expect-error - we know the value is an error so we can safely cast to a result with a different Value type
+        if (result instanceof Err) return result as Err<U, E | F>;
+        const mapped = f((result as Ok<T, never>).value);
+        if ("then" in mapped) {
+          return await mapped;
+        }
+        return mapped;
+      }),
+    );
   }
 
   /**
-   * Inspects the success value of an AsyncResult or Result without changing it.
+   * Chains another result-returning operation onto the error path.
    *
-   * This function supports two calling patterns:
-   * 1. Curried: `inspect(fn)(result)` - perfect for pipe composition
-   * 2. Binary: `inspect(result, fn)` - more intuitive for direct calls
+   * The callback may return a synchronous {@link Result}, an {@link AsyncResult},
+   * or a promise of a `Result`.
    *
-   * If the Result is Ok, the provided function is applied to the contained value
-   * for side effects (like logging), and the original Result is returned unchanged.
-   * The inspection function can be synchronous or asynchronous. If the Result is Err,
-   * it is passed through unchanged.
-   *
-   * This is useful for debugging, logging, or other side effects that should
-   * not affect the flow of the computation.
-   *
-   * @example
-   * ```typescript
-   * import { AsyncResult, pipe, Ok } from "@joyful/result";
-   * 
-   * const result = AsyncResult.fromResult(new Ok(42));
-   * 
-   * // Curried form (great for pipes)
-   * const withLogging = pipe(
-   *   result,
-   *   AsyncResult.inspect((value) => console.log("Processing:", value))
-   * );
-   * console.log((await withLogging).unwrap()); // 42 (unchanged)
-   * 
-   * // Binary form (more direct)
-   * const unchanged = AsyncResult.inspect(result, (value) => console.log("Value:", value));
-   * console.log((await unchanged).unwrap()); // 42 (unchanged)
-   * 
-   * // Async inspection function
-   * const withAsyncLogging = await pipe(
-   *   result,
-   *   AsyncResult.inspect(async (value) => {
-   *     await new Promise(resolve => setTimeout(resolve, 100));
-   *     console.log("Async processing:", value);
-   *   })
-   * );
-   * console.log(withAsyncLogging.unwrap()); // 42 (unchanged)
-   * ```
+   * @param f Function that receives the error value and returns a recovery result.
+   * @returns A new async result for the recovery computation.
    */
-  export function inspect<T, E>(
-    result: Result<T, E> | AsyncResult<T, E>,
-    fn: (value: T) => void | Promise<void>,
-  ): AsyncResult<T, E>;
-  export function inspect<T, E>(
-    fn: (value: T) => void | Promise<void>,
-  ): (result: Result<T, E> | AsyncResult<T, E>) => AsyncResult<T, E>;
-  export function inspect<T, E>(
-    resultOrFn: Result<T, E> | AsyncResult<T, E> | ((value: T) => void | Promise<void>),
-    maybeFn?: (value: T) => void | Promise<void>,
-  ):
-    | AsyncResult<T, E>
-    | ((result: Result<T, E> | AsyncResult<T, E>) => AsyncResult<T, E>) {
-    if (maybeFn !== undefined) {
-      const result = resultOrFn as Result<T, E> | AsyncResult<T, E>;
-      const fn = maybeFn;
-      return new AsyncResultImpl(inspectInner(result, fn));
-    }
-
-    return (result: Result<T, E> | AsyncResult<T, E>): AsyncResult<T, E> => {
-      return new AsyncResultImpl(
-        inspectInner(result, resultOrFn as (value: T) => void),
-      );
-    };
+  orElse<U, F>(
+    f: (err: E) => Result<U, F> | AsyncResult<U, F> | Promise<Result<U, F>>,
+  ): AsyncResult<T | U, F> {
+    return new AsyncResult(
+      this.promise.then(async (result) => {
+        // @ts-expect-error - we know the value is an error so we can safely cast to a result with a different Value type
+        if (result instanceof Ok) return result as Ok<T | U, F>;
+        const mapped = f((result as Err<T, never>).error);
+        if ("then" in mapped) {
+          return await mapped;
+        }
+        return mapped;
+      }),
+    );
   }
 
   /**
-   * Inspects the error value of an AsyncResult or Result without changing it.
+   * Schedules a side effect for the success value and returns this result.
    *
-   * This function supports two calling patterns:
-   * 1. Curried: `inspectErr(fn)(result)` - perfect for pipe composition
-   * 2. Binary: `inspectErr(result, fn)` - more intuitive for direct calls
-   *
-   * If the Result is Err, the provided function is applied to the contained error
-   * for side effects (like error logging), and the original Result is returned unchanged.
-   * The inspection function can be synchronous or asynchronous. If the Result is Ok,
-   * it is passed through unchanged.
-   *
-   * This is useful for error logging, monitoring, or other error-side effects
-   * that should not affect the flow of the computation.
-   *
-   * @example
-   * ```typescript
-   * import { AsyncResult, pipe, Err } from "@joyful/result";
-   * 
-   * const result = AsyncResult.fromResult(new Err("network error"));
-   * 
-   * // Curried form (great for pipes)
-   * const withErrorLogging = pipe(
-   *   result,
-   *   AsyncResult.inspectErr((error) => console.error("Error occurred:", error))
-   * );
-   * console.log((await withErrorLogging).unwrapErr()); // "network error" (unchanged)
-   * 
-   * // Binary form (more direct)
-   * const unchanged = AsyncResult.inspectErr(result, (error) => console.error("Error:", error));
-   * console.log((await unchanged).unwrapErr()); // "network error" (unchanged)
-   * 
-   * // Async error inspection
-   * const withAsyncErrorLogging = await pipe(
-   *   result,
-   *   AsyncResult.inspectErr(async (error) => {
-   *     await new Promise(resolve => setTimeout(resolve, 100));
-   *     console.error("Async error logging:", error);
-   *   })
-   * );
-   * console.log(withAsyncErrorLogging.unwrapErr()); // "network error" (unchanged)
-   * ```
+   * @param f Function to call with the success value.
+   * @returns This async result.
    */
-  export function inspectErr<T, E>(
-    result: Result<T, E> | AsyncResult<T, E>,
-    fn: (error: E) => void | Promise<void>,
-  ): AsyncResult<T, E>;
-  export function inspectErr<T, E>(
-    fn: (error: E) => void | Promise<void>,
-  ): (result: Result<T, E> | AsyncResult<T, E>) => AsyncResult<T, E>;
-  export function inspectErr<T, E>(
-    resultOrFn: Result<T, E> | AsyncResult<T, E> | ((error: E) => void | Promise<void>),
-    maybeFn?: (error: E) => void | Promise<void>,
-  ):
-    | AsyncResult<T, E>
-    | ((result: Result<T, E> | AsyncResult<T, E>) => AsyncResult<T, E>) {
-    if (maybeFn !== undefined) {
-      const result = resultOrFn as Result<T, E> | AsyncResult<T, E>;
-      const fn = maybeFn;
-      return new AsyncResultImpl(inspectErrInner(result, fn));
-    }
+  inspect(f: (value: T) => void): this {
+    this.promise.then((result) => result.inspect(f));
+    return this;
+  }
 
-    return (result: Result<T, E> | AsyncResult<T, E>): AsyncResult<T, E> => {
-      return new AsyncResultImpl(
-        inspectErrInner(result, resultOrFn as (error: E) => void),
-      );
-    };
+  /**
+   * Schedules a side effect for the error value and returns this result.
+   *
+   * @param f Function to call with the error value.
+   * @returns This async result.
+   */
+  inspectErr(f: (err: E) => void): AsyncResult<T, E> {
+    this.promise.then((result) => result.inspectErr(f));
+    return this;
   }
 }
