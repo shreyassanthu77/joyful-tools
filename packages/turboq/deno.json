@@ -1,5 +1,4 @@
 {
-  "name": "@joyful/turboq",
   "version": "0.0.1",
   "exports": "./src/main.ts",
   "license": "MIT",
