@@ -1,4 +1,4 @@
-import { assertEquals, assertThrows } from "std/assert";
+import { assertEquals, assertInstanceOf, assertThrows } from "std/assert";
 import { Result } from "./main.ts";
 
 Deno.test("Result Core", () => {
@@ -137,6 +137,51 @@ Deno.test("Result.wrap", async () => {
     }),
     Result.err("boom"),
   );
+});
+
+Deno.test("Result.taggedError", () => {
+  class JsonParseError extends Result.taggedError("JsonParseError")<{
+    input: string;
+  }> {}
+  const cause = new SyntaxError("boom");
+
+  const error = new JsonParseError({
+    input: "not json",
+    message: "Failed to parse JSON",
+    cause,
+  });
+
+  assertInstanceOf(error, Error);
+  assertInstanceOf(error, JsonParseError);
+  assertEquals(error._tag, "JsonParseError");
+  assertEquals(error.name, "JsonParseError");
+  assertEquals(error.message, "Failed to parse JSON");
+  assertEquals(error.cause, cause);
+  assertEquals(error.input, "not json");
+
+  const defaultMessageError = new JsonParseError({ input: "still not json" });
+  assertEquals(defaultMessageError.message, "JsonParseError");
+
+  const result = Result.wrap({
+    try: (): number => {
+      throw cause;
+    },
+    catch: (caught) =>
+      new JsonParseError({
+        input: "still not json",
+        cause: caught,
+      }),
+  });
+
+  assertEquals(result.isErr(), true);
+
+  if (result.isErr()) {
+    assertInstanceOf(result.error, JsonParseError);
+    assertEquals(result.error._tag, "JsonParseError");
+    assertEquals(result.error.message, "JsonParseError");
+    assertEquals(result.error.input, "still not json");
+    assertEquals(result.error.cause, cause);
+  }
 });
 
 Deno.test("Result.run", () => {

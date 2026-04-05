@@ -10,6 +10,7 @@
       "LICENSE",
       "README.md",
       "src/main.ts",
+      "src/errors.ts",
       "src/result.ts",
       "src/async-result.ts"
     ]

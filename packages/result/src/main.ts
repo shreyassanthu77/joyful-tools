@@ -9,10 +9,12 @@
  * Use the {@link Result.ok} and {@link Result.err} helpers to construct values,
  * then compose them with methods like `map`, `andThen`, `orElse`, and
  * `unwrapOr`. Use {@link Result.wrap} when you want to convert throwing code or
- * rejecting promises into result values. When the computation is asynchronous,
- * use {@link AsyncResult} or call `result.async()` to keep the same style of
- * composition. For generator-based composition, use {@link Result.run} with
- * `yield*` on `Result` and `AsyncResult` values.
+ * rejecting promises into result values. Use {@link Result.taggedError} when
+ * you want structured `Error` values with a stable `_tag` for narrowing and
+ * logging. When the computation is asynchronous, use {@link AsyncResult} or
+ * call `result.async()` to keep the same style of composition. For
+ * generator-based composition, use {@link Result.run} with `yield*` on
+ * `Result` and `AsyncResult` values.
  *
  * @example
  * ```typescript
@@ -40,8 +42,10 @@
 
 export * from "./result.ts";
 export * from "./async-result.ts";
+export * from "./errors.ts";
 
 import { AsyncResult } from "./async-result.ts";
+import { taggedError as createTaggedError } from "./errors.ts";
 import { Err, Ok } from "./result.ts";
 /**
  * A value that is either a successful {@link Ok} or a failed {@link Err}.
@@ -92,6 +96,31 @@ export namespace Result {
   export function err<E, T = never>(err: E): Result<T, E> {
     return new Err(err);
   }
+
+  /**
+   * Creates an `Error` subclass with a fixed `_tag` and typed custom fields.
+   *
+   * Tagged errors are useful when you want structured domain failures that also
+   * behave like normal `Error` instances in logs and tracing tools.
+   *
+   * @example
+   * ```typescript
+   * class JsonParseError extends Result.taggedError("JsonParseError")<{
+   *   input: string;
+   * }> {}
+   *
+   * const result = Result.wrap({
+   *   try: () => JSON.parse("not json"),
+   *   catch: (cause) =>
+   *     new JsonParseError({
+   *       input: "not json",
+   *       message: "Failed to parse JSON",
+   *       cause,
+   *     }),
+   * });
+   * ```
+   */
+  export const taggedError = createTaggedError;
 
   /**
    * Options for {@link Result.wrap}.
