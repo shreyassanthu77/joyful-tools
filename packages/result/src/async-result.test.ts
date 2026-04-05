@@ -202,3 +202,35 @@ Deno.test("AsyncResult.inspectErr", async () => {
   });
   assertEquals(value, 2);
 });
+
+Deno.test("AsyncResult.run", async () => {
+  assertEquals(
+    await Result.run(async function* () {
+      const first = yield* Result.ok(2).async();
+      const second = yield* new AsyncResult(Promise.resolve(Result.ok(3)));
+      return Result.ok(first + second);
+    }),
+    Result.ok(5),
+  );
+
+  let reached = false;
+  assertEquals(
+    await Result.run(async function* () {
+      yield* new AsyncResult(Promise.resolve(Result.err("boom")));
+      reached = true;
+      return Result.ok(1);
+    }),
+    Result.err("boom"),
+  );
+  assertEquals(reached, false);
+
+  await assertRejects(
+    () =>
+      // deno-lint-ignore require-yield
+      Result.run(async function* () {
+        throw new Error("boom");
+      }).expect("unreachable"),
+    Error,
+    "Error in Result.run generator: Error: boom",
+  );
+});

@@ -30,6 +30,7 @@ npx jsr add @joyful/result
 - Avoid exception-heavy control flow for expected failures.
 - Transform success and error values with `map()` and `mapErr()`.
 - Chain dependent operations with `andThen()` and recover with `orElse()`.
+- Compose complex flows with `Result.run()` and `yield*`.
 - Use the same model for async code with `AsyncResult`.
 
 ## Quick Start
@@ -150,6 +151,47 @@ const value = Result.err("missing value").orElse((error) =>
 // Ok("default")
 ```
 
+## Generator Composition With `Result.run`
+
+`Result.run()` lets you write sequential result logic with `yield*` instead of
+nesting `andThen()` calls. `Ok` values continue the generator with their
+unwrapped value, and `Err` values stop the generator early and become the final
+result.
+
+### Synchronous generators
+
+```typescript
+import { Result } from "@joyful/result";
+
+function parseNumber(input: string): Result<number, string> {
+  const value = Number(input);
+  return Number.isNaN(value) ? Result.err("invalid number") : Result.ok(value);
+}
+
+function requirePositive(value: number): Result<number, string> {
+  return value > 0 ? Result.ok(value) : Result.err("value must be positive");
+}
+
+const result = Result.run(function* () {
+  const parsed = yield* parseNumber("42");
+  const positive = yield* requirePositive(parsed);
+  return Result.ok(positive * 2);
+});
+
+// Ok(84)
+```
+
+If any yielded result is an error, execution stops immediately:
+
+```typescript
+const result = Result.run(function* () {
+  const parsed = yield* parseNumber("nope");
+  return Result.ok(parsed * 2);
+});
+
+// Err("invalid number")
+```
+
 ### Defaults, assertions, and side effects
 
 - `unwrapOr(defaultValue)` returns the success value or a fallback.
@@ -221,6 +263,27 @@ const value = await Result.ok(2)
 // 30
 ```
 
+### Async generators with `Result.run`
+
+`Result.run()` also accepts an async generator, which makes it useful when you
+want the same `yield*` flow over `AsyncResult` values.
+
+```typescript
+import { AsyncResult, Result } from "@joyful/result";
+
+function fetchScore(): AsyncResult<number, string> {
+  return new AsyncResult(Promise.resolve(Result.ok(21)));
+}
+
+const result = await Result.run(async function* () {
+  const score = yield* fetchScore();
+  const bonus = yield* Result.ok(2).async();
+  return Result.ok(score * bonus);
+});
+
+// Ok(42)
+```
+
 ## API Overview
 
 - `Result<T, E>`: union type of `Ok<T, E>` and `Err<T, E>`.
@@ -231,6 +294,7 @@ const value = await Result.ok(2)
 - `andThen()` and `orElse()`: compose additional result-returning operations.
 - `unwrapOr()`, `expect()`, `expectErr()`: extract values.
 - `inspect()` and `inspectErr()`: observe values without changing them.
+- `Result.run()`: compose results with generator or async generator control flow.
 - `async()`: convert a `Result` to `AsyncResult`.
 - `AsyncResult`: async wrapper with the same composition primitives.
 

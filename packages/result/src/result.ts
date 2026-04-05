@@ -166,6 +166,19 @@ export class Ok<T, E = never> implements BaseResult<T, E> {
   async(): AsyncResult<T, E> {
     return new AsyncResult(Promise.resolve(this));
   }
+
+  /**
+   * Supports `yield*` inside {@link Result.run} generator workflows.
+   *
+   * Successful results immediately return their contained value to the
+   * generator, so execution continues with the unwrapped value.
+   *
+   * @returns A generator-compatible representation of this result.
+   */
+  // deno-lint-ignore require-yield
+  *[Symbol.iterator](): Generator<Err<never, E>, T, unknown> {
+    return this.value;
+  }
 }
 
 /**
@@ -314,5 +327,19 @@ export class Err<T, E = never> implements BaseResult<T, E> {
    */
   async(): AsyncResult<T, E> {
     return new AsyncResult(Promise.resolve(this));
+  }
+
+  /**
+   * Supports `yield*` inside {@link Result.run} generator workflows.
+   *
+   * Failed results yield themselves so {@link Result.run} can stop early and
+   * return the error.
+   *
+   * @returns A generator-compatible representation of this result.
+   */
+  *[Symbol.iterator](): Generator<Err<never, E>, T, unknown> {
+    // @ts-expect-error - we know the value is an error so we can safely cast to a result with a different Value type
+    yield this;
+    throw "unreachable";
   }
 }

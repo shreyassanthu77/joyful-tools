@@ -216,4 +216,20 @@ export class AsyncResult<T, E = unknown> implements PromiseLike<Result<T, E>> {
     this.promise.then((result) => result.inspectErr(f));
     return this;
   }
+
+  /**
+   * Supports `yield*` inside async {@link Result.run} generator workflows.
+   *
+   * Successful results return their contained value to the async generator.
+   * Failed results yield their error result so `Result.run` can stop early.
+   *
+   * @returns An async-generator-compatible representation of this result.
+   */
+  async *[Symbol.asyncIterator](): AsyncGenerator<Err<never, E>, T, unknown> {
+    const result = await this.promise;
+    if (result instanceof Ok) return result.value;
+    // @ts-expect-error - we know the value is an error so we can safely cast to a result with a different Value type
+    yield result;
+    throw "unreachable";
+  }
 }

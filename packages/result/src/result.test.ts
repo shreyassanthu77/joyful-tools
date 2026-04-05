@@ -100,3 +100,35 @@ Deno.test("Result.inspectErr", () => {
   });
   assertEquals(value, 2);
 });
+
+Deno.test("Result.run", () => {
+  assertEquals(
+    Result.run(function* () {
+      const first = yield* Result.ok(2);
+      const second = yield* Result.ok(3);
+      return Result.ok(first + second);
+    }),
+    Result.ok(5),
+  );
+
+  let reached = false;
+  assertEquals(
+    Result.run(function* () {
+      yield* Result.err("boom");
+      reached = true;
+      return Result.ok(1);
+    }),
+    Result.err("boom"),
+  );
+  assertEquals(reached, false);
+
+  assertThrows(
+    () =>
+      // deno-lint-ignore require-yield
+      Result.run(function* () {
+        throw new Error("boom");
+      }),
+    Error,
+    "Error in Result.run generator: Error: boom",
+  );
+});
