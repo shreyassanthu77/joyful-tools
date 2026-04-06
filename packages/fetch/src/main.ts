@@ -68,7 +68,7 @@
  * ```
  */
 
-import { AsyncResult, Err, Result } from "@joyful/result";
+import { AsyncResult, Err, Result, taggedError } from "@joyful/result";
 
 /**
  * Default `jfetch` using `globalThis.fetch`.
@@ -211,7 +211,8 @@ export type ResponseError = NetworkError | AbortError | HttpError;
  * ```
  */
 export class JoyfulResponse
-  implements PromiseLike<Result<Response, ResponseError>> {
+  implements PromiseLike<Result<Response, ResponseError>>
+{
   #response: Promise<Result<Response, ResponseError>>;
 
   constructor(response: Promise<Result<Response, ResponseError>>) {
@@ -386,7 +387,7 @@ export class JoyfulResponse
  * }
  * ```
  */
-export class NetworkError extends Result.taggedError("NetworkError") {}
+export class NetworkError extends taggedError("NetworkError") {}
 
 /**
  * Thrown when the request is aborted via `AbortSignal` or times out via
@@ -418,7 +419,7 @@ export class NetworkError extends Result.taggedError("NetworkError") {}
  * // result.error._tag === "AbortError"
  * ```
  */
-export class AbortError extends Result.taggedError("AbortError") {}
+export class AbortError extends taggedError("AbortError") {}
 
 /**
  * Thrown when the response has a non-2xx status code.
@@ -455,7 +456,7 @@ export class AbortError extends Result.taggedError("AbortError") {}
  *   });
  * ```
  */
-export class HttpError extends Result.taggedError("HttpError")<{
+export class HttpError extends taggedError("HttpError")<{
   response: JoyfulResponse;
   status: number;
 }> {}
@@ -473,4 +474,4 @@ export class HttpError extends Result.taggedError("HttpError")<{
  * }
  * ```
  */
-export class ParseError extends Result.taggedError("ParseError") {}
+export class ParseError extends taggedError("ParseError") {}
