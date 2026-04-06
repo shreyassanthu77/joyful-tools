@@ -134,7 +134,7 @@ Deno.test(".response allows reading headers", async () => {
       new Response("ok", {
         headers: { "x-request-id": "abc123" },
       }),
-    ),
+    )
   );
 
   const requestId = await fetch("/api")

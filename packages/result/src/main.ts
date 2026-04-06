@@ -119,7 +119,7 @@ export namespace Result {
    *     }),
    * });
    * ```
-  */
+   */
   export const taggedError = errors.taggedError;
 
   /**

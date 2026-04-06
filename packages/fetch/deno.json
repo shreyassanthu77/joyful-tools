@@ -1,4 +1,5 @@
 {
+  "$schema": "https://raw.githubusercontent.com/denoland/deno/refs/heads/main/cli/schemas/config-file.v1.json",
   "name": "@joyful/fetch",
   "version": "0.0.1",
   "license": "MIT",
@@ -6,12 +7,12 @@
   "exports": {
     ".": "./src/main.ts"
   },
+  "lint": {
+    "rules": {
+      "exclude": ["no-slow-types"]
+    }
+  },
   "publish": {
-    "include": [
-      "LICENSE",
-      "README.md",
-      "src/main.ts",
-      "src/errors.ts"
-    ]
+    "include": ["LICENSE", "README.md", "src/main.ts", "src/errors.ts"]
   }
 }

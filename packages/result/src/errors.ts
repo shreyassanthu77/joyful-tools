@@ -112,20 +112,18 @@ export type MatchSomeHandlers<E extends MatchableError> = Partial<
 export type MatchResultValue<Handlers> = {
   [K in keyof Handlers]: Handlers[K] extends // deno-lint-ignore no-explicit-any
   (...args: any[]) => infer R
-    ? // deno-lint-ignore no-explicit-any
-      Resolved<R> extends SyncResult<infer T, any>
-      ? T
-      : never
+    // deno-lint-ignore no-explicit-any
+    ? Resolved<R> extends SyncResult<infer T, any> ? T
+    : never
     : never;
 }[keyof Handlers];
 
 export type MatchResultError<Handlers> = {
   [K in keyof Handlers]: Handlers[K] extends // deno-lint-ignore no-explicit-any
   (...args: any[]) => infer R
-    ? // deno-lint-ignore no-explicit-any
-      Resolved<R> extends SyncResult<any, infer E>
-      ? E
-      : never
+    // deno-lint-ignore no-explicit-any
+    ? Resolved<R> extends SyncResult<any, infer E> ? E
+    : never
     : never;
 }[keyof Handlers];
 

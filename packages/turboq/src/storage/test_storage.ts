@@ -1,4 +1,4 @@
-import type { StorageObj, Storage } from "../types.ts";
+import type { Storage, StorageObj } from "../types.ts";
 import { inspect } from "node:util";
 
 export class TestStorage implements Storage {

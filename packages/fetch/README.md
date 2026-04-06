@@ -2,8 +2,8 @@
 
 A thin wrapper around the web standard `fetch` that returns
 [`@joyful/result`](https://jsr.io/@joyful/result) types instead of throwing
-exceptions. Every response — success, HTTP error, network failure, or body
-parse error — is modelled as data you can inspect, transform, and recover from.
+exceptions. Every response — success, HTTP error, network failure, or body parse
+error — is modelled as data you can inspect, transform, and recover from.
 
 ## Installation
 
@@ -41,8 +41,8 @@ if (result.isOk()) {
 ```
 
 `jfetch` has the same signature as `fetch` — you pass it a URL and an optional
-`RequestInit`. The difference is that it returns a `JoyfulResponse` instead of
-a `Promise<Response>`.
+`RequestInit`. The difference is that it returns a `JoyfulResponse` instead of a
+`Promise<Response>`.
 
 ## Reading The Body
 
@@ -68,8 +68,9 @@ const form = await jfetch("/api/form").formData();
 ```
 
 All body methods return `AsyncResult<T, ResponseError | ParseError>`. If the
-request itself failed or returned a non-2xx status, the body method short-circuits
-and returns the original error without attempting to read the body.
+request itself failed or returned a non-2xx status, the body method
+short-circuits and returns the original error without attempting to read the
+body.
 
 ## Reading Headers And Response Metadata
 
@@ -133,12 +134,12 @@ console.log(`${page.data.length} of ${page.total} users`);
 
 `@joyful/fetch` categorises every failure into one of four tagged errors:
 
-| Error | `_tag` | When |
-|---|---|---|
+| Error          | `_tag`           | When                                                           |
+| -------------- | ---------------- | -------------------------------------------------------------- |
 | `NetworkError` | `"NetworkError"` | `fetch` itself throws — DNS failure, CORS, network unreachable |
-| `AbortError` | `"AbortError"` | The request was aborted via `AbortSignal` |
-| `HttpError` | `"HttpError"` | The server responded with a non-2xx status code |
-| `ParseError` | `"ParseError"` | Body parsing failed (e.g. invalid JSON) |
+| `AbortError`   | `"AbortError"`   | The request was aborted via `AbortSignal`                      |
+| `HttpError`    | `"HttpError"`    | The server responded with a non-2xx status code                |
+| `ParseError`   | `"ParseError"`   | Body parsing failed (e.g. invalid JSON)                        |
 
 All four extend `Error` and carry a `_tag` discriminator, so you can use
 `@joyful/result`'s tagged error matching.
@@ -375,11 +376,13 @@ if (result.isOk()) {
 ### Exports
 
 - `jfetch` — default fetch wrapper using `globalThis.fetch`.
-- `createFetch(fetchFn)` — create a custom `jfetch` from any `fetch`-compatible function.
+- `createFetch(fetchFn)` — create a custom `jfetch` from any `fetch`-compatible
+  function.
 - `JoyfulResponse` — response wrapper with body methods returning `AsyncResult`.
 - `NetworkError` — tagged error for network-level failures.
 - `AbortError` — tagged error for aborted requests.
-- `HttpError` — tagged error for non-2xx responses (has `.status` and `.response`).
+- `HttpError` — tagged error for non-2xx responses (has `.status` and
+  `.response`).
 - `ParseError` — tagged error for body parsing failures.
 - `ResponseError` — union type: `NetworkError | AbortError | HttpError`.
 - `FetchFn` — type alias for `typeof globalThis.fetch`.
@@ -387,25 +390,25 @@ if (result.isOk()) {
 
 ### `JoyfulResponse`
 
-| Member | Type | Description |
-|---|---|---|
-| `.response` | `AsyncResult<Response, ResponseError>` | The underlying response as an `AsyncResult` |
-| `.json<T>()` | `AsyncResult<T, ResponseError \| ParseError>` | Parse body as JSON |
-| `.text()` | `AsyncResult<string, ResponseError \| ParseError>` | Read body as text |
-| `.arrayBuffer()` | `AsyncResult<ArrayBuffer, ResponseError \| ParseError>` | Read body as ArrayBuffer |
-| `.blob()` | `AsyncResult<Blob, ResponseError \| ParseError>` | Read body as Blob |
-| `.bytes()` | `AsyncResult<Uint8Array, ResponseError \| ParseError>` | Read body as bytes |
-| `.formData()` | `AsyncResult<FormData, ResponseError \| ParseError>` | Read body as FormData |
-| `.then(...)` | `PromiseLike<Result<Response, ResponseError>>` | Await directly for raw `Result` |
+| Member           | Type                                                    | Description                                 |
+| ---------------- | ------------------------------------------------------- | ------------------------------------------- |
+| `.response`      | `AsyncResult<Response, ResponseError>`                  | The underlying response as an `AsyncResult` |
+| `.json<T>()`     | `AsyncResult<T, ResponseError \| ParseError>`           | Parse body as JSON                          |
+| `.text()`        | `AsyncResult<string, ResponseError \| ParseError>`      | Read body as text                           |
+| `.arrayBuffer()` | `AsyncResult<ArrayBuffer, ResponseError \| ParseError>` | Read body as ArrayBuffer                    |
+| `.blob()`        | `AsyncResult<Blob, ResponseError \| ParseError>`        | Read body as Blob                           |
+| `.bytes()`       | `AsyncResult<Uint8Array, ResponseError \| ParseError>`  | Read body as bytes                          |
+| `.formData()`    | `AsyncResult<FormData, ResponseError \| ParseError>`    | Read body as FormData                       |
+| `.then(...)`     | `PromiseLike<Result<Response, ResponseError>>`          | Await directly for raw `Result`             |
 
 ### Error Types
 
-| Error | Fields | When |
-|---|---|---|
-| `NetworkError` | `message`, `cause` | `fetch` throws (DNS, CORS, unreachable) |
-| `AbortError` | `message`, `cause` | Request aborted via `AbortSignal` |
-| `HttpError` | `message`, `cause`, `status`, `response` | Non-2xx status code |
-| `ParseError` | `message`, `cause` | Body parsing fails |
+| Error          | Fields                                   | When                                    |
+| -------------- | ---------------------------------------- | --------------------------------------- |
+| `NetworkError` | `message`, `cause`                       | `fetch` throws (DNS, CORS, unreachable) |
+| `AbortError`   | `message`, `cause`                       | Request aborted via `AbortSignal`       |
+| `HttpError`    | `message`, `cause`, `status`, `response` | Non-2xx status code                     |
+| `ParseError`   | `message`, `cause`                       | Body parsing fails                      |
 
 All errors extend `Error` and have a `_tag` field matching their class name.
 

@@ -211,8 +211,7 @@ export type ResponseError = NetworkError | AbortError | HttpError;
  * ```
  */
 export class JoyfulResponse
-  implements PromiseLike<Result<Response, ResponseError>>
-{
+  implements PromiseLike<Result<Response, ResponseError>> {
   #response: Promise<Result<Response, ResponseError>>;
 
   constructor(response: Promise<Result<Response, ResponseError>>) {

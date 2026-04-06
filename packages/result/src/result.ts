@@ -20,15 +20,13 @@ interface BaseResult<T, E = unknown> {
   andThen<U, F>(f: (value: T) => Result<U, F>): Result<U, E | F>;
   orElse<U, F>(f: (err: E) => Result<U, F>): Result<T | U, F>;
   orElseMatch<
-    const Handlers extends E extends MatchableError
-      ? MatchHandlers<E>
+    const Handlers extends E extends MatchableError ? MatchHandlers<E>
       : never,
   >(
     handlers: Handlers,
   ): Result<T | MatchResultValue<Handlers>, MatchResultError<Handlers>>;
   orElseMatchSome<
-    const Handlers extends E extends MatchableError
-      ? MatchSomeHandlers<E>
+    const Handlers extends E extends MatchableError ? MatchSomeHandlers<E>
       : never,
   >(
     handlers: Handlers,
@@ -191,14 +189,16 @@ export class Ok<T, E = never> implements BaseResult<T, E> {
    * ```
    */
   orElseMatch<
-    const Handlers extends E extends MatchableError
-      ? MatchHandlers<E>
+    const Handlers extends E extends MatchableError ? MatchHandlers<E>
       : never,
   >(
     handlers: Handlers,
   ): Result<T | MatchResultValue<Handlers>, MatchResultError<Handlers>> {
     void handlers;
-    return this as Result<T | MatchResultValue<Handlers>, MatchResultError<Handlers>>;
+    return this as Result<
+      T | MatchResultValue<Handlers>,
+      MatchResultError<Handlers>
+    >;
   }
 
   /**
@@ -218,8 +218,7 @@ export class Ok<T, E = never> implements BaseResult<T, E> {
    * ```
    */
   orElseMatchSome<
-    const Handlers extends E extends MatchableError
-      ? MatchSomeHandlers<E>
+    const Handlers extends E extends MatchableError ? MatchSomeHandlers<E>
       : never,
   >(
     handlers: Handlers,
@@ -440,8 +439,7 @@ export class Err<T, E = never> implements BaseResult<T, E> {
    * ```
    */
   orElseMatch<
-    const Handlers extends E extends MatchableError
-      ? MatchHandlers<E>
+    const Handlers extends E extends MatchableError ? MatchHandlers<E>
       : never,
   >(
     handlers: Handlers,
@@ -485,8 +483,7 @@ export class Err<T, E = never> implements BaseResult<T, E> {
    * ```
    */
   orElseMatchSome<
-    const Handlers extends E extends MatchableError
-      ? MatchSomeHandlers<E>
+    const Handlers extends E extends MatchableError ? MatchSomeHandlers<E>
       : never,
   >(
     handlers: Handlers,

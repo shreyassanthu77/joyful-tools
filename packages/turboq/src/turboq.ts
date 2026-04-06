@@ -1,4 +1,4 @@
-import type { Storage, EntryId } from "./types.ts";
+import type { EntryId, Storage } from "./types.ts";
 import { TypedEventTarget } from "./types.ts";
 
 export type TurboqOptions = {
@@ -93,10 +93,10 @@ export class Turboq extends TypedEventTarget<TurboqEvents> {
     }
     const resolvers = Promise.withResolvers<void>();
 
-    const existingAck =
-      this.#acks.get(entryId) ?? this.#acksInFlight?.get(entryId);
-    const existingNack =
-      this.#nacks.get(entryId) ?? this.#nacksInFlight?.get(entryId);
+    const existingAck = this.#acks.get(entryId) ??
+      this.#acksInFlight?.get(entryId);
+    const existingNack = this.#nacks.get(entryId) ??
+      this.#nacksInFlight?.get(entryId);
     if (existingNack) {
       resolvers.reject(new TurboqError("DoubleAck"));
     } else if (existingAck) {
@@ -119,10 +119,10 @@ export class Turboq extends TypedEventTarget<TurboqEvents> {
       return Promise.reject(new TurboqError("Closed"));
     }
     const resolvers = Promise.withResolvers<void>();
-    const existingAck =
-      this.#acks.get(entryId) ?? this.#acksInFlight?.get(entryId);
-    const existingNack =
-      this.#nacks.get(entryId) ?? this.#nacksInFlight?.get(entryId);
+    const existingAck = this.#acks.get(entryId) ??
+      this.#acksInFlight?.get(entryId);
+    const existingNack = this.#nacks.get(entryId) ??
+      this.#nacksInFlight?.get(entryId);
     if (existingAck) {
       resolvers.reject(new TurboqError("DoubleAck"));
     } else if (existingNack) {
@@ -143,8 +143,8 @@ export class Turboq extends TypedEventTarget<TurboqEvents> {
       return Promise.reject(new TurboqError("Closed"));
     }
     const resolvers = Promise.withResolvers<void>();
-    const existingHeartbeat =
-      this.#heartbeats.get(entryId) ?? this.#heartbeatsInFlight?.get(entryId);
+    const existingHeartbeat = this.#heartbeats.get(entryId) ??
+      this.#heartbeatsInFlight?.get(entryId);
     if (existingHeartbeat) {
       existingHeartbeat.promise.then(resolvers.resolve, resolvers.reject);
     } else {
@@ -266,8 +266,8 @@ export class Turboq extends TypedEventTarget<TurboqEvents> {
           switch (entry.state) {
             case "pending": {
               const wasDeferred = entry.availableAt !== null;
-              const isAvailable =
-                entry.availableAt === null || entry.availableAt <= now;
+              const isAvailable = entry.availableAt === null ||
+                entry.availableAt <= now;
               if (isAvailable && poppedEntries.length < pops.length) {
                 entry.state = "running";
                 entry.lastHeartbeat = now;
@@ -349,7 +349,9 @@ export class Turboq extends TypedEventTarget<TurboqEvents> {
                     earliestWake = hbExpiresAt;
                   }
                   if (entry.expiresAt !== null) {
-                    if (earliestWake === null || entry.expiresAt < earliestWake) {
+                    if (
+                      earliestWake === null || entry.expiresAt < earliestWake
+                    ) {
                       earliestWake = entry.expiresAt;
                     }
                   }
@@ -418,9 +420,7 @@ export class Turboq extends TypedEventTarget<TurboqEvents> {
           this.#heartbeats = new Map();
 
           // Exponential backoff before retry (50ms, 100ms, 200ms, ... capped at 1s)
-          await new Promise((r) =>
-            setTimeout(r, Math.min(1000, 50 * 2 ** i)),
-          );
+          await new Promise((r) => setTimeout(r, Math.min(1000, 50 * 2 ** i)));
           continue casRetry;
         }
 
@@ -443,13 +443,16 @@ export class Turboq extends TypedEventTarget<TurboqEvents> {
         for (const [, ack] of acks) ack.reject(new TurboqError("InvalidEntry"));
 
         for (const nackedEntry of nackedEntries) nacks.delete(nackedEntry.id);
-        for (const [, nack] of nacks)
+        for (const [, nack] of nacks) {
           nack.resolvers.reject(new TurboqError("InvalidEntry"));
+        }
 
-        for (const heartbeatedEntry of heartbeatedEntries)
+        for (const heartbeatedEntry of heartbeatedEntries) {
           heartbeats.delete(heartbeatedEntry.id);
-        for (const [, hb] of heartbeats)
+        }
+        for (const [, hb] of heartbeats) {
           hb.reject(new TurboqError("InvalidEntry"));
+        }
 
         if (ackedEntries.length > 0) {
           this.dispatchEvent(new TurboqDoneEvent(ackedEntries as DoneEntry[]));
@@ -491,7 +494,10 @@ export class Turboq extends TypedEventTarget<TurboqEvents> {
         const pendingCount = queue.entries.filter(
           (e) => e.state === "pending" || e.state === "running",
         ).length;
-        if (pendingCount === 0 && (ackedEntries.length > 0 || deadEntries.length > 0)) {
+        if (
+          pendingCount === 0 &&
+          (ackedEntries.length > 0 || deadEntries.length > 0)
+        ) {
           this.dispatchEvent(new TurboqDrainEvent());
         }
 
@@ -686,14 +692,31 @@ export class TurboqDrainEvent extends CustomEvent<void> {
   }
 }
 
-export class TurboqBackpressureEvent extends CustomEvent<{ depth: number; threshold: number }> {
+export class TurboqBackpressureEvent
+  extends CustomEvent<{ depth: number; threshold: number }> {
   constructor(depth: number, threshold: number) {
     super("backpressure", { detail: { depth, threshold } });
   }
 }
 
-export class TurboqCommitFailedEvent extends CustomEvent<{ pushCount: number; popCount: number; ackCount: number; nackCount: number; heartbeatCount: number }> {
-  constructor(counts: { pushCount: number; popCount: number; ackCount: number; nackCount: number; heartbeatCount: number }) {
+export class TurboqCommitFailedEvent extends CustomEvent<
+  {
+    pushCount: number;
+    popCount: number;
+    ackCount: number;
+    nackCount: number;
+    heartbeatCount: number;
+  }
+> {
+  constructor(
+    counts: {
+      pushCount: number;
+      popCount: number;
+      ackCount: number;
+      nackCount: number;
+      heartbeatCount: number;
+    },
+  ) {
     super("commitFailed", { detail: counts });
   }
 }

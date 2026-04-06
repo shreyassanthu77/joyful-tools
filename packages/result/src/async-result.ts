@@ -261,8 +261,7 @@ export class AsyncResult<T, E = unknown> implements PromiseLike<Result<T, E>> {
    * ```
    */
   orElseMatch<
-    const Handlers extends E extends MatchableError
-      ? MatchHandlers<E>
+    const Handlers extends E extends MatchableError ? MatchHandlers<E>
       : never,
   >(
     handlers: Handlers,
@@ -338,8 +337,7 @@ export class AsyncResult<T, E = unknown> implements PromiseLike<Result<T, E>> {
    * ```
    */
   orElseMatchSome<
-    const Handlers extends E extends MatchableError
-      ? MatchSomeHandlers<E>
+    const Handlers extends E extends MatchableError ? MatchSomeHandlers<E>
       : never,
   >(
     handlers: Handlers,

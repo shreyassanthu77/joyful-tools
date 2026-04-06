@@ -184,8 +184,8 @@ const value = Result.err("missing value").orElse((error) =>
 
 ### Recovering tagged errors with `orElseMatch()`
 
-Use `orElseMatch()` when your error type is a tagged error union and you want
-an exhaustive recovery map.
+Use `orElseMatch()` when your error type is a tagged error union and you want an
+exhaustive recovery map.
 
 ```typescript
 import { Result } from "@joyful/result";
@@ -267,8 +267,7 @@ Thrown values become `Err` results:
 ```typescript
 const parsed = Result.wrap({
   try: () => JSON.parse("not json"),
-  catch: (error) =>
-    error instanceof Error ? error.message : String(error),
+  catch: (error) => error instanceof Error ? error.message : String(error),
 });
 
 // Err("Unexpected token 'o', \"not json\" is not valid JSON")
@@ -363,8 +362,7 @@ const config = await Result.wrap({
 
     return response.json();
   },
-  catch: (error) =>
-    error instanceof Error ? error.message : String(error),
+  catch: (error) => error instanceof Error ? error.message : String(error),
 });
 ```
 
@@ -464,10 +462,12 @@ const result = await Result.run(async function* () {
 - `Ok` and `Err`: concrete classes with `.value` and `.error` fields.
 - `map()` and `mapErr()`: transform success and error values.
 - `andThen()` and `orElse()`: compose additional result-returning operations.
-- `orElseMatch()` and `orElseMatchSome()`: recover tagged errors with handler maps.
+- `orElseMatch()` and `orElseMatchSome()`: recover tagged errors with handler
+  maps.
 - `unwrapOr()`, `expect()`, `expectErr()`: extract values.
 - `inspect()` and `inspectErr()`: observe values without changing them.
-- `Result.run()`: compose results with generator or async generator control flow.
+- `Result.run()`: compose results with generator or async generator control
+  flow.
 - `async()`: convert a `Result` to `AsyncResult`.
 - `AsyncResult`: async wrapper with the same composition primitives.
 
@@ -477,8 +477,10 @@ const result = await Result.run(async function* () {
 - `mapErr()`: transform an error value without changing the success type.
 - `andThen()`: continue with another operation that already returns a `Result`.
 - `orElse()`: recover from any error value with one fallback function.
-- `orElseMatch()`: exhaustively recover tagged errors with one handler per `_tag`.
-- `orElseMatchSome()`: recover only selected tagged errors and leave the rest unchanged.
+- `orElseMatch()`: exhaustively recover tagged errors with one handler per
+  `_tag`.
+- `orElseMatchSome()`: recover only selected tagged errors and leave the rest
+  unchanged.
 
 ## License
 

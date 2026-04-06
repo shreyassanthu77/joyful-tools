@@ -1,6 +1,5 @@
 # @joyful/turboq
 
-
 ## Installation
 
 ```bash

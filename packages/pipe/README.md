@@ -1,6 +1,7 @@
 # @joyful/pipe
 
-A JavaScript/TypeScript utility for function composition that allows you to pipe values through a series of functions.
+A JavaScript/TypeScript utility for function composition that allows you to pipe
+values through a series of functions.
 
 ## Installation
 
@@ -20,7 +21,8 @@ npx jsr add @joyful/pipe
 
 ## Usage
 
-The `pipe` function takes a value and a series of functions, applying each function to the result of the previous one.
+The `pipe` function takes a value and a series of functions, applying each
+function to the result of the previous one.
 
 ```typescript
 import { pipe } from "@joyful/pipe";
@@ -40,10 +42,12 @@ const result = pipe(4, double, square, addFive);
 ### `pipe(value, ...functions)`
 
 **Parameters:**
+
 - `value: T` - The initial value to pipe through the functions
 - `...functions: ((value: T) => U)[]` - Functions to apply in sequence
 
 **Returns:**
+
 - The final result after applying all functions
 
 ## Example
@@ -62,7 +66,8 @@ const result = pipe("  hello world  ", trim, toUpperCase, addExclamation);
 ## Benefits
 
 - **Type Safety**: Full TypeScript support with proper type inference
-- **Readability**: Left-to-right function composition is easier to read than nested function calls
+- **Readability**: Left-to-right function composition is easier to read than
+  nested function calls
 - **Immutability**: Creates new values without mutating the original
 - **Composable**: Easy to create reusable function pipelines
 

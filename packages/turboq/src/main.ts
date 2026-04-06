@@ -1,6 +1,6 @@
 export * from "./storage/test_storage.ts";
 export * from "./turboq.ts";
-export type { EntryId, StorageObj, Storage } from "./types.ts";
+export type { EntryId, Storage, StorageObj } from "./types.ts";
 
 import { Turboq } from "./turboq.ts";
 import { TestStorage } from "./storage/test_storage.ts";
