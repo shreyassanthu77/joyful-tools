@@ -40,7 +40,9 @@ import { Err, Ok } from "./result.ts";
  * }
  * ```
  */
-export class AsyncResult<T, E = unknown> implements PromiseLike<Result<T, E>> {
+export class AsyncResult<T, E = unknown>
+  implements PromiseLike<Result<T, E>>, AsyncIterable<Err<never, E>, T, unknown>
+{
   /** The underlying promise that resolves to a {@link Result}. */
   promise: Promise<Result<T, E>>;
 
@@ -261,14 +263,10 @@ export class AsyncResult<T, E = unknown> implements PromiseLike<Result<T, E>> {
    * ```
    */
   orElseMatch<
-    const Handlers extends E extends MatchableError ? MatchHandlers<E>
-      : never,
+    const Handlers extends E extends MatchableError ? MatchHandlers<E> : never,
   >(
     handlers: Handlers,
-  ): AsyncResult<
-    T | MatchResultValue<Handlers>,
-    MatchResultError<Handlers>
-  > {
+  ): AsyncResult<T | MatchResultValue<Handlers>, MatchResultError<Handlers>> {
     return new AsyncResult(
       this.promise.then(async (result) => {
         if (result instanceof Ok) {
@@ -283,16 +281,10 @@ export class AsyncResult<T, E = unknown> implements PromiseLike<Result<T, E>> {
           error: E,
         ) =>
           | Result<MatchResultValue<Handlers>, MatchResultError<Handlers>>
-          | AsyncResult<
-            MatchResultValue<Handlers>,
-            MatchResultError<Handlers>
-          >
+          | AsyncResult<MatchResultValue<Handlers>, MatchResultError<Handlers>>
           | Promise<
-            Result<
-              MatchResultValue<Handlers>,
-              MatchResultError<Handlers>
-            >
-          >;
+              Result<MatchResultValue<Handlers>, MatchResultError<Handlers>>
+            >;
         const mapped = handler(error);
 
         if (mapped != null && "then" in mapped) {
@@ -337,7 +329,8 @@ export class AsyncResult<T, E = unknown> implements PromiseLike<Result<T, E>> {
    * ```
    */
   orElseMatchSome<
-    const Handlers extends E extends MatchableError ? MatchSomeHandlers<E>
+    const Handlers extends E extends MatchableError
+      ? MatchSomeHandlers<E>
       : never,
   >(
     handlers: Handlers,
@@ -358,21 +351,17 @@ export class AsyncResult<T, E = unknown> implements PromiseLike<Result<T, E>> {
 
         const error = (result as Err<T, E>).error as E & MatchableError;
         const handler = handlers[error._tag as keyof Handlers] as
-          | ((error: E) =>
-            | Result<
-              MatchResultValue<Handlers>,
-              MatchResultError<Handlers>
-            >
-            | AsyncResult<
-              MatchResultValue<Handlers>,
-              MatchResultError<Handlers>
-            >
-            | Promise<
-              Result<
-                MatchResultValue<Handlers>,
-                MatchResultError<Handlers>
-              >
-            >)
+          | ((
+              error: E,
+            ) =>
+              | Result<MatchResultValue<Handlers>, MatchResultError<Handlers>>
+              | AsyncResult<
+                  MatchResultValue<Handlers>,
+                  MatchResultError<Handlers>
+                >
+              | Promise<
+                  Result<MatchResultValue<Handlers>, MatchResultError<Handlers>>
+                >)
           | undefined;
 
         if (!handler) {

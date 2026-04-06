@@ -9,7 +9,8 @@ import type {
 } from "./errors.ts";
 import type { Result } from "./main.ts";
 
-interface BaseResult<T, E = unknown> {
+interface BaseResult<T, E = unknown>
+  extends Iterable<Err<never, E>, T, unknown> {
   isOk(): this is Ok<T, E>;
   isErr(): this is Err<T, E>;
   unwrapOr(defaultValue: T): T;
@@ -20,13 +21,13 @@ interface BaseResult<T, E = unknown> {
   andThen<U, F>(f: (value: T) => Result<U, F>): Result<U, E | F>;
   orElse<U, F>(f: (err: E) => Result<U, F>): Result<T | U, F>;
   orElseMatch<
-    const Handlers extends E extends MatchableError ? MatchHandlers<E>
-      : never,
+    const Handlers extends E extends MatchableError ? MatchHandlers<E> : never,
   >(
     handlers: Handlers,
   ): Result<T | MatchResultValue<Handlers>, MatchResultError<Handlers>>;
   orElseMatchSome<
-    const Handlers extends E extends MatchableError ? MatchSomeHandlers<E>
+    const Handlers extends E extends MatchableError
+      ? MatchSomeHandlers<E>
       : never,
   >(
     handlers: Handlers,
@@ -189,8 +190,7 @@ export class Ok<T, E = never> implements BaseResult<T, E> {
    * ```
    */
   orElseMatch<
-    const Handlers extends E extends MatchableError ? MatchHandlers<E>
-      : never,
+    const Handlers extends E extends MatchableError ? MatchHandlers<E> : never,
   >(
     handlers: Handlers,
   ): Result<T | MatchResultValue<Handlers>, MatchResultError<Handlers>> {
@@ -218,7 +218,8 @@ export class Ok<T, E = never> implements BaseResult<T, E> {
    * ```
    */
   orElseMatchSome<
-    const Handlers extends E extends MatchableError ? MatchSomeHandlers<E>
+    const Handlers extends E extends MatchableError
+      ? MatchSomeHandlers<E>
       : never,
   >(
     handlers: Handlers,
@@ -439,8 +440,7 @@ export class Err<T, E = never> implements BaseResult<T, E> {
    * ```
    */
   orElseMatch<
-    const Handlers extends E extends MatchableError ? MatchHandlers<E>
-      : never,
+    const Handlers extends E extends MatchableError ? MatchHandlers<E> : never,
   >(
     handlers: Handlers,
   ): Result<T | MatchResultValue<Handlers>, MatchResultError<Handlers>> {
@@ -483,7 +483,8 @@ export class Err<T, E = never> implements BaseResult<T, E> {
    * ```
    */
   orElseMatchSome<
-    const Handlers extends E extends MatchableError ? MatchSomeHandlers<E>
+    const Handlers extends E extends MatchableError
+      ? MatchSomeHandlers<E>
       : never,
   >(
     handlers: Handlers,
@@ -495,8 +496,8 @@ export class Err<T, E = never> implements BaseResult<T, E> {
     const error = this.error as E & MatchableError;
     const handler = handlers[error._tag as keyof Handlers] as
       | ((
-        error: E,
-      ) => Result<MatchResultValue<Handlers>, MatchResultError<Handlers>>)
+          error: E,
+        ) => Result<MatchResultValue<Handlers>, MatchResultError<Handlers>>)
       | undefined;
 
     if (!handler) {
