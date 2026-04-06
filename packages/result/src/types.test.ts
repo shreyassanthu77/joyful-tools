@@ -247,3 +247,156 @@ Deno.test(
     );
   },
 );
+
+// --- Result.run type tests ---
+
+Deno.test("Result.run with all-ok yields returns Result<T, never>", () => {
+  const res = Result.run(function* () {
+    const a = yield* Result.ok(2);
+    const b = yield* Result.ok("hello");
+    return Result.ok(a + b.length);
+  });
+  attest(res).type.toString.snap("Result<number, never>");
+});
+
+Deno.test("Result.run propagates yield error types", () => {
+  const res = Result.run(function* () {
+    const a = yield* Result.ok<number, string>(2);
+    return Result.ok(a);
+  });
+  attest(res).type.toString.snap("Result<number, string>");
+});
+
+Deno.test("Result.run accumulates error types from multiple yields", () => {
+  const res = Result.run(function* () {
+    const a = yield* Result.ok<number, string>(2);
+    const b = yield* Result.ok<string, number>(String(a));
+    return Result.ok(b);
+  });
+  attest(res).type.toString.snap("Result<string, string | number>");
+});
+
+Deno.test("Result.run includes return Result error type in the output", () => {
+  const res = Result.run(function* () {
+    const a = yield* Result.ok(2);
+    if (a > 10) return Result.err("too big" as const);
+    return Result.ok(a);
+  });
+  attest(res).type.toString.snap('Result<number, "too big">');
+});
+
+Deno.test(
+  "Result.run yield* after orElseMatch narrows error types",
+  () => {
+    class A extends Result.taggedError("A") {}
+    class B extends Result.taggedError("B") {}
+
+    const res = Result.run(function* () {
+      const a = yield* Result.ok<number, A | B>(2).orElseMatch({
+        A: () => Result.ok(0),
+        B: () => Result.ok(-1),
+      });
+      return Result.ok(a);
+    });
+    attest(res).type.toString.snap("Result<number, never>");
+  },
+);
+
+Deno.test(
+  "Result.run yield* after orElseMatchSome keeps unhandled errors",
+  () => {
+    class A extends Result.taggedError("A") {}
+    class B extends Result.taggedError("B") {}
+
+    const res = Result.run(function* () {
+      const a = yield* Result.ok<number, A | B>(2).orElseMatchSome({
+        A: () => Result.ok(0),
+      });
+      return Result.ok(a);
+    });
+    attest(res).type.toString.snap("Result<number, B>");
+  },
+);
+
+// --- Async Result.run type tests ---
+
+Deno.test(
+  "Async Result.run with all-ok yields returns AsyncResult<T, never>",
+  async () => {
+    const res = Result.run(async function* () {
+      const a = yield* Result.ok(2).async();
+      const b = yield* Result.ok("hello").async();
+      return Result.ok(a + b.length);
+    });
+    attest(res).type.toString.snap("AsyncResult<number, never>");
+  },
+);
+
+Deno.test("Async Result.run propagates yield error types", async () => {
+  const res = Result.run(async function* () {
+    const a = yield* Result.ok<number, string>(2).async();
+    return Result.ok(a);
+  });
+  attest(res).type.toString.snap("AsyncResult<number, string>");
+});
+
+Deno.test(
+  "Async Result.run accumulates error types from multiple yields",
+  async () => {
+    const res = Result.run(async function* () {
+      const a = yield* Result.ok<number, string>(2).async();
+      const b = yield* Result.ok<string, number>(String(a)).async();
+      return Result.ok(b);
+    });
+    attest(res).type.toString.snap("AsyncResult<string, string | number>");
+  },
+);
+
+Deno.test(
+  "Async Result.run includes return Result error type in the output",
+  async () => {
+    const res = Result.run(async function* () {
+      const a = yield* Result.ok(2).async();
+      if (a > 10) return Result.err("too big" as const);
+      return Result.ok(a);
+    });
+    attest(res).type.toString.snap('AsyncResult<number, "too big">');
+  },
+);
+
+Deno.test(
+  "Async Result.run yield* after orElseMatch narrows error types",
+  async () => {
+    class A extends Result.taggedError("A") {}
+    class B extends Result.taggedError("B") {}
+
+    const res = Result.run(async function* () {
+      const a = yield* Result.ok<number, A | B>(2)
+        .orElseMatch({
+          A: () => Result.ok(0),
+          B: () => Result.ok(-1),
+        })
+        .async();
+      return Result.ok(a);
+    });
+    attest(res).type.toString.snap("AsyncResult<number, never>");
+  },
+);
+
+Deno.test(
+  "Async Result.run yield* after orElseMatchSome keeps unhandled errors",
+  async () => {
+    class A extends Result.taggedError("A") {}
+    class B extends Result.taggedError("B") {}
+
+    const res = Result.run(async function* () {
+      const a = yield* Result.ok<number, A | B>(2)
+        .orElseMatchSome({
+          A: () => Result.ok(0),
+        })
+        .async();
+      return Result.ok(a);
+    });
+    attest(res).type.toString.snap("AsyncResult<number, B>");
+  },
+);

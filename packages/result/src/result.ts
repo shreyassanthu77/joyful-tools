@@ -1,4 +1,4 @@
-import { AsyncResult } from "@joyful/result";
+import { AsyncResult } from "./async-result.ts";
 import type {
   MatchableError,
   MatchHandlers,
