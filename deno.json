@@ -2,10 +2,12 @@
   "$schema": "https://raw.githubusercontent.com/denoland/deno/refs/heads/main/cli/schemas/config-file.v1.json",
   "nodeModulesDir": "auto",
   "imports": {
-    "std/assert": "jsr:@std/assert"
+    "std/assert": "jsr:@std/assert",
+    "@deno/dnt": "jsr:@deno/dnt"
   },
   "tasks": {
-    "test": "deno test -A"
+    "test": "deno test -A",
+    "build:npm": "deno run -A scripts/build_npm.ts"
   },
   "workspace": [
     "packages/fetch",
