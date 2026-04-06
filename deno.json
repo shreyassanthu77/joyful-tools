@@ -5,7 +5,7 @@
     "std/assert": "jsr:@std/assert"
   },
   "tasks": {
-    "test": "deno test"
+    "test": "deno test -A"
   },
   "workspace": ["packages/pipe", "packages/result", "packages/turboq"]
 }
