@@ -1,4 +1,5 @@
 import { AsyncResult } from "@joyful/result";
+import type { Result } from "./main.ts";
 
 interface BaseResult<T, E = unknown> {
   isOk(): this is Ok<T, E>;
@@ -6,10 +7,10 @@ interface BaseResult<T, E = unknown> {
   unwrapOr(defaultValue: T): T;
   expect(message: string): T;
   expectErr(message: string): E;
-  map<U>(f: (value: T) => U): BaseResult<U, E>;
-  mapErr<F>(f: (err: E) => F): BaseResult<T, F>;
-  andThen<U, F>(f: (value: T) => BaseResult<U, F>): BaseResult<U, E | F>;
-  orElse<U, F>(f: (err: E) => BaseResult<U, F>): BaseResult<T | U, F>;
+  map<U>(f: (value: T) => U): Result<U, E>;
+  mapErr<F>(f: (err: E) => F): Result<T, F>;
+  andThen<U, F>(f: (value: T) => Result<U, F>): Result<U, E | F>;
+  orElse<U, F>(f: (err: E) => Result<U, F>): Result<T | U, F>;
   inspect(f: (value: T) => void): this;
   inspectErr(f: (err: E) => void): this;
   async(): AsyncResult<T, E>;
@@ -88,7 +89,7 @@ export class Ok<T, E = never> implements BaseResult<T, E> {
    * // Ok(3)
    * ```
    */
-  map<U>(f: (value: T) => U): BaseResult<U, E> {
+  map<U>(f: (value: T) => U): Result<U, E> {
     return new Ok(f(this.value));
   }
 
@@ -98,7 +99,7 @@ export class Ok<T, E = never> implements BaseResult<T, E> {
    * @param f Function that would map an error value.
    * @returns This result with the same success value.
    */
-  mapErr<F>(f: (err: E) => F): BaseResult<T, F> {
+  mapErr<F>(f: (err: E) => F): Result<T, F> {
     void f;
     // @ts-expect-error - we know the value is an error so we can safely cast to a result with a different Value type
     return this as Ok<T, F>;
@@ -120,7 +121,7 @@ export class Ok<T, E = never> implements BaseResult<T, E> {
    * });
    * ```
    */
-  andThen<U, F>(f: (value: T) => BaseResult<U, F>): BaseResult<U, E | F> {
+  andThen<U, F>(f: (value: T) => Result<U, F>): Result<U, E | F> {
     return f(this.value);
   }
 
@@ -130,7 +131,7 @@ export class Ok<T, E = never> implements BaseResult<T, E> {
    * @param f Function that would recover from an error.
    * @returns This result with the same success value.
    */
-  orElse<U, F>(f: (err: E) => BaseResult<U, F>): BaseResult<T | U, F> {
+  orElse<U, F>(f: (err: E) => Result<U, F>): Result<T | U, F> {
     void f;
     // @ts-expect-error - we know the value is an error so we can safely cast to a result with a different Value type
     return this as Ok<T | U, F>;
@@ -247,7 +248,7 @@ export class Err<T, E = never> implements BaseResult<T, E> {
    * @param f Function that would map a success value.
    * @returns This result with the same error value.
    */
-  map<U>(f: (value: T) => U): BaseResult<U, E> {
+  map<U>(f: (value: T) => U): Result<U, E> {
     void f;
     // @ts-expect-error - we know the value is an error so we can safely cast to a result with a different Value type
     return this as Err<U, E>;
@@ -265,7 +266,7 @@ export class Err<T, E = never> implements BaseResult<T, E> {
    * // Err("BOOM")
    * ```
    */
-  mapErr<F>(f: (err: E) => F): BaseResult<T, F> {
+  mapErr<F>(f: (err: E) => F): Result<T, F> {
     return new Err(f(this.error));
   }
 
@@ -275,7 +276,7 @@ export class Err<T, E = never> implements BaseResult<T, E> {
    * @param f Function that would produce the next result from a success value.
    * @returns This result with the same error value.
    */
-  andThen<U, F>(f: (value: T) => BaseResult<U, F>): BaseResult<U, E | F> {
+  andThen<U, F>(f: (value: T) => Result<U, F>): Result<U, E | F> {
     void f;
     // @ts-expect-error - we know the value is an error so we can safely cast to a result with a different Value type
     return this as Err<U, E | F>;
@@ -294,7 +295,7 @@ export class Err<T, E = never> implements BaseResult<T, E> {
    * );
    * ```
    */
-  orElse<U, F>(f: (err: E) => BaseResult<U, F>): BaseResult<T | U, F> {
+  orElse<U, F>(f: (err: E) => Result<U, F>): Result<T | U, F> {
     return f(this.error);
   }
 
