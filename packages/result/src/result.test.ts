@@ -1,11 +1,11 @@
 import { assertEquals, assertInstanceOf, assertThrows } from "std/assert";
-import { Result } from "./main.ts";
+import { Result, taggedError } from "./main.ts";
 
-class ValidationError extends Result.taggedError("ValidationError")<{
+class ValidationError extends taggedError("ValidationError")<{
   field: string;
 }> {}
 
-class NetworkError extends Result.taggedError("NetworkError")<{
+class NetworkError extends taggedError("NetworkError")<{
   status: number;
 }> {}
 
@@ -209,7 +209,8 @@ Deno.test("Result.wrap", async () => {
       try: (): number => {
         throw new Error("boom");
       },
-      catch: (error) => error instanceof Error ? error.message : String(error),
+      catch: (error) =>
+        error instanceof Error ? error.message : String(error),
     }),
     Result.err("boom"),
   );
@@ -225,14 +226,15 @@ Deno.test("Result.wrap", async () => {
   assertEquals(
     await Result.wrap({
       try: () => Promise.reject(new Error("boom")),
-      catch: (error) => error instanceof Error ? error.message : String(error),
+      catch: (error) =>
+        error instanceof Error ? error.message : String(error),
     }),
     Result.err("boom"),
   );
 });
 
-Deno.test("Result.taggedError", () => {
-  class JsonParseError extends Result.taggedError("JsonParseError")<{
+Deno.test("taggedError", () => {
+  class JsonParseError extends taggedError("JsonParseError")<{
     input: string;
   }> {}
   const cause = new SyntaxError("boom");

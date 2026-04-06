@@ -44,7 +44,11 @@ export * from "./result.ts";
 export * from "./async-result.ts";
 
 import { AsyncResult } from "./async-result.ts";
-import * as errors from "./errors.ts";
+export {
+  taggedError,
+  type TaggedError,
+  type TaggedErrorFactory,
+} from "./errors.ts";
 import { Err, Ok } from "./result.ts";
 /**
  * A value that is either a successful {@link Ok} or a failed {@link Err}.
@@ -96,31 +100,6 @@ export namespace Result {
   export function err<E, T = never>(err: E): Result<T, E> {
     return new Err(err);
   }
-
-  /**
-   * Creates an `Error` subclass with a fixed `_tag` and typed custom fields.
-   *
-   * Tagged errors are useful when you want structured domain failures that also
-   * behave like normal `Error` instances in logs and tracing tools.
-   *
-   * @example
-   * ```typescript
-   * class JsonParseError extends Result.taggedError("JsonParseError")<{
-   *   input: string;
-   * }> {}
-   *
-   * const result = Result.wrap({
-   *   try: () => JSON.parse("not json"),
-   *   catch: (cause) =>
-   *     new JsonParseError({
-   *       input: "not json",
-   *       message: "Failed to parse JSON",
-   *       cause,
-   *     }),
-   * });
-   * ```
-   */
-  export const taggedError = errors.taggedError;
 
   /**
    * Options for {@link Result.wrap}.

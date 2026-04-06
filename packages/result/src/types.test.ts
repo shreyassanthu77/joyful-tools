@@ -1,6 +1,6 @@
 // deno-lint-ignore-file
 import { AsyncResult } from "./async-result.ts";
-import { Result } from "./main.ts";
+import { Result, taggedError } from "./main.ts";
 import { attest, setup, teardown } from "@ark/attest";
 
 Deno.test.beforeAll(() => void setup());
@@ -44,8 +44,8 @@ Deno.test(
 Deno.test(
   "Result.orElseMatch should change the error type and extend the success type",
   () => {
-    class A extends Result.taggedError("A") {}
-    class B extends Result.taggedError("B") {}
+    class A extends taggedError("A") {}
+    class B extends taggedError("B") {}
 
     const v = Result.err<A | B, string>(new A({}));
     const res = v.orElseMatch({
@@ -59,8 +59,8 @@ Deno.test(
 Deno.test(
   "Result.orElseMatch handlers should properly narrow the error type",
   () => {
-    class A extends Result.taggedError("A") {}
-    class B extends Result.taggedError("B") {}
+    class A extends taggedError("A") {}
+    class B extends taggedError("B") {}
 
     Result.err<A | B>(new A({})).orElseMatch({
       A: (a) => void attest(a).type.toString.snap("A"),
@@ -77,8 +77,8 @@ Deno.test(
 Deno.test(
   "Result.orElseMatchSome should remove the handled errors from the error type",
   () => {
-    class A extends Result.taggedError("A") {}
-    class B extends Result.taggedError("B") {}
+    class A extends taggedError("A") {}
+    class B extends taggedError("B") {}
 
     const v = Result.err<A | B, string>(new A({}));
     const res = v.orElseMatchSome({
@@ -98,8 +98,8 @@ Deno.test(
 Deno.test(
   "Result.orElseMatchSome handlers should properly narrow the error type",
   () => {
-    class A extends Result.taggedError("A") {}
-    class B extends Result.taggedError("B") {}
+    class A extends taggedError("A") {}
+    class B extends taggedError("B") {}
 
     Result.err<A | B>(new A({})).orElseMatchSome({
       A: (a) => void attest(a).type.toString.snap("A"),
@@ -114,7 +114,7 @@ Deno.test(
 );
 
 Deno.test("Result.orElseMatchSome should extend the success type", () => {
-  class A extends Result.taggedError("A") {}
+  class A extends taggedError("A") {}
   const v = Result.err<A, string>(new A({}));
   attest<Result<string | number, never>>(
     v.orElseMatchSome({
@@ -156,8 +156,8 @@ Deno.test(
 Deno.test(
   "AsyncResult.orElseMatch should change the error type and extend the success type",
   async () => {
-    class A extends Result.taggedError("A") {}
-    class B extends Result.taggedError("B") {}
+    class A extends taggedError("A") {}
+    class B extends taggedError("B") {}
 
     const v: AsyncResult<string, A | B> = Result.err<A | B, string>(
       new A({}),
@@ -173,8 +173,8 @@ Deno.test(
 Deno.test(
   "AsyncResult.orElseMatch handlers should properly narrow the error type",
   async () => {
-    class A extends Result.taggedError("A") {}
-    class B extends Result.taggedError("B") {}
+    class A extends taggedError("A") {}
+    class B extends taggedError("B") {}
 
     const v1: AsyncResult<never, A | B> = Result.err<A | B>(new A({})).async();
     await v1.orElseMatch({
@@ -193,8 +193,8 @@ Deno.test(
 Deno.test(
   "AsyncResult.orElseMatchSome should remove the handled errors from the error type",
   async () => {
-    class A extends Result.taggedError("A") {}
-    class B extends Result.taggedError("B") {}
+    class A extends taggedError("A") {}
+    class B extends taggedError("B") {}
 
     const v: AsyncResult<string, A | B> = Result.err<A | B, string>(
       new A({}),
@@ -218,8 +218,8 @@ Deno.test(
 Deno.test(
   "AsyncResult.orElseMatchSome handlers should properly narrow the error type",
   async () => {
-    class A extends Result.taggedError("A") {}
-    class B extends Result.taggedError("B") {}
+    class A extends taggedError("A") {}
+    class B extends taggedError("B") {}
 
     const v1: AsyncResult<never, A | B> = Result.err<A | B>(new A({})).async();
     await v1.orElseMatchSome({
@@ -238,7 +238,7 @@ Deno.test(
 Deno.test(
   "AsyncResult.orElseMatchSome should extend the success type",
   async () => {
-    class A extends Result.taggedError("A") {}
+    class A extends taggedError("A") {}
     const v: AsyncResult<string, A> = Result.err<A, string>(new A({})).async();
     attest<AsyncResult<string | number, never>>(
       v.orElseMatchSome({
@@ -285,28 +285,25 @@ Deno.test("Result.run includes return Result error type in the output", () => {
   attest(res).type.toString.snap('Result<number, "too big">');
 });
 
-Deno.test(
-  "Result.run yield* after orElseMatch narrows error types",
-  () => {
-    class A extends Result.taggedError("A") {}
-    class B extends Result.taggedError("B") {}
+Deno.test("Result.run yield* after orElseMatch narrows error types", () => {
+  class A extends taggedError("A") {}
+  class B extends taggedError("B") {}
 
-    const res = Result.run(function* () {
-      const a = yield* Result.ok<number, A | B>(2).orElseMatch({
-        A: () => Result.ok(0),
-        B: () => Result.ok(-1),
-      });
-      return Result.ok(a);
+  const res = Result.run(function* () {
+    const a = yield* Result.ok<number, A | B>(2).orElseMatch({
+      A: () => Result.ok(0),
+      B: () => Result.ok(-1),
     });
-    attest(res).type.toString.snap("Result<number, never>");
-  },
-);
+    return Result.ok(a);
+  });
+  attest(res).type.toString.snap("Result<number, never>");
+});
 
 Deno.test(
   "Result.run yield* after orElseMatchSome keeps unhandled errors",
   () => {
-    class A extends Result.taggedError("A") {}
-    class B extends Result.taggedError("B") {}
+    class A extends taggedError("A") {}
+    class B extends taggedError("B") {}
 
     const res = Result.run(function* () {
       const a = yield* Result.ok<number, A | B>(2).orElseMatchSome({
@@ -367,8 +364,8 @@ Deno.test(
 Deno.test(
   "Async Result.run yield* after orElseMatch narrows error types",
   async () => {
-    class A extends Result.taggedError("A") {}
-    class B extends Result.taggedError("B") {}
+    class A extends taggedError("A") {}
+    class B extends taggedError("B") {}
 
     const res = Result.run(async function* () {
       const a = yield* Result.ok<number, A | B>(2)
@@ -386,8 +383,8 @@ Deno.test(
 Deno.test(
   "Async Result.run yield* after orElseMatchSome keeps unhandled errors",
   async () => {
-    class A extends Result.taggedError("A") {}
-    class B extends Result.taggedError("B") {}
+    class A extends taggedError("A") {}
+    class B extends taggedError("B") {}
 
     const res = Result.run(async function* () {
       const a = yield* Result.ok<number, A | B>(2)
