@@ -1,9 +1,9 @@
 import type {
-  MatchAsyncResultError,
-  MatchAsyncResultHandlers,
-  MatchAsyncResultValue,
-  MatchSomeAsyncResultHandlers,
   MatchableError,
+  MatchHandlers,
+  MatchResultError,
+  MatchResultValue,
+  MatchSomeHandlers,
   RemainingMatchErrors,
 } from "./errors.ts";
 import type { Result } from "./main.ts";
@@ -262,20 +262,20 @@ export class AsyncResult<T, E = unknown> implements PromiseLike<Result<T, E>> {
    */
   orElseMatch<
     const Handlers extends E extends MatchableError
-      ? MatchAsyncResultHandlers<E>
+      ? MatchHandlers<E>
       : never,
   >(
     handlers: Handlers,
   ): AsyncResult<
-    T | MatchAsyncResultValue<Handlers>,
-    MatchAsyncResultError<Handlers>
+    T | MatchResultValue<Handlers>,
+    MatchResultError<Handlers>
   > {
     return new AsyncResult(
       this.promise.then(async (result) => {
         if (result instanceof Ok) {
           return result as Ok<
-            T | MatchAsyncResultValue<Handlers>,
-            MatchAsyncResultError<Handlers>
+            T | MatchResultValue<Handlers>,
+            MatchResultError<Handlers>
           >;
         }
 
@@ -283,20 +283,20 @@ export class AsyncResult<T, E = unknown> implements PromiseLike<Result<T, E>> {
         const handler = handlers[error._tag as keyof Handlers] as unknown as (
           error: E,
         ) =>
-          | Result<MatchAsyncResultValue<Handlers>, MatchAsyncResultError<Handlers>>
+          | Result<MatchResultValue<Handlers>, MatchResultError<Handlers>>
           | AsyncResult<
-            MatchAsyncResultValue<Handlers>,
-            MatchAsyncResultError<Handlers>
+            MatchResultValue<Handlers>,
+            MatchResultError<Handlers>
           >
           | Promise<
             Result<
-              MatchAsyncResultValue<Handlers>,
-              MatchAsyncResultError<Handlers>
+              MatchResultValue<Handlers>,
+              MatchResultError<Handlers>
             >
           >;
         const mapped = handler(error);
 
-        if ("then" in mapped) {
+        if (mapped != null && "then" in mapped) {
           return await mapped;
         }
 
@@ -339,22 +339,22 @@ export class AsyncResult<T, E = unknown> implements PromiseLike<Result<T, E>> {
    */
   orElseMatchSome<
     const Handlers extends E extends MatchableError
-      ? MatchSomeAsyncResultHandlers<E>
+      ? MatchSomeHandlers<E>
       : never,
   >(
     handlers: Handlers,
   ): AsyncResult<
-    T | MatchAsyncResultValue<Handlers>,
+    T | MatchResultValue<Handlers>,
     | (E extends MatchableError ? RemainingMatchErrors<E, Handlers> : E)
-    | MatchAsyncResultError<Handlers>
+    | MatchResultError<Handlers>
   > {
     return new AsyncResult(
       this.promise.then(async (result) => {
         if (result instanceof Ok) {
           return result as Ok<
-            T | MatchAsyncResultValue<Handlers>,
+            T | MatchResultValue<Handlers>,
             | (E extends MatchableError ? RemainingMatchErrors<E, Handlers> : E)
-            | MatchAsyncResultError<Handlers>
+            | MatchResultError<Handlers>
           >;
         }
 
@@ -362,32 +362,32 @@ export class AsyncResult<T, E = unknown> implements PromiseLike<Result<T, E>> {
         const handler = handlers[error._tag as keyof Handlers] as
           | ((error: E) =>
             | Result<
-              MatchAsyncResultValue<Handlers>,
-              MatchAsyncResultError<Handlers>
+              MatchResultValue<Handlers>,
+              MatchResultError<Handlers>
             >
             | AsyncResult<
-              MatchAsyncResultValue<Handlers>,
-              MatchAsyncResultError<Handlers>
+              MatchResultValue<Handlers>,
+              MatchResultError<Handlers>
             >
             | Promise<
               Result<
-                MatchAsyncResultValue<Handlers>,
-                MatchAsyncResultError<Handlers>
+                MatchResultValue<Handlers>,
+                MatchResultError<Handlers>
               >
             >)
           | undefined;
 
         if (!handler) {
           return result as Err<
-            T | MatchAsyncResultValue<Handlers>,
+            T | MatchResultValue<Handlers>,
             | (E extends MatchableError ? RemainingMatchErrors<E, Handlers> : E)
-            | MatchAsyncResultError<Handlers>
+            | MatchResultError<Handlers>
           >;
         }
 
         const mapped = handler(error);
 
-        if ("then" in mapped) {
+        if (mapped != null && "then" in mapped) {
           return await mapped;
         }
 

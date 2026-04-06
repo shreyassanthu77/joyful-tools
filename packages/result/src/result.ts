@@ -1,10 +1,10 @@
 import { AsyncResult } from "@joyful/result";
 import type {
   MatchableError,
+  MatchHandlers,
   MatchResultError,
-  MatchResultHandlers,
   MatchResultValue,
-  MatchSomeResultHandlers,
+  MatchSomeHandlers,
   RemainingMatchErrors,
 } from "./errors.ts";
 import type { Result } from "./main.ts";
@@ -21,14 +21,14 @@ interface BaseResult<T, E = unknown> {
   orElse<U, F>(f: (err: E) => Result<U, F>): Result<T | U, F>;
   orElseMatch<
     const Handlers extends E extends MatchableError
-      ? MatchResultHandlers<E>
+      ? MatchHandlers<E>
       : never,
   >(
     handlers: Handlers,
   ): Result<T | MatchResultValue<Handlers>, MatchResultError<Handlers>>;
   orElseMatchSome<
     const Handlers extends E extends MatchableError
-      ? MatchSomeResultHandlers<E>
+      ? MatchSomeHandlers<E>
       : never,
   >(
     handlers: Handlers,
@@ -192,7 +192,7 @@ export class Ok<T, E = never> implements BaseResult<T, E> {
    */
   orElseMatch<
     const Handlers extends E extends MatchableError
-      ? MatchResultHandlers<E>
+      ? MatchHandlers<E>
       : never,
   >(
     handlers: Handlers,
@@ -219,7 +219,7 @@ export class Ok<T, E = never> implements BaseResult<T, E> {
    */
   orElseMatchSome<
     const Handlers extends E extends MatchableError
-      ? MatchSomeResultHandlers<E>
+      ? MatchSomeHandlers<E>
       : never,
   >(
     handlers: Handlers,
@@ -441,7 +441,7 @@ export class Err<T, E = never> implements BaseResult<T, E> {
    */
   orElseMatch<
     const Handlers extends E extends MatchableError
-      ? MatchResultHandlers<E>
+      ? MatchHandlers<E>
       : never,
   >(
     handlers: Handlers,
@@ -486,7 +486,7 @@ export class Err<T, E = never> implements BaseResult<T, E> {
    */
   orElseMatchSome<
     const Handlers extends E extends MatchableError
-      ? MatchSomeResultHandlers<E>
+      ? MatchSomeHandlers<E>
       : never,
   >(
     handlers: Handlers,

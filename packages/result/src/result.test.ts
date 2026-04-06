@@ -86,7 +86,7 @@ Deno.test("Result.orElseMatch recovers handled errors", () => {
     new ValidationError({ field: "email" }),
   );
 
-  const recovered: Result<number | string, boolean> = result.orElseMatch({
+  const recovered = result.orElseMatch({
     ValidationError: (error) => Result.ok(`invalid:${error.field}`),
     NetworkError: (error) => Result.err(error.status === 503),
   });
@@ -99,7 +99,7 @@ Deno.test("Result.orElseMatch can remap handled errors", () => {
     new ValidationError({ field: "email" }),
   );
 
-  const recovered: Result<number | string, string> = result.orElseMatch({
+  const recovered = result.orElseMatch({
     ValidationError: (error) => Result.err(`invalid:${error.field}`),
     NetworkError: (error) => Result.err(`retry:${error.status}`),
   });
@@ -123,24 +123,19 @@ Deno.test("Result.orElseMatchSome recovers handled errors", () => {
     new ValidationError({ field: "email" }),
   );
 
-  const recovered: Result<number | string, NetworkError> = result.orElseMatchSome(
-    {
-      ValidationError: (error) => Result.ok(`invalid:${error.field}`),
-    },
-  );
+  const recovered = result.orElseMatchSome({
+    ValidationError: (error) => Result.ok(`invalid:${error.field}`),
+  });
 
   assertEquals(recovered, Result.ok("invalid:email"));
 });
 
 Deno.test("Result.orElseMatchSome can remap handled errors", () => {
-  const result: Result<number, ValidationError | NetworkError> = Result.err(
-    new ValidationError({ field: "email" }),
-  );
+  const result = Result.err(new ValidationError({ field: "email" }));
 
-  const recovered: Result<number | string, NetworkError | string> = result
-    .orElseMatchSome({
-      ValidationError: (error) => Result.err(`invalid:${error.field}`),
-    });
+  const recovered = result.orElseMatchSome({
+    ValidationError: (error) => Result.err(`invalid:${error.field}`),
+  });
 
   assertEquals(recovered, Result.err("invalid:email"));
 });

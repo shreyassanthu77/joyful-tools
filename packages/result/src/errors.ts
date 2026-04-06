@@ -95,159 +95,40 @@ export function taggedError<Tag extends string = string>(
 }
 
 export type MatchableError = Error & { readonly _tag: string };
-// deno-lint-ignore no-explicit-any
-type AnyFn = (...args: any[]) => unknown;
-type SyncResult<T, E> = Ok<T, E> | Err<T, E>;
-type ResolvedMatchResult<T> = T extends PromiseLike<infer U>
-  ? ResolvedMatchResult<U>
-  : T;
 
-export type MatchReturn<Handlers> = ReturnType<
-  Extract<Handlers[keyof Handlers], AnyFn>
->;
+type SyncResult<T, E> = Ok<T, E> | Err<T, E>;
+type Resolved<T> = T extends PromiseLike<infer U> ? Resolved<U> : T;
 
 export type MatchHandlers<E extends MatchableError> = {
-  [K in E["_tag"]]: (error: Extract<E, { _tag: K }>) => unknown;
+  // deno-lint-ignore no-explicit-any
+  [K in E["_tag"]]: (error: Extract<E, { _tag: K }>) => any;
 };
 
-export type MatchValueHandlers<E extends MatchableError, R> = {
-  [K in E["_tag"]]: (error: Extract<E, { _tag: K }>) => R;
-};
-
-export type MatchResultHandlers<E extends MatchableError> = {
-  [K in E["_tag"]]: (error: Extract<E, { _tag: K }>) => SyncResult<any, any>;
-};
-
-export type MatchSomeResultHandlers<E extends MatchableError> = Partial<
-  MatchResultHandlers<E>
+export type MatchSomeHandlers<E extends MatchableError> = Partial<
+  MatchHandlers<E>
 >;
 
-export type MatchResultValue<Handlers> = MatchReturn<Handlers> extends SyncResult<
-  infer T,
-  unknown
-> ? T
-  : never;
+export type MatchResultValue<Handlers> = {
+  [K in keyof Handlers]: Handlers[K] extends // deno-lint-ignore no-explicit-any
+  (...args: any[]) => infer R
+    ? // deno-lint-ignore no-explicit-any
+      Resolved<R> extends SyncResult<infer T, any>
+      ? T
+      : never
+    : never;
+}[keyof Handlers];
 
-export type MatchResultError<Handlers> = MatchReturn<Handlers> extends SyncResult<
-  unknown,
-  infer E
-> ? E
-  : never;
-
-export type MatchAsyncResultHandlers<E extends MatchableError> = {
-  [K in E["_tag"]]: (error: Extract<E, { _tag: K }>) =>
-    | SyncResult<any, any>
-    | PromiseLike<SyncResult<any, any>>;
-};
-
-export type MatchSomeAsyncResultHandlers<E extends MatchableError> = Partial<
-  MatchAsyncResultHandlers<E>
->;
-
-export type MatchAsyncResultValue<Handlers> = ResolvedMatchResult<
-  MatchReturn<Handlers>
-> extends SyncResult<infer T, unknown> ? T
-  : never;
-
-export type MatchAsyncResultError<Handlers> = ResolvedMatchResult<
-  MatchReturn<Handlers>
-> extends SyncResult<unknown, infer E> ? E
-  : never;
+export type MatchResultError<Handlers> = {
+  [K in keyof Handlers]: Handlers[K] extends // deno-lint-ignore no-explicit-any
+  (...args: any[]) => infer R
+    ? // deno-lint-ignore no-explicit-any
+      Resolved<R> extends SyncResult<any, infer E>
+      ? E
+      : never
+    : never;
+}[keyof Handlers];
 
 export type RemainingMatchErrors<
   E extends MatchableError,
   Handlers extends Partial<Record<string, unknown>>,
 > = Exclude<E, { _tag: Extract<keyof Handlers, string> }>;
-
-/**
- * Matches a tagged error result against a complete set of handlers.
- *
- * Each handler key must match one `_tag` in the error union. The selected
- * handler receives the corresponding narrowed error type, and the return type
- * is inferred as the union of all handler return types.
- *
- * @param error Failed result containing a tagged error.
- * @param handlers Mapping from `_tag` values to handler functions.
- * @returns The value returned by the matching handler.
- *
- * @example
- * ```typescript
- * class ValidationError extends taggedError("ValidationError")<{
- *   field: string;
- * }> {}
- * class NetworkError extends taggedError("NetworkError")<{
- *   status: number;
- * }> {}
- *
- * const result = new Err<never, ValidationError | NetworkError>(
- *   new NetworkError({ status: 503 }),
- * );
- *
- * const message = matchError(result, {
- *   ValidationError: (error) => `invalid:${error.field}`,
- *   NetworkError: (error) => `retry:${error.status}`,
- * });
- * ```
- */
-export function matchError<
-  const E extends MatchableError,
-  const Handlers extends MatchHandlers<E>,
->(error: Err<unknown, E>, handlers: Handlers): MatchReturn<Handlers> {
-  const handler = handlers[error.error._tag as E["_tag"]] as unknown as (
-    error: E,
-  ) => MatchReturn<Handlers>;
-
-  return handler(error.error);
-}
-
-/**
- * Matches a tagged error result against a partial set of handlers.
- *
- * If no handler exists for the current `_tag`, `orElse` is called. The return
- * type is inferred as the union of the provided handler return types and the
- * fallback return type.
- *
- * @param error Failed result containing a tagged error.
- * @param handlers Partial mapping from `_tag` values to handler functions.
- * @param orElse Fallback used when no handler matches the current `_tag`.
- * @returns The value returned by the matching handler or the fallback.
- *
- * @example
- * ```typescript
- * class ValidationError extends taggedError("ValidationError")<{
- *   field: string;
- * }> {}
- * class NetworkError extends taggedError("NetworkError")<{
- *   status: number;
- * }> {}
- *
- * const result = new Err<never, ValidationError | NetworkError>(
- *   new NetworkError({ status: 503 }),
- * );
- *
- * const message = matchErrorPartial(
- *   result,
- *   {
- *     ValidationError: (error) => `invalid:${error.field}`,
- *   },
- *   () => "default",
- * );
- * ```
- */
-export function matchErrorPartial<
-  const E extends MatchableError,
-  const Handlers extends Partial<MatchHandlers<E>>,
-  OrElse,
->(
-  error: Err<unknown, E>,
-  handlers: Handlers,
-  orElse: () => OrElse,
-): MatchReturn<Handlers> | OrElse {
-  const handler = handlers[error.error._tag as E["_tag"]] as unknown as
-    | ((error: E) => MatchReturn<Handlers>)
-    | undefined;
-
-  if (!handler) return orElse();
-
-  return handler(error.error);
-}

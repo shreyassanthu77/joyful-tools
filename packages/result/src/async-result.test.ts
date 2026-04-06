@@ -1,3 +1,5 @@
+// deno-lint-ignore-file require-await require-yield
+
 import { assertEquals, assertInstanceOf, assertRejects } from "std/assert";
 import { AsyncResult } from "./async-result.ts";
 import { Result } from "./main.ts";
@@ -79,7 +81,6 @@ Deno.test("AsyncResult.map", async () => {
 
   assertEquals(
     await new AsyncResult(Promise.resolve(Result.ok(2))).map(
-      // deno-lint-ignore require-await
       async (x) => x + 1,
     ),
     Result.ok(3),
@@ -110,7 +111,6 @@ Deno.test("AsyncResult.mapErr", async () => {
 
   assertEquals(
     await new AsyncResult(Promise.resolve(Result.err<number, void>(2))).mapErr(
-      // deno-lint-ignore require-await
       async (x) => x + 1,
     ),
     Result.err(3),
@@ -120,7 +120,7 @@ Deno.test("AsyncResult.mapErr", async () => {
 Deno.test("AsyncResult.andThen", async () => {
   assertEquals(
     await new AsyncResult(Promise.resolve(Result.ok(2))).andThen((x) =>
-      Result.ok(x + 1)
+      Result.ok(x + 1),
     ),
     Result.ok(3),
   );
@@ -133,9 +133,8 @@ Deno.test("AsyncResult.andThen", async () => {
   );
 
   assertEquals(
-    // deno-lint-ignore require-await
     await new AsyncResult(Promise.resolve(Result.ok(2))).andThen(async (x) =>
-      Result.ok(x + 1)
+      Result.ok(x + 1),
     ),
     Result.ok(3),
   );
@@ -151,7 +150,7 @@ Deno.test("AsyncResult.andThen", async () => {
 Deno.test("AsyncResult.orElse", async () => {
   assertEquals(
     await new AsyncResult(Promise.resolve(Result.ok(2))).orElse((x) =>
-      Result.ok(x + 1)
+      Result.ok(x + 1),
     ),
     Result.ok(2),
   );
@@ -172,7 +171,6 @@ Deno.test("AsyncResult.orElse", async () => {
 
   assertEquals(
     await new AsyncResult(Promise.resolve(Result.err<number, void>(2))).orElse(
-      // deno-lint-ignore require-await
       async (x) => Result.ok(x + 1),
     ),
     Result.ok(3),
@@ -201,9 +199,7 @@ Deno.test("AsyncResult.orElseMatch supports async handlers", async () => {
 
   const recovered: Result<number | string, string> = await result.orElseMatch({
     ValidationError: (error) =>
-      new AsyncResult(
-        Promise.resolve(Result.err(`invalid:${error.field}`)),
-      ),
+      new AsyncResult(Promise.resolve(Result.err(`invalid:${error.field}`))),
     NetworkError: async (error) => Result.err(`retry:${error.status}`),
   });
 
@@ -228,8 +224,8 @@ Deno.test("AsyncResult.orElseMatchSome recovers handled errors", async () => {
       Promise.resolve(Result.err(new ValidationError({ field: "email" }))),
     );
 
-  const recovered: Result<number | string, NetworkError> = await result
-    .orElseMatchSome({
+  const recovered: Result<number | string, NetworkError> =
+    await result.orElseMatchSome({
       ValidationError: (error) => Result.ok(`invalid:${error.field}`),
     });
 
@@ -242,42 +238,48 @@ Deno.test("AsyncResult.orElseMatchSome can remap handled errors", async () => {
       Promise.resolve(Result.err(new ValidationError({ field: "email" }))),
     );
 
-  const recovered: Result<number | string, NetworkError | string> = await result
-    .orElseMatchSome({
+  const recovered: Result<number | string, NetworkError | string> =
+    await result.orElseMatchSome({
       ValidationError: async (error) => Result.err(`invalid:${error.field}`),
     });
 
   assertEquals(recovered, Result.err("invalid:email"));
 });
 
-Deno.test("AsyncResult.orElseMatchSome leaves unhandled errors unchanged", async () => {
-  const result: AsyncResult<number, ValidationError | NetworkError> =
-    new AsyncResult(
-      Promise.resolve(Result.err(new NetworkError({ status: 503 }))),
-    );
+Deno.test(
+  "AsyncResult.orElseMatchSome leaves unhandled errors unchanged",
+  async () => {
+    const result: AsyncResult<number, ValidationError | NetworkError> =
+      new AsyncResult(
+        Promise.resolve(Result.err(new NetworkError({ status: 503 }))),
+      );
 
-  const remaining = await result.orElseMatchSome({
-    ValidationError: (error) => Result.ok(`invalid:${error.field}`),
-  });
+    const remaining = await result.orElseMatchSome({
+      ValidationError: (error) => Result.ok(`invalid:${error.field}`),
+    });
 
-  assertEquals(remaining.isErr(), true);
+    assertEquals(remaining.isErr(), true);
 
-  if (remaining.isErr()) {
-    assertInstanceOf(remaining.error, NetworkError);
-    assertEquals(remaining.error.status, 503);
-  }
-});
+    if (remaining.isErr()) {
+      assertInstanceOf(remaining.error, NetworkError);
+      assertEquals(remaining.error.status, 503);
+    }
+  },
+);
 
-Deno.test("AsyncResult.orElseMatchSome leaves ok results unchanged", async () => {
-  const result: AsyncResult<number, ValidationError | NetworkError> =
-    new AsyncResult(Promise.resolve(Result.ok(123)));
+Deno.test(
+  "AsyncResult.orElseMatchSome leaves ok results unchanged",
+  async () => {
+    const result: AsyncResult<number, ValidationError | NetworkError> =
+      new AsyncResult(Promise.resolve(Result.ok(123)));
 
-  const remaining = await result.orElseMatchSome({
-    ValidationError: (error) => Result.ok(error.field),
-  });
+    const remaining = await result.orElseMatchSome({
+      ValidationError: (error) => Result.ok(error.field),
+    });
 
-  assertEquals(remaining, Result.ok(123));
-});
+    assertEquals(remaining, Result.ok(123));
+  },
+);
 
 Deno.test("AsyncResult.inspect", async () => {
   let value = 0;
@@ -318,9 +320,8 @@ Deno.test("AsyncResult.wrap", async () => {
   );
 
   assertEquals(
-    await AsyncResult.wrap(
-      Promise.reject(new Error("boom")),
-      (error) => error instanceof Error ? error.message : String(error),
+    await AsyncResult.wrap(Promise.reject(new Error("boom")), (error) =>
+      error instanceof Error ? error.message : String(error),
     ),
     Result.err("boom"),
   );
@@ -349,7 +350,6 @@ Deno.test("AsyncResult.run", async () => {
 
   await assertRejects(
     () =>
-      // deno-lint-ignore require-yield
       Result.run(async function* () {
         throw new Error("boom");
       }).expect("unreachable"),
