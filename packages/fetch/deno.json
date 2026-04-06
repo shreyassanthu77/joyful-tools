@@ -7,11 +7,6 @@
   "exports": {
     ".": "./src/main.ts"
   },
-  "lint": {
-    "rules": {
-      "exclude": ["no-slow-types"]
-    }
-  },
   "publish": {
     "include": ["LICENSE", "README.md", "src/main.ts", "src/errors.ts"]
   }

@@ -36,4 +36,4 @@ jobs:
 
       - name: Publish package
         working-directory: packages/
-        run: npx jsr publish
+        run: npx jsr publish --allow-slow-types
