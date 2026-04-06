@@ -387,9 +387,7 @@ export class JoyfulResponse
  * }
  * ```
  */
-export class NetworkError extends Result.taggedError("NetworkError")<
-  Record<never, never>
-> {}
+export class NetworkError extends Result.taggedError("NetworkError") {}
 
 /**
  * Thrown when the request is aborted via `AbortSignal` or times out via
@@ -421,9 +419,7 @@ export class NetworkError extends Result.taggedError("NetworkError")<
  * // result.error._tag === "AbortError"
  * ```
  */
-export class AbortError extends Result.taggedError("AbortError")<
-  Record<never, never>
-> {}
+export class AbortError extends Result.taggedError("AbortError") {}
 
 /**
  * Thrown when the response has a non-2xx status code.
@@ -478,6 +474,4 @@ export class HttpError extends Result.taggedError("HttpError")<{
  * }
  * ```
  */
-export class ParseError extends Result.taggedError("ParseError")<
-  Record<never, never>
-> {}
+export class ParseError extends Result.taggedError("ParseError") {}
