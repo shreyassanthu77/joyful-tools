@@ -1,6 +1,7 @@
 import type { Err, Ok } from "./result.ts";
 
-type NoFields = Record<PropertyKey, never>;
+// deno-lint-ignore no-empty-interface
+interface NoFields {}
 
 type TaggedErrorArgs<Fields extends object> = keyof Fields extends never
   ? [init?: TaggedErrorInit<Fields>]
