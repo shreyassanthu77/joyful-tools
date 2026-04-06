@@ -1,0 +1,9 @@
+{
+  "name": "@joyful/tools",
+  "private": true,
+  "devDependencies": {
+    "@ark/attest": "^0.56.0",
+    "typescript": "^6.0.2",
+    "vitest": "^4.1.2"
+  }
+}
