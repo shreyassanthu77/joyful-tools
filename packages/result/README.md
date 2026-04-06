@@ -30,6 +30,8 @@ npx jsr add @joyful/result
 - Avoid exception-heavy control flow for expected failures.
 - Transform success and error values with `map()` and `mapErr()`.
 - Chain dependent operations with `andThen()` and recover with `orElse()`.
+- Recover tagged errors with `orElseMatch()` and `orElseMatchSome()`.
+- Model domain failures with `Result.taggedError()`.
 - Wrap throwing or rejecting code with `Result.wrap()`.
 - Compose complex flows with `Result.run()` and `yield*`.
 - Use the same model for async code with `AsyncResult`.
@@ -78,6 +80,34 @@ import { Err, Ok } from "@joyful/result";
 const ok = new Ok(123);
 const err = new Err("boom");
 ```
+
+## Tagged Errors
+
+Use `Result.taggedError()` when you want rich `Error` objects with a stable
+`_tag` that can be matched later.
+
+```typescript
+import { Result } from "@joyful/result";
+
+class ValidationError extends Result.taggedError("ValidationError")<{
+  field: string;
+}> {}
+
+class NetworkError extends Result.taggedError("NetworkError")<{
+  status: number;
+}> {}
+
+const error = new ValidationError({
+  field: "email",
+  message: "Email is required",
+});
+
+console.log(error._tag);
+// "ValidationError"
+```
+
+Tagged errors are normal `Error` instances, so they still work well with logs,
+stack traces, and `cause`.
 
 ## Working With Success And Error Paths
 
@@ -151,6 +181,69 @@ const value = Result.err("missing value").orElse((error) =>
 );
 // Ok("default")
 ```
+
+### Recovering tagged errors with `orElseMatch()`
+
+Use `orElseMatch()` when your error type is a tagged error union and you want
+an exhaustive recovery map.
+
+```typescript
+import { Result } from "@joyful/result";
+
+class ValidationError extends Result.taggedError("ValidationError")<{
+  field: string;
+}> {}
+
+class NetworkError extends Result.taggedError("NetworkError")<{
+  status: number;
+}> {}
+
+const result: Result<string, ValidationError | NetworkError> = Result.err(
+  new ValidationError({ field: "email" }),
+);
+
+const recovered = result.orElseMatch({
+  ValidationError: (error) => Result.ok(`guest:${error.field}`),
+  NetworkError: (error) => Result.err(`retry:${error.status}`),
+});
+// Ok("guest:email") | Err("retry:...")
+```
+
+Each handler must return a `Result`, so `orElseMatch()` fits naturally when you
+want to recover, remap, or continue composing in the result model.
+
+### Recovering some tagged errors with `orElseMatchSome()`
+
+Use `orElseMatchSome()` when you only want to handle part of a tagged error
+union and leave the rest untouched.
+
+```typescript
+import { Result } from "@joyful/result";
+
+class ValidationError extends Result.taggedError("ValidationError")<{
+  field: string;
+}> {}
+
+class NetworkError extends Result.taggedError("NetworkError")<{
+  status: number;
+}> {}
+
+const result: Result<string, ValidationError | NetworkError> = Result.err(
+  new NetworkError({ status: 503 }),
+);
+
+const recovered = result.orElseMatchSome({
+  ValidationError: (error) => Result.ok(`fixed:${error.field}`),
+});
+
+if (recovered.isErr()) {
+  console.log(recovered.error._tag);
+  // "NetworkError"
+}
+```
+
+This is useful when some errors can be recovered locally and others should keep
+flowing upward.
 
 ### Wrapping throwing code with `Result.wrap()`
 
@@ -316,6 +409,30 @@ const value = await Result.ok(2)
 // 30
 ```
 
+`orElseMatch()` and `orElseMatchSome()` are available on `AsyncResult` too.
+Handlers may return a `Result`, an `AsyncResult`, or a `Promise<Result>`.
+
+```typescript
+import { Result } from "@joyful/result";
+
+class ValidationError extends Result.taggedError("ValidationError")<{
+  field: string;
+}> {}
+
+class NetworkError extends Result.taggedError("NetworkError")<{
+  status: number;
+}> {}
+
+const result = Result.err<string, ValidationError | NetworkError>(
+  new ValidationError({ field: "email" }),
+).async();
+
+const recovered = await result.orElseMatchSome({
+  ValidationError: async (error) => Result.ok(error.field.length),
+  NetworkError: (error) => Result.err(`retry:${error.status}`),
+});
+```
+
 ### Async generators with `Result.run`
 
 `Result.run()` also accepts an async generator, which makes it useful when you
@@ -342,15 +459,26 @@ const result = await Result.run(async function* () {
 - `Result<T, E>`: union type of `Ok<T, E>` and `Err<T, E>`.
 - `Result.ok(value)`: create a successful result.
 - `Result.err(error)`: create a failed result.
+- `Result.taggedError(tag)`: create tagged `Error` subclasses for domain errors.
 - `Result.wrap(options)`: convert throwing or rejecting code into a result.
 - `Ok` and `Err`: concrete classes with `.value` and `.error` fields.
 - `map()` and `mapErr()`: transform success and error values.
 - `andThen()` and `orElse()`: compose additional result-returning operations.
+- `orElseMatch()` and `orElseMatchSome()`: recover tagged errors with handler maps.
 - `unwrapOr()`, `expect()`, `expectErr()`: extract values.
 - `inspect()` and `inspectErr()`: observe values without changing them.
 - `Result.run()`: compose results with generator or async generator control flow.
 - `async()`: convert a `Result` to `AsyncResult`.
 - `AsyncResult`: async wrapper with the same composition primitives.
+
+## Which Method Should I Use?
+
+- `map()`: transform a successful value without changing the error type.
+- `mapErr()`: transform an error value without changing the success type.
+- `andThen()`: continue with another operation that already returns a `Result`.
+- `orElse()`: recover from any error value with one fallback function.
+- `orElseMatch()`: exhaustively recover tagged errors with one handler per `_tag`.
+- `orElseMatchSome()`: recover only selected tagged errors and leave the rest unchanged.
 
 ## License
 

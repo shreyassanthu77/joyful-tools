@@ -61,21 +61,21 @@ export class Ok<T, E = never> implements BaseResult<T, E> {
     this.value = value;
   }
 
-  /** Returns `true` because this result is successful. */
+  /** Returns `true` if the result is {@link Ok}, otherwise `false`. */
   isOk(): this is Ok<T, E> {
     return true;
   }
 
-  /** Returns `false` because this result is not an error. */
+  /** Returns `true` if the result is {@link Err}, otherwise `false`. */
   isErr(): this is Err<T, E> {
     return false;
   }
 
   /**
-   * Returns the contained value and ignores the fallback.
+   * Returns the success value when the result is {@link Ok}, otherwise returns `defaultValue`.
    *
    * @param defaultValue Fallback value for the error case.
-   * @returns The contained value.
+   * @returns The success value or `defaultValue`.
    */
   unwrapOr(defaultValue: T): T {
     void defaultValue;
@@ -83,10 +83,11 @@ export class Ok<T, E = never> implements BaseResult<T, E> {
   }
 
   /**
-   * Returns the contained value.
+   * Returns the success value when the result is {@link Ok}, otherwise throws an `Error`.
    *
-   * @param message Error message that would be used for an error result.
-   * @returns The contained value.
+   * @param message Error message used when the result is {@link Err}.
+   * @returns The success value.
+   * @throws {Error}
    */
   expect(message: string): T {
     void message;
@@ -94,9 +95,10 @@ export class Ok<T, E = never> implements BaseResult<T, E> {
   }
 
   /**
-   * Throws an `Error` with the provided message.
+   * Returns the error value when the result is {@link Err}, otherwise throws an `Error`.
    *
-   * @param message Error message to throw.
+   * @param message Error message used when the result is {@link Ok}.
+   * @returns The error value.
    * @throws {Error}
    */
   expectErr(message: string): E {
@@ -104,10 +106,12 @@ export class Ok<T, E = never> implements BaseResult<T, E> {
   }
 
   /**
-   * Transforms the contained value.
+   * Maps the success value with `f` when the result is {@link Ok}.
+   *
+   * If the result is {@link Err}, it is returned unchanged.
    *
    * @param f Function that maps the success value to a new value.
-   * @returns A new successful result with the mapped value.
+   * @returns A result containing the mapped success value or the original error.
    *
    * @example
    * ```typescript
@@ -120,10 +124,12 @@ export class Ok<T, E = never> implements BaseResult<T, E> {
   }
 
   /**
-   * Returns this result unchanged because there is no error to map.
+   * Maps the error value with `f` when the result is {@link Err}.
    *
-   * @param f Function that would map an error value.
-   * @returns This result with the same success value.
+   * If the result is {@link Ok}, it is returned unchanged.
+   *
+   * @param f Function that maps the error value to a new error.
+   * @returns A result containing the original success value or the mapped error.
    */
   mapErr<F>(f: (err: E) => F): Result<T, F> {
     void f;
@@ -132,10 +138,12 @@ export class Ok<T, E = never> implements BaseResult<T, E> {
   }
 
   /**
-   * Chains another result-returning operation.
+   * Chains another result-returning operation onto the success path.
+   *
+   * If the result is {@link Err}, it is returned unchanged.
    *
    * @param f Function that receives the success value and returns the next result.
-   * @returns The result returned by `f`.
+   * @returns The result returned by `f`, or the original error.
    *
    * @example
    * ```typescript
@@ -152,10 +160,12 @@ export class Ok<T, E = never> implements BaseResult<T, E> {
   }
 
   /**
-   * Returns this result unchanged because it is already successful.
+   * Chains another result-returning operation onto the error path.
+   *
+   * If the result is {@link Ok}, it is returned unchanged.
    *
    * @param f Function that would recover from an error.
-   * @returns This result with the same success value.
+   * @returns The result returned by `f`, or the original success value.
    */
   orElse<U, F>(f: (err: E) => Result<U, F>): Result<T | U, F> {
     void f;
@@ -164,10 +174,12 @@ export class Ok<T, E = never> implements BaseResult<T, E> {
   }
 
   /**
-   * Returns this result unchanged because there is no error to recover from.
+   * Recovers from a tagged error with an exhaustive set of result-returning handlers.
+   *
+   * If the result is {@link Ok}, it is returned unchanged.
    *
    * @param handlers Handler map that would be used for an error result.
-   * @returns This successful result.
+   * @returns The matched recovery result or the original success value.
    *
    * @example
    * ```typescript
@@ -190,10 +202,12 @@ export class Ok<T, E = never> implements BaseResult<T, E> {
   }
 
   /**
-   * Returns this result unchanged because there is no matching error to recover from.
+   * Recovers from matching tagged errors and leaves unhandled errors unchanged.
+   *
+   * If the result is {@link Ok}, it is returned unchanged.
    *
    * @param handlers Partial handler map for tagged errors.
-   * @returns This successful result.
+   * @returns The matched recovery result, the original success value, or the unhandled error.
    *
    * @example
    * ```typescript
@@ -223,7 +237,9 @@ export class Ok<T, E = never> implements BaseResult<T, E> {
   }
 
   /**
-   * Runs a side effect with the contained value and returns this result.
+   * Runs a side effect for the success value when the result is {@link Ok}.
+   *
+   * If the result is {@link Err}, `f` is not called.
    *
    * @param f Function to call with the success value.
    * @returns This result.
@@ -234,9 +250,11 @@ export class Ok<T, E = never> implements BaseResult<T, E> {
   }
 
   /**
-   * Returns this result unchanged without calling `f`.
+   * Runs a side effect for the error value when the result is {@link Err}.
    *
-   * @param f Function that would observe an error value.
+   * If the result is {@link Ok}, `f` is not called.
+   *
+   * @param f Function to call with the error value.
    * @returns This result.
    */
   inspectErr(f: (err: E) => void): this {
@@ -286,30 +304,31 @@ export class Err<T, E = never> implements BaseResult<T, E> {
     this.error = err;
   }
 
-  /** Returns `false` because this result is not successful. */
+  /** Returns `true` if the result is {@link Ok}, otherwise `false`. */
   isOk(): this is Ok<T, E> {
     return false;
   }
 
-  /** Returns `true` because this result is an error. */
+  /** Returns `true` if the result is {@link Err}, otherwise `false`. */
   isErr(): this is Err<T, E> {
     return true;
   }
 
   /**
-   * Returns the provided fallback value.
+   * Returns the success value when the result is {@link Ok}, otherwise returns `defaultValue`.
    *
    * @param defaultValue Value to return for the error case.
-   * @returns `defaultValue`.
+   * @returns The success value or `defaultValue`.
    */
   unwrapOr(defaultValue: T): T {
     return defaultValue;
   }
 
   /**
-   * Throws an `Error` with the provided message.
+   * Returns the success value when the result is {@link Ok}, otherwise throws an `Error`.
    *
-   * @param message Error message to throw.
+   * @param message Error message used when the result is {@link Err}.
+   * @returns The success value.
    * @throws {Error}
    */
   expect(message: string): T {
@@ -317,10 +336,11 @@ export class Err<T, E = never> implements BaseResult<T, E> {
   }
 
   /**
-   * Returns the contained error.
+   * Returns the error value when the result is {@link Err}, otherwise throws an `Error`.
    *
-   * @param message Error message that would be used for a successful result.
-   * @returns The contained error.
+   * @param message Error message used when the result is {@link Ok}.
+   * @returns The error value.
+   * @throws {Error}
    */
   expectErr(message: string): E {
     void message;
@@ -328,10 +348,12 @@ export class Err<T, E = never> implements BaseResult<T, E> {
   }
 
   /**
-   * Returns this result unchanged because there is no success value to map.
+   * Maps the success value with `f` when the result is {@link Ok}.
    *
-   * @param f Function that would map a success value.
-   * @returns This result with the same error value.
+   * If the result is {@link Err}, it is returned unchanged.
+   *
+   * @param f Function that maps the success value to a new value.
+   * @returns A result containing the mapped success value or the original error.
    */
   map<U>(f: (value: T) => U): Result<U, E> {
     void f;
@@ -340,10 +362,12 @@ export class Err<T, E = never> implements BaseResult<T, E> {
   }
 
   /**
-   * Transforms the contained error.
+   * Maps the error value with `f` when the result is {@link Err}.
+   *
+   * If the result is {@link Ok}, it is returned unchanged.
    *
    * @param f Function that maps the error value to a new error.
-   * @returns A new failed result with the mapped error.
+   * @returns A result containing the original success value or the mapped error.
    *
    * @example
    * ```typescript
@@ -356,10 +380,12 @@ export class Err<T, E = never> implements BaseResult<T, E> {
   }
 
   /**
-   * Returns this result unchanged because the success path is skipped.
+   * Chains another result-returning operation onto the success path.
    *
-   * @param f Function that would produce the next result from a success value.
-   * @returns This result with the same error value.
+   * If the result is {@link Err}, it is returned unchanged.
+   *
+   * @param f Function that receives the success value and returns the next result.
+   * @returns The result returned by `f`, or the original error.
    */
   andThen<U, F>(f: (value: T) => Result<U, F>): Result<U, E | F> {
     void f;
@@ -368,10 +394,12 @@ export class Err<T, E = never> implements BaseResult<T, E> {
   }
 
   /**
-   * Recovers from the error by returning another result.
+   * Chains another result-returning operation onto the error path.
+   *
+   * If the result is {@link Ok}, it is returned unchanged.
    *
    * @param f Function that receives the error value and returns a recovery result.
-   * @returns The result returned by `f`.
+   * @returns The result returned by `f`, or the original success value.
    *
    * @example
    * ```typescript
@@ -387,8 +415,10 @@ export class Err<T, E = never> implements BaseResult<T, E> {
   /**
    * Recovers from a tagged error with an exhaustive set of result-returning handlers.
    *
+   * If the result is {@link Ok}, it is returned unchanged.
+   *
    * @param handlers Mapping from `_tag` values to handler functions.
-   * @returns The result returned by the matching handler.
+   * @returns The matched recovery result or the original success value.
    *
    * @example
    * ```typescript
@@ -430,8 +460,10 @@ export class Err<T, E = never> implements BaseResult<T, E> {
   /**
    * Recovers from matching tagged errors and leaves unhandled ones unchanged.
    *
+   * If the result is {@link Ok}, it is returned unchanged.
+   *
    * @param handlers Partial mapping from `_tag` values to result-returning handlers.
-   * @returns The matching handler result or the remaining `Err`.
+   * @returns The matched recovery result, the original success value, or the unhandled error.
    *
    * @example
    * ```typescript
@@ -486,9 +518,11 @@ export class Err<T, E = never> implements BaseResult<T, E> {
   }
 
   /**
-   * Returns this result unchanged without calling `f`.
+   * Runs a side effect for the success value when the result is {@link Ok}.
    *
-   * @param f Function that would observe a success value.
+   * If the result is {@link Err}, `f` is not called.
+   *
+   * @param f Function to call with the success value.
    * @returns This result.
    */
   inspect(f: (value: T) => void): this {
@@ -497,7 +531,9 @@ export class Err<T, E = never> implements BaseResult<T, E> {
   }
 
   /**
-   * Runs a side effect with the contained error and returns this result.
+   * Runs a side effect for the error value when the result is {@link Err}.
+   *
+   * If the result is {@link Ok}, `f` is not called.
    *
    * @param f Function to call with the error value.
    * @returns This result.
