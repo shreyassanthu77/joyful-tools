@@ -7,5 +7,5 @@
   "tasks": {
     "test": "deno test -A"
   },
-  "workspace": ["packages/pipe", "packages/result", "packages/turboq"]
+  "workspace": ["packages/fetch", "packages/pipe", "packages/result", "packages/turboq"]
 }
