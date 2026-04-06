@@ -7,14 +7,14 @@
  * exceptions.
  *
  * Use the {@link Result.ok} and {@link Result.err} helpers to construct values,
- * then compose them with methods like `map`, `andThen`, `orElse`, and
- * `unwrapOr`. Use {@link Result.wrap} when you want to convert throwing code or
- * rejecting promises into result values. Use {@link Result.taggedError} when
- * you want structured `Error` values with a stable `_tag` for narrowing and
- * logging. When the computation is asynchronous, use {@link AsyncResult} or
- * call `result.async()` to keep the same style of composition. For
- * generator-based composition, use {@link Result.run} with `yield*` on
- * `Result` and `AsyncResult` values.
+ * then compose them with methods like `map`, `andThen`, `orElse`,
+ * `orElseMatch`, `orElseMatchSome`, and `unwrapOr`. Use {@link Result.wrap}
+ * when you want to convert throwing code or rejecting promises into result
+ * values. Use {@link Result.taggedError} when you want structured `Error`
+ * values with a stable `_tag` for narrowing and logging. When the computation
+ * is asynchronous, use {@link AsyncResult} or call `result.async()` to keep
+ * the same style of composition. For generator-based composition, use
+ * {@link Result.run} with `yield*` on `Result` and `AsyncResult` values.
  *
  * @example
  * ```typescript
@@ -42,7 +42,6 @@
 
 export * from "./result.ts";
 export * from "./async-result.ts";
-export * from "./errors.ts";
 
 import { AsyncResult } from "./async-result.ts";
 import * as errors from "./errors.ts";
@@ -52,7 +51,8 @@ import { Err, Ok } from "./result.ts";
  *
  * `Result` makes failure explicit in the type system. Callers can branch with
  * `isOk()` and `isErr()`, transform values with `map()` and `mapErr()`, and
- * chain operations with `andThen()` and `orElse()`.
+ * chain operations with `andThen()`, `orElse()`, `orElseMatch()`, and
+ * `orElseMatchSome()`.
  *
  * @example
  * ```typescript
@@ -121,63 +121,6 @@ export namespace Result {
    * ```
   */
   export const taggedError = errors.taggedError;
-
-  /**
-   * Matches a tagged error result with handlers for every `_tag` variant.
-   *
-   * Use this when you have an {@link Err} whose error type is a tagged union and
-   * you want exhaustive handling with per-variant narrowing.
-   *
-   * @example
-   * ```typescript
-   * class ValidationError extends Result.taggedError("ValidationError")<{
-   *   field: string;
-   * }> {}
-   * class NetworkError extends Result.taggedError("NetworkError")<{
-   *   status: number;
-   * }> {}
-   *
-   * const result = Result.err<ValidationError | NetworkError>(
-   *   new NetworkError({ status: 503 }),
-   * );
-   *
-   * const message = Result.matchError(result, {
-   *   ValidationError: (error) => `invalid:${error.field}`,
-   *   NetworkError: (error) => `retry:${error.status}`,
-   * });
-   * ```
-   */
-  export const matchError = errors.matchError;
-
-  /**
-   * Matches a tagged error result with a partial handler map and fallback.
-   *
-   * Use this when only some `_tag` variants need custom handling and the rest
-   * should share a default path.
-   *
-   * @example
-   * ```typescript
-   * class ValidationError extends Result.taggedError("ValidationError")<{
-   *   field: string;
-   * }> {}
-   * class NetworkError extends Result.taggedError("NetworkError")<{
-   *   status: number;
-   * }> {}
-   *
-   * const result = Result.err<ValidationError | NetworkError>(
-   *   new NetworkError({ status: 503 }),
-   * );
-   *
-   * const message = Result.matchErrorPartial(
-   *   result,
-   *   {
-   *     ValidationError: (error) => `invalid:${error.field}`,
-   *   },
-   *   () => "default",
-   * );
-   * ```
-   */
-  export const matchErrorPartial = errors.matchErrorPartial;
 
   /**
    * Options for {@link Result.wrap}.

@@ -1,3 +1,11 @@
+import type {
+  MatchAsyncResultError,
+  MatchAsyncResultHandlers,
+  MatchAsyncResultValue,
+  MatchSomeAsyncResultHandlers,
+  MatchableError,
+  RemainingMatchErrors,
+} from "./errors.ts";
 import type { Result } from "./main.ts";
 import { Err, Ok } from "./result.ts";
 
@@ -6,8 +14,9 @@ import { Err, Ok } from "./result.ts";
  *
  * `AsyncResult` lets you keep using result-style composition when the
  * underlying computation is asynchronous. You can `await` it directly to get
- * the wrapped {@link Result}, or call methods like `map`, `andThen`, and
- * `unwrapOr` without leaving the result model.
+ * the wrapped {@link Result}, or call methods like `map`, `andThen`, `orElse`,
+ * `orElseMatch`, `orElseMatchSome`, and `unwrapOr` without leaving the result
+ * model.
  *
  * @example
  * ```typescript
@@ -214,6 +223,174 @@ export class AsyncResult<T, E = unknown> implements PromiseLike<Result<T, E>> {
         if ("then" in mapped) {
           return await mapped;
         }
+        return mapped;
+      }),
+    );
+  }
+
+  /**
+   * Recovers from a tagged error with an exhaustive set of result-returning handlers.
+   *
+   * Handlers may return a synchronous {@link Result}, an {@link AsyncResult},
+   * or a promise of a `Result`.
+   *
+   * @param handlers Mapping from `_tag` values to handler functions.
+   * @returns A new async result for the recovery computation.
+   *
+   * @example
+   * ```typescript
+   * class ValidationError extends Result.taggedError("ValidationError")<{
+   *   field: string;
+   * }> {}
+   * class NetworkError extends Result.taggedError("NetworkError")<{
+   *   status: number;
+   * }> {}
+   *
+   * const result = new AsyncResult(
+   *   Promise.resolve(
+   *     Result.err<number, ValidationError | NetworkError>(
+   *       new ValidationError({ field: "email" }),
+   *     ),
+   *   ),
+   * );
+   *
+   * const recovered = result.orElseMatch({
+   *   ValidationError: (error) => Result.ok(error.field.length),
+   *   NetworkError: (error) => Result.err(`retry:${error.status}`),
+   * });
+   * ```
+   */
+  orElseMatch<
+    const Handlers extends E extends MatchableError
+      ? MatchAsyncResultHandlers<E>
+      : never,
+  >(
+    handlers: Handlers,
+  ): AsyncResult<
+    T | MatchAsyncResultValue<Handlers>,
+    MatchAsyncResultError<Handlers>
+  > {
+    return new AsyncResult(
+      this.promise.then(async (result) => {
+        if (result instanceof Ok) {
+          return result as Ok<
+            T | MatchAsyncResultValue<Handlers>,
+            MatchAsyncResultError<Handlers>
+          >;
+        }
+
+        const error = (result as Err<T, E>).error as E & MatchableError;
+        const handler = handlers[error._tag as keyof Handlers] as unknown as (
+          error: E,
+        ) =>
+          | Result<MatchAsyncResultValue<Handlers>, MatchAsyncResultError<Handlers>>
+          | AsyncResult<
+            MatchAsyncResultValue<Handlers>,
+            MatchAsyncResultError<Handlers>
+          >
+          | Promise<
+            Result<
+              MatchAsyncResultValue<Handlers>,
+              MatchAsyncResultError<Handlers>
+            >
+          >;
+        const mapped = handler(error);
+
+        if ("then" in mapped) {
+          return await mapped;
+        }
+
+        return mapped;
+      }),
+    );
+  }
+
+  /**
+   * Recovers from matching tagged errors and leaves unhandled ones unchanged.
+   *
+   * Handlers may return a synchronous {@link Result}, an {@link AsyncResult},
+   * or a promise of a `Result`.
+   *
+   * @param handlers Partial mapping from `_tag` values to result-returning handlers.
+   * @returns A new async result for the recovery computation.
+   *
+   * @example
+   * ```typescript
+   * class ValidationError extends Result.taggedError("ValidationError")<{
+   *   field: string;
+   * }> {}
+   * class NetworkError extends Result.taggedError("NetworkError")<{
+   *   status: number;
+   * }> {}
+   *
+   * const result = new AsyncResult(
+   *   Promise.resolve(
+   *     Result.err<number, ValidationError | NetworkError>(
+   *       new NetworkError({ status: 503 }),
+   *     ),
+   *   ),
+   * );
+   *
+   * const recovered = result.orElseMatchSome({
+   *   ValidationError: (error) => Result.ok(error.field.length),
+   * });
+   * // AsyncResult<number, NetworkError>
+   * ```
+   */
+  orElseMatchSome<
+    const Handlers extends E extends MatchableError
+      ? MatchSomeAsyncResultHandlers<E>
+      : never,
+  >(
+    handlers: Handlers,
+  ): AsyncResult<
+    T | MatchAsyncResultValue<Handlers>,
+    | (E extends MatchableError ? RemainingMatchErrors<E, Handlers> : E)
+    | MatchAsyncResultError<Handlers>
+  > {
+    return new AsyncResult(
+      this.promise.then(async (result) => {
+        if (result instanceof Ok) {
+          return result as Ok<
+            T | MatchAsyncResultValue<Handlers>,
+            | (E extends MatchableError ? RemainingMatchErrors<E, Handlers> : E)
+            | MatchAsyncResultError<Handlers>
+          >;
+        }
+
+        const error = (result as Err<T, E>).error as E & MatchableError;
+        const handler = handlers[error._tag as keyof Handlers] as
+          | ((error: E) =>
+            | Result<
+              MatchAsyncResultValue<Handlers>,
+              MatchAsyncResultError<Handlers>
+            >
+            | AsyncResult<
+              MatchAsyncResultValue<Handlers>,
+              MatchAsyncResultError<Handlers>
+            >
+            | Promise<
+              Result<
+                MatchAsyncResultValue<Handlers>,
+                MatchAsyncResultError<Handlers>
+              >
+            >)
+          | undefined;
+
+        if (!handler) {
+          return result as Err<
+            T | MatchAsyncResultValue<Handlers>,
+            | (E extends MatchableError ? RemainingMatchErrors<E, Handlers> : E)
+            | MatchAsyncResultError<Handlers>
+          >;
+        }
+
+        const mapped = handler(error);
+
+        if ("then" in mapped) {
+          return await mapped;
+        }
+
         return mapped;
       }),
     );

@@ -1,4 +1,4 @@
-import type { Err } from "./result.ts";
+import type { Err, Ok } from "./result.ts";
 
 type NoFields = Record<PropertyKey, never>;
 
@@ -97,6 +97,10 @@ export function taggedError<Tag extends string = string>(
 export type MatchableError = Error & { readonly _tag: string };
 // deno-lint-ignore no-explicit-any
 type AnyFn = (...args: any[]) => unknown;
+type SyncResult<T, E> = Ok<T, E> | Err<T, E>;
+type ResolvedMatchResult<T> = T extends PromiseLike<infer U>
+  ? ResolvedMatchResult<U>
+  : T;
 
 export type MatchReturn<Handlers> = ReturnType<
   Extract<Handlers[keyof Handlers], AnyFn>
@@ -105,6 +109,55 @@ export type MatchReturn<Handlers> = ReturnType<
 export type MatchHandlers<E extends MatchableError> = {
   [K in E["_tag"]]: (error: Extract<E, { _tag: K }>) => unknown;
 };
+
+export type MatchValueHandlers<E extends MatchableError, R> = {
+  [K in E["_tag"]]: (error: Extract<E, { _tag: K }>) => R;
+};
+
+export type MatchResultHandlers<E extends MatchableError> = {
+  [K in E["_tag"]]: (error: Extract<E, { _tag: K }>) => SyncResult<any, any>;
+};
+
+export type MatchSomeResultHandlers<E extends MatchableError> = Partial<
+  MatchResultHandlers<E>
+>;
+
+export type MatchResultValue<Handlers> = MatchReturn<Handlers> extends SyncResult<
+  infer T,
+  unknown
+> ? T
+  : never;
+
+export type MatchResultError<Handlers> = MatchReturn<Handlers> extends SyncResult<
+  unknown,
+  infer E
+> ? E
+  : never;
+
+export type MatchAsyncResultHandlers<E extends MatchableError> = {
+  [K in E["_tag"]]: (error: Extract<E, { _tag: K }>) =>
+    | SyncResult<any, any>
+    | PromiseLike<SyncResult<any, any>>;
+};
+
+export type MatchSomeAsyncResultHandlers<E extends MatchableError> = Partial<
+  MatchAsyncResultHandlers<E>
+>;
+
+export type MatchAsyncResultValue<Handlers> = ResolvedMatchResult<
+  MatchReturn<Handlers>
+> extends SyncResult<infer T, unknown> ? T
+  : never;
+
+export type MatchAsyncResultError<Handlers> = ResolvedMatchResult<
+  MatchReturn<Handlers>
+> extends SyncResult<unknown, infer E> ? E
+  : never;
+
+export type RemainingMatchErrors<
+  E extends MatchableError,
+  Handlers extends Partial<Record<string, unknown>>,
+> = Exclude<E, { _tag: Extract<keyof Handlers, string> }>;
 
 /**
  * Matches a tagged error result against a complete set of handlers.

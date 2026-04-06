@@ -1,6 +1,14 @@
-import { assertEquals, assertRejects } from "std/assert";
+import { assertEquals, assertInstanceOf, assertRejects } from "std/assert";
 import { AsyncResult } from "./async-result.ts";
 import { Result } from "./main.ts";
+
+class ValidationError extends Result.taggedError("ValidationError")<{
+  field: string;
+}> {}
+
+class NetworkError extends Result.taggedError("NetworkError")<{
+  status: number;
+}> {}
 
 Deno.test("AsyncResult Core", async () => {
   assertEquals(
@@ -169,6 +177,106 @@ Deno.test("AsyncResult.orElse", async () => {
     ),
     Result.ok(3),
   );
+});
+
+Deno.test("AsyncResult.orElseMatch recovers handled errors", async () => {
+  const result: AsyncResult<number, ValidationError | NetworkError> =
+    new AsyncResult(
+      Promise.resolve(Result.err(new ValidationError({ field: "email" }))),
+    );
+
+  const recovered: Result<number | string, boolean> = await result.orElseMatch({
+    ValidationError: (error) => Result.ok(`invalid:${error.field}`),
+    NetworkError: (error) => Result.err(error.status === 503),
+  });
+
+  assertEquals(recovered, Result.ok("invalid:email"));
+});
+
+Deno.test("AsyncResult.orElseMatch supports async handlers", async () => {
+  const result: AsyncResult<number, ValidationError | NetworkError> =
+    new AsyncResult(
+      Promise.resolve(Result.err(new ValidationError({ field: "email" }))),
+    );
+
+  const recovered: Result<number | string, string> = await result.orElseMatch({
+    ValidationError: (error) =>
+      new AsyncResult(
+        Promise.resolve(Result.err(`invalid:${error.field}`)),
+      ),
+    NetworkError: async (error) => Result.err(`retry:${error.status}`),
+  });
+
+  assertEquals(recovered, Result.err("invalid:email"));
+});
+
+Deno.test("AsyncResult.orElseMatch leaves ok results unchanged", async () => {
+  const result: AsyncResult<number, ValidationError | NetworkError> =
+    new AsyncResult(Promise.resolve(Result.ok(123)));
+
+  const recovered = await result.orElseMatch({
+    ValidationError: (error) => Result.ok(`invalid:${error.field}`),
+    NetworkError: (error) => Result.err(`retry:${error.status}`),
+  });
+
+  assertEquals(recovered, Result.ok(123));
+});
+
+Deno.test("AsyncResult.orElseMatchSome recovers handled errors", async () => {
+  const result: AsyncResult<number, ValidationError | NetworkError> =
+    new AsyncResult(
+      Promise.resolve(Result.err(new ValidationError({ field: "email" }))),
+    );
+
+  const recovered: Result<number | string, NetworkError> = await result
+    .orElseMatchSome({
+      ValidationError: (error) => Result.ok(`invalid:${error.field}`),
+    });
+
+  assertEquals(recovered, Result.ok("invalid:email"));
+});
+
+Deno.test("AsyncResult.orElseMatchSome can remap handled errors", async () => {
+  const result: AsyncResult<number, ValidationError | NetworkError> =
+    new AsyncResult(
+      Promise.resolve(Result.err(new ValidationError({ field: "email" }))),
+    );
+
+  const recovered: Result<number | string, NetworkError | string> = await result
+    .orElseMatchSome({
+      ValidationError: async (error) => Result.err(`invalid:${error.field}`),
+    });
+
+  assertEquals(recovered, Result.err("invalid:email"));
+});
+
+Deno.test("AsyncResult.orElseMatchSome leaves unhandled errors unchanged", async () => {
+  const result: AsyncResult<number, ValidationError | NetworkError> =
+    new AsyncResult(
+      Promise.resolve(Result.err(new NetworkError({ status: 503 }))),
+    );
+
+  const remaining = await result.orElseMatchSome({
+    ValidationError: (error) => Result.ok(`invalid:${error.field}`),
+  });
+
+  assertEquals(remaining.isErr(), true);
+
+  if (remaining.isErr()) {
+    assertInstanceOf(remaining.error, NetworkError);
+    assertEquals(remaining.error.status, 503);
+  }
+});
+
+Deno.test("AsyncResult.orElseMatchSome leaves ok results unchanged", async () => {
+  const result: AsyncResult<number, ValidationError | NetworkError> =
+    new AsyncResult(Promise.resolve(Result.ok(123)));
+
+  const remaining = await result.orElseMatchSome({
+    ValidationError: (error) => Result.ok(error.field),
+  });
+
+  assertEquals(remaining, Result.ok(123));
 });
 
 Deno.test("AsyncResult.inspect", async () => {

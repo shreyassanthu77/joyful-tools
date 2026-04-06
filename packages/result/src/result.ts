@@ -1,4 +1,12 @@
 import { AsyncResult } from "@joyful/result";
+import type {
+  MatchableError,
+  MatchResultError,
+  MatchResultHandlers,
+  MatchResultValue,
+  MatchSomeResultHandlers,
+  RemainingMatchErrors,
+} from "./errors.ts";
 import type { Result } from "./main.ts";
 
 interface BaseResult<T, E = unknown> {
@@ -11,6 +19,24 @@ interface BaseResult<T, E = unknown> {
   mapErr<F>(f: (err: E) => F): Result<T, F>;
   andThen<U, F>(f: (value: T) => Result<U, F>): Result<U, E | F>;
   orElse<U, F>(f: (err: E) => Result<U, F>): Result<T | U, F>;
+  orElseMatch<
+    const Handlers extends E extends MatchableError
+      ? MatchResultHandlers<E>
+      : never,
+  >(
+    handlers: Handlers,
+  ): Result<T | MatchResultValue<Handlers>, MatchResultError<Handlers>>;
+  orElseMatchSome<
+    const Handlers extends E extends MatchableError
+      ? MatchSomeResultHandlers<E>
+      : never,
+  >(
+    handlers: Handlers,
+  ): Result<
+    T | MatchResultValue<Handlers>,
+    | (E extends MatchableError ? RemainingMatchErrors<E, Handlers> : E)
+    | MatchResultError<Handlers>
+  >;
   inspect(f: (value: T) => void): this;
   inspectErr(f: (err: E) => void): this;
   async(): AsyncResult<T, E>;
@@ -135,6 +161,65 @@ export class Ok<T, E = never> implements BaseResult<T, E> {
     void f;
     // @ts-expect-error - we know the value is an error so we can safely cast to a result with a different Value type
     return this as Ok<T | U, F>;
+  }
+
+  /**
+   * Returns this result unchanged because there is no error to recover from.
+   *
+   * @param handlers Handler map that would be used for an error result.
+   * @returns This successful result.
+   *
+   * @example
+   * ```typescript
+   * const result = Result.ok(42).orElseMatch({
+   *   ValidationError: () => Result.ok(0),
+   *   NetworkError: () => Result.err("retry"),
+   * });
+   * // Ok(42)
+   * ```
+   */
+  orElseMatch<
+    const Handlers extends E extends MatchableError
+      ? MatchResultHandlers<E>
+      : never,
+  >(
+    handlers: Handlers,
+  ): Result<T | MatchResultValue<Handlers>, MatchResultError<Handlers>> {
+    void handlers;
+    return this as Result<T | MatchResultValue<Handlers>, MatchResultError<Handlers>>;
+  }
+
+  /**
+   * Returns this result unchanged because there is no matching error to recover from.
+   *
+   * @param handlers Partial handler map for tagged errors.
+   * @returns This successful result.
+   *
+   * @example
+   * ```typescript
+   * const result = Result.ok(42).orElseMatchSome({
+   *   ValidationError: () => Result.ok(0),
+   * });
+   * // Ok(42)
+   * ```
+   */
+  orElseMatchSome<
+    const Handlers extends E extends MatchableError
+      ? MatchSomeResultHandlers<E>
+      : never,
+  >(
+    handlers: Handlers,
+  ): Result<
+    T | MatchResultValue<Handlers>,
+    | (E extends MatchableError ? RemainingMatchErrors<E, Handlers> : E)
+    | MatchResultError<Handlers>
+  > {
+    void handlers;
+    return this as Result<
+      T | MatchResultValue<Handlers>,
+      | (E extends MatchableError ? RemainingMatchErrors<E, Handlers> : E)
+      | MatchResultError<Handlers>
+    >;
   }
 
   /**
@@ -297,6 +382,107 @@ export class Err<T, E = never> implements BaseResult<T, E> {
    */
   orElse<U, F>(f: (err: E) => Result<U, F>): Result<T | U, F> {
     return f(this.error);
+  }
+
+  /**
+   * Recovers from a tagged error with an exhaustive set of result-returning handlers.
+   *
+   * @param handlers Mapping from `_tag` values to handler functions.
+   * @returns The result returned by the matching handler.
+   *
+   * @example
+   * ```typescript
+   * class ValidationError extends Result.taggedError("ValidationError")<{
+   *   field: string;
+   * }> {}
+   * class NetworkError extends Result.taggedError("NetworkError")<{
+   *   status: number;
+   * }> {}
+   *
+   * const result = Result.err<number, ValidationError | NetworkError>(
+   *   new ValidationError({ field: "email" }),
+   * );
+   *
+   * const recovered = result.orElseMatch({
+   *   ValidationError: (error) => Result.ok(error.field.length),
+   *   NetworkError: (error) => Result.err(`retry:${error.status}`),
+   * });
+   * ```
+   */
+  orElseMatch<
+    const Handlers extends E extends MatchableError
+      ? MatchResultHandlers<E>
+      : never,
+  >(
+    handlers: Handlers,
+  ): Result<T | MatchResultValue<Handlers>, MatchResultError<Handlers>> {
+    const error = this.error as E & MatchableError;
+    const handler = handlers[error._tag as keyof Handlers] as unknown as (
+      error: E,
+    ) => Result<MatchResultValue<Handlers>, MatchResultError<Handlers>>;
+
+    return handler(error) as Result<
+      T | MatchResultValue<Handlers>,
+      MatchResultError<Handlers>
+    >;
+  }
+
+  /**
+   * Recovers from matching tagged errors and leaves unhandled ones unchanged.
+   *
+   * @param handlers Partial mapping from `_tag` values to result-returning handlers.
+   * @returns The matching handler result or the remaining `Err`.
+   *
+   * @example
+   * ```typescript
+   * class ValidationError extends Result.taggedError("ValidationError")<{
+   *   field: string;
+   * }> {}
+   * class NetworkError extends Result.taggedError("NetworkError")<{
+   *   status: number;
+   * }> {}
+   *
+   * const result = Result.err<number, ValidationError | NetworkError>(
+   *   new NetworkError({ status: 503 }),
+   * );
+   *
+   * const recovered = result.orElseMatchSome({
+   *   ValidationError: (error) => Result.ok(error.field.length),
+   * });
+   * // Err(NetworkError)
+   * ```
+   */
+  orElseMatchSome<
+    const Handlers extends E extends MatchableError
+      ? MatchSomeResultHandlers<E>
+      : never,
+  >(
+    handlers: Handlers,
+  ): Result<
+    T | MatchResultValue<Handlers>,
+    | (E extends MatchableError ? RemainingMatchErrors<E, Handlers> : E)
+    | MatchResultError<Handlers>
+  > {
+    const error = this.error as E & MatchableError;
+    const handler = handlers[error._tag as keyof Handlers] as
+      | ((
+        error: E,
+      ) => Result<MatchResultValue<Handlers>, MatchResultError<Handlers>>)
+      | undefined;
+
+    if (!handler) {
+      return this as Result<
+        T | MatchResultValue<Handlers>,
+        | (E extends MatchableError ? RemainingMatchErrors<E, Handlers> : E)
+        | MatchResultError<Handlers>
+      >;
+    }
+
+    return handler(error) as Result<
+      T | MatchResultValue<Handlers>,
+      | (E extends MatchableError ? RemainingMatchErrors<E, Handlers> : E)
+      | MatchResultError<Handlers>
+    >;
   }
 
   /**
