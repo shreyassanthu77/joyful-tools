@@ -45,7 +45,7 @@ export * from "./async-result.ts";
 export * from "./errors.ts";
 
 import { AsyncResult } from "./async-result.ts";
-import { taggedError as createTaggedError } from "./errors.ts";
+import * as errors from "./errors.ts";
 import { Err, Ok } from "./result.ts";
 /**
  * A value that is either a successful {@link Ok} or a failed {@link Err}.
@@ -119,8 +119,65 @@ export namespace Result {
    *     }),
    * });
    * ```
+  */
+  export const taggedError = errors.taggedError;
+
+  /**
+   * Matches a tagged error result with handlers for every `_tag` variant.
+   *
+   * Use this when you have an {@link Err} whose error type is a tagged union and
+   * you want exhaustive handling with per-variant narrowing.
+   *
+   * @example
+   * ```typescript
+   * class ValidationError extends Result.taggedError("ValidationError")<{
+   *   field: string;
+   * }> {}
+   * class NetworkError extends Result.taggedError("NetworkError")<{
+   *   status: number;
+   * }> {}
+   *
+   * const result = Result.err<ValidationError | NetworkError>(
+   *   new NetworkError({ status: 503 }),
+   * );
+   *
+   * const message = Result.matchError(result, {
+   *   ValidationError: (error) => `invalid:${error.field}`,
+   *   NetworkError: (error) => `retry:${error.status}`,
+   * });
+   * ```
    */
-  export const taggedError = createTaggedError;
+  export const matchError = errors.matchError;
+
+  /**
+   * Matches a tagged error result with a partial handler map and fallback.
+   *
+   * Use this when only some `_tag` variants need custom handling and the rest
+   * should share a default path.
+   *
+   * @example
+   * ```typescript
+   * class ValidationError extends Result.taggedError("ValidationError")<{
+   *   field: string;
+   * }> {}
+   * class NetworkError extends Result.taggedError("NetworkError")<{
+   *   status: number;
+   * }> {}
+   *
+   * const result = Result.err<ValidationError | NetworkError>(
+   *   new NetworkError({ status: 503 }),
+   * );
+   *
+   * const message = Result.matchErrorPartial(
+   *   result,
+   *   {
+   *     ValidationError: (error) => `invalid:${error.field}`,
+   *   },
+   *   () => "default",
+   * );
+   * ```
+   */
+  export const matchErrorPartial = errors.matchErrorPartial;
 
   /**
    * Options for {@link Result.wrap}.
