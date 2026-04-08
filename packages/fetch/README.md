@@ -334,6 +334,44 @@ if (result.isOk()) {
 }
 ```
 
+### Direct yield with header inspection
+
+You can also `yield* jfetch(...)` directly to get a `FetchedResponse` — a
+response-like object that exposes synchronous property accessors (matching the
+native `Response` surface) and body-reader methods that return
+`AsyncResult<T, ParseError>`. Request-level errors short-circuit exactly as
+they do with the body-reader style.
+
+This is especially useful when you want to inspect headers or status before
+deciding how to parse the body:
+
+```typescript
+import { jfetch } from "@joyful/fetch";
+import { Result } from "@joyful/result";
+
+const result = await Result.run(async function* () {
+  // yield* jfetch(...) resolves the request, short-circuiting on any
+  // NetworkError, AbortError, or HttpError.
+  const res = yield* jfetch("/api/items");
+
+  // Headers and status are available synchronously on the FetchedResponse.
+  const total = Number(res.headers.get("x-total-count") ?? "0");
+
+  if (res.status === 204) {
+    return Result.ok({ items: [], total: 0 });
+  }
+
+  // Body reader methods return AsyncResult<T, ParseError> — the
+  // request-error union is already narrowed away.
+  const items = yield* res.json<Item[]>();
+
+  return Result.ok({ items, total });
+});
+```
+
+The two styles can be mixed freely in the same generator — use whichever is
+clearest for each step.
+
 ## Custom Fetch Implementations
 
 Use `createFetch` to build a `jfetch` backed by a different `fetch`
@@ -392,6 +430,10 @@ if (result.isOk()) {
 - `createFetch(fetchFn)` — create a custom `jfetch` from any `fetch`-compatible
   function.
 - `JoyfulResponse` — response wrapper with body methods returning `AsyncResult`.
+  Also supports `yield*` directly inside `Result.run` generators.
+- `FetchedResponse` — the value returned when you `yield* jfetch(...)`. Exposes
+  synchronous `Response` property accessors and body-reader methods that return
+  `AsyncResult<T, ParseError>`.
 - `NetworkError` — tagged error for network-level failures.
 - `AbortError` — tagged error for aborted requests.
 - `HttpError` — tagged error for non-2xx responses (has `.status` and
@@ -403,16 +445,42 @@ if (result.isOk()) {
 
 ### `JoyfulResponse`
 
-| Member           | Type                                                    | Description                                 |
-| ---------------- | ------------------------------------------------------- | ------------------------------------------- |
-| `.response`      | `AsyncResult<Response, ResponseError>`                  | The underlying response as an `AsyncResult` |
-| `.json<T>()`     | `AsyncResult<T, ResponseError \| ParseError>`           | Parse body as JSON                          |
-| `.text()`        | `AsyncResult<string, ResponseError \| ParseError>`      | Read body as text                           |
-| `.arrayBuffer()` | `AsyncResult<ArrayBuffer, ResponseError \| ParseError>` | Read body as ArrayBuffer                    |
-| `.blob()`        | `AsyncResult<Blob, ResponseError \| ParseError>`        | Read body as Blob                           |
-| `.bytes()`       | `AsyncResult<Uint8Array, ResponseError \| ParseError>`  | Read body as bytes                          |
-| `.formData()`    | `AsyncResult<FormData, ResponseError \| ParseError>`    | Read body as FormData                       |
-| `.then(...)`     | `PromiseLike<Result<Response, ResponseError>>`          | Await directly for raw `Result`             |
+| Member           | Type                                                    | Description                                        |
+| ---------------- | ------------------------------------------------------- | -------------------------------------------------- |
+| `.response`      | `AsyncResult<Response, ResponseError>`                  | The underlying response as an `AsyncResult`        |
+| `.json<T>()`     | `AsyncResult<T, ResponseError \| ParseError>`           | Parse body as JSON                                 |
+| `.text()`        | `AsyncResult<string, ResponseError \| ParseError>`      | Read body as text                                  |
+| `.arrayBuffer()` | `AsyncResult<ArrayBuffer, ResponseError \| ParseError>` | Read body as ArrayBuffer                           |
+| `.blob()`        | `AsyncResult<Blob, ResponseError \| ParseError>`        | Read body as Blob                                  |
+| `.bytes()`       | `AsyncResult<Uint8Array, ResponseError \| ParseError>`  | Read body as bytes                                 |
+| `.formData()`    | `AsyncResult<FormData, ResponseError \| ParseError>`    | Read body as FormData                              |
+| `.then(...)`     | `PromiseLike<Result<Response, ResponseError>>`          | Await directly for raw `Result`                    |
+| `yield*`         | Returns `FetchedResponse`                               | Use inside `Result.run` to cross the error boundary |
+
+### `FetchedResponse`
+
+Obtained by `yield* jfetch(...)` inside a `Result.run` generator. Request-level
+errors have already been handled at the `yield*` boundary.
+
+| Member           | Type                            | Description                                 |
+| ---------------- | ------------------------------- | ------------------------------------------- |
+| `.headers`       | `Headers`                       | Response headers                            |
+| `.status`        | `number`                        | HTTP status code                            |
+| `.ok`            | `boolean`                       | `true` if status is 200–299                 |
+| `.url`           | `string`                        | Final URL (after redirects)                 |
+| `.redirected`    | `boolean`                       | Whether the request was redirected          |
+| `.statusText`    | `string`                        | Status message                              |
+| `.type`          | `ResponseType`                  | Response type                               |
+| `.body`          | `ReadableStream \| null`        | Raw body stream                             |
+| `.bodyUsed`      | `boolean`                       | Whether the body has been consumed          |
+| `.response`      | `Response`                      | The underlying raw `Response`               |
+| `.clone()`       | `FetchedResponse`               | Clone the response                          |
+| `.json<T>()`     | `AsyncResult<T, ParseError>`    | Parse body as JSON                          |
+| `.text()`        | `AsyncResult<string, ParseError>` | Read body as text                          |
+| `.arrayBuffer()` | `AsyncResult<ArrayBuffer, ParseError>` | Read body as ArrayBuffer           |
+| `.blob()`        | `AsyncResult<Blob, ParseError>` | Read body as Blob                           |
+| `.bytes()`       | `AsyncResult<Uint8Array, ParseError>` | Read body as bytes                    |
+| `.formData()`    | `AsyncResult<FormData, ParseError>` | Read body as FormData                  |
 
 ### Error Types
 
