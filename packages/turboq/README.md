@@ -3,15 +3,24 @@
 ## Installation
 
 ```bash
-# deno
-deno add jsr:@joyful/turboq
+# npm
+npm install @joyful-tools/turboq
 
-# pnpm 10.9+
+# pnpm
+pnpm add @joyful-tools/turboq
+
+# bun
+bun add @joyful-tools/turboq
+
+# npm (from JSR)
+npx jsr add @joyful/turboq
+
+# pnpm 10.9+ (from JSR)
 pnpm add jsr:@joyful/turboq
 
-# yarn 4.9+
+# yarn 4.9+ (from JSR)
 yarn add jsr:@joyful/turboq
 
-# npm, bun, and older versions of yarn or pnpm
-npx jsr add @joyful/turboq
+# deno
+deno add jsr:@joyful/turboq
 ```

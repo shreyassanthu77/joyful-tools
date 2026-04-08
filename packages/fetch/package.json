@@ -4,6 +4,14 @@
   "type": "module",
   "license": "MIT",
   "description": "A fetch wrapper that returns AsyncResult values instead of throwing",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/shreyassanthu77/joyful-tools.git",
+    "directory": "packages/fetch"
+  },
+  "bugs": {
+    "url": "https://github.com/shreyassanthu77/joyful-tools/issues"
+  },
   "exports": {
     ".": {
       "default": "./src/main.ts"

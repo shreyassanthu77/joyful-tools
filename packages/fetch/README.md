@@ -8,18 +8,31 @@ error — is modelled as data you can inspect, transform, and recover from.
 ## Installation
 
 ```bash
-# deno
-deno add jsr:@joyful/fetch
+# npm
+npm install @joyful-tools/fetch
 
-# pnpm 10.9+
+# pnpm
+pnpm add @joyful-tools/fetch
+
+# bun
+bun add @joyful-tools/fetch
+
+# npm (from JSR)
+npx jsr add @joyful/fetch
+
+# pnpm 10.9+ (from JSR)
 pnpm add jsr:@joyful/fetch
 
-# yarn 4.9+
+# yarn 4.9+ (from JSR)
 yarn add jsr:@joyful/fetch
 
-# npm, bun, and older versions of yarn or pnpm
-npx jsr add @joyful/fetch
+# deno
+deno add jsr:@joyful/fetch
 ```
+
+> The examples below use `@joyful/fetch` and `@joyful/result` (the JSR names) in
+> imports. If you installed from npm, use `@joyful-tools/fetch` and
+> `@joyful-tools/result` instead.
 
 ## Quick Start
 

@@ -11,18 +11,30 @@ of the function signature and compose both paths directly.
 ## Installation
 
 ```bash
-# deno
-deno add jsr:@joyful/result
+# npm
+npm install @joyful-tools/result
 
-# pnpm 10.9+
+# pnpm
+pnpm add @joyful-tools/result
+
+# bun
+bun add @joyful-tools/result
+
+# npm (from JSR)
+npx jsr add @joyful/result
+
+# pnpm 10.9+ (from JSR)
 pnpm add jsr:@joyful/result
 
-# yarn 4.9+
+# yarn 4.9+ (from JSR)
 yarn add jsr:@joyful/result
 
-# npm, bun, and older versions of yarn or pnpm
-npx jsr add @joyful/result
+# deno
+deno add jsr:@joyful/result
 ```
+
+> The examples below use `@joyful/result` (the JSR name) in imports. If you
+> installed from npm, use `@joyful-tools/result` instead.
 
 ## Why Result?
 

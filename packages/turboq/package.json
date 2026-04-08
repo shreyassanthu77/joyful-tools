@@ -5,6 +5,14 @@
   "license": "MIT",
   "private": true,
   "description": "A durable queue with CAS-based storage, heartbeat timeouts, and retry logic",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/shreyassanthu77/joyful-tools.git",
+    "directory": "packages/turboq"
+  },
+  "bugs": {
+    "url": "https://github.com/shreyassanthu77/joyful-tools/issues"
+  },
   "exports": {
     ".": {
       "default": "./src/main.ts"

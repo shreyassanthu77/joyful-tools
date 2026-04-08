@@ -6,18 +6,30 @@ values through a series of functions.
 ## Installation
 
 ```bash
-# deno
-deno add jsr:@joyful/pipe
+# npm
+npm install @joyful-tools/pipe
 
-# pnpm 10.9+
+# pnpm
+pnpm add @joyful-tools/pipe
+
+# bun
+bun add @joyful-tools/pipe
+
+# npm (from JSR)
+npx jsr add @joyful/pipe
+
+# pnpm 10.9+ (from JSR)
 pnpm add jsr:@joyful/pipe
 
-# yarn 4.9+
+# yarn 4.9+ (from JSR)
 yarn add jsr:@joyful/pipe
 
-# npm, bun, and older versions of yarn or pnpm
-npx jsr add @joyful/pipe
+# deno
+deno add jsr:@joyful/pipe
 ```
+
+> The examples below use `@joyful/pipe` (the JSR name) in imports. If you
+> installed from npm, use `@joyful-tools/pipe` instead.
 
 ## Usage
 
