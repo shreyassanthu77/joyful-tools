@@ -1,6 +1,6 @@
 {
   "name": "@joyful-tools/fetch",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "type": "module",
   "license": "MIT",
   "description": "A fetch wrapper that returns AsyncResult values instead of throwing",
