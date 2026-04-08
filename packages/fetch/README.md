@@ -55,7 +55,10 @@ if (result.isOk()) {
 
 `jfetch` has the same signature as `fetch` — you pass it a URL and an optional
 `RequestInit`. The difference is that it returns a `JoyfulResponse` instead of a
-`Promise<Response>`.
+`Promise<Response>`. `JoyfulResponse` extends
+`AsyncResult<FetchedResponse, ResponseError>`, so you can compose over a
+successful response directly with `map`, `andThen`, `orElseMatch`, and the rest
+of the `AsyncResult` API.
 
 ## Reading The Body
 
@@ -88,28 +91,25 @@ body.
 ## Reading Headers And Response Metadata
 
 Sometimes you need access to headers, status codes, or other response metadata
-from a successful request. Use the `.response` field to get the underlying
-`AsyncResult<Response, ResponseError>`, then `map` over it to extract what you
-need.
+from a successful request. `JoyfulResponse` is already an
+`AsyncResult<FetchedResponse, ResponseError>`, so you can `map` over it
+directly.
 
 ```typescript
 import { jfetch } from "@joyful/fetch";
 
 // Get a specific header
 const contentType = await jfetch("/api/data")
-  .response
   .map((res) => res.headers.get("content-type"))
   .unwrapOr(null);
 
 // Get the status code
 const status = await jfetch("/api/health")
-  .response
   .map((res) => res.status)
   .unwrapOr(0);
 
 // Read multiple pieces of metadata at once
 const info = await jfetch("/api/data")
-  .response
   .map((res) => ({
     status: res.status,
     etag: res.headers.get("etag"),
@@ -120,11 +120,10 @@ const info = await jfetch("/api/data")
 
 ### Reading Both Headers And Body
 
-When you need headers and a parsed body together, use `andThen` on the response:
+When you need headers and a parsed body together, use `andThen` on the request:
 
 ```typescript
 import { jfetch } from "@joyful/fetch";
-import { Result } from "@joyful/result";
 
 interface Page<T> {
   data: T;
@@ -132,11 +131,11 @@ interface Page<T> {
 }
 
 const page = await jfetch("/api/users")
-  .response
-  .andThen(async (res) => {
+  .andThen((res) => {
     const total = Number(res.headers.get("x-total-count") ?? "0");
-    const data = await res.json() as User[];
-    return Result.ok<Page<User[]>>({ data, total });
+    return res
+      .json<User[]>()
+      .map((data) => ({ data, total } satisfies Page<User[]>));
   })
   .unwrapOr({ data: [], total: 0 });
 
@@ -225,7 +224,7 @@ const result = await jfetch("/api/users")
 
 When you get an `HttpError`, the server still sent a response — maybe with a
 JSON error body you want to read. The `HttpError` carries a `response` field
-that is a fully usable `JoyfulResponse` already resolved with the raw response:
+that is a fully usable `FetchedResponse`:
 
 ```typescript
 import { jfetch } from "@joyful/fetch";
@@ -405,8 +404,8 @@ console.log(result.isOk()); // true
 ## Using As A Plain PromiseLike
 
 `JoyfulResponse` implements `PromiseLike`, so you can `await` it directly to get
-a `Result<Response, ResponseError>` when you want full control over the raw
-response:
+a `Result<FetchedResponse, ResponseError>` when you want full control over the
+successful response metadata before reading the body:
 
 ```typescript
 import { jfetch } from "@joyful/fetch";
@@ -417,8 +416,10 @@ if (result.isOk()) {
   const response = result.value;
   console.log(response.status);
   console.log(response.headers.get("content-type"));
-  const body = await response.json();
-  console.log(body);
+  const body = await response.json<{ ok: boolean }>();
+  if (body.isOk()) {
+    console.log(body.value.ok);
+  }
 }
 ```
 
@@ -429,8 +430,9 @@ if (result.isOk()) {
 - `jfetch` — default fetch wrapper using `globalThis.fetch`.
 - `createFetch(fetchFn)` — create a custom `jfetch` from any `fetch`-compatible
   function.
-- `JoyfulResponse` — response wrapper with body methods returning `AsyncResult`.
-  Also supports `yield*` directly inside `Result.run` generators.
+- `JoyfulResponse` — an `AsyncResult<FetchedResponse, ResponseError>` with
+  convenience body methods. Also supports `yield*` directly inside `Result.run`
+  generators.
 - `FetchedResponse` — the value returned when you `yield* jfetch(...)`. Exposes
   synchronous `Response` property accessors and body-reader methods that return
   `AsyncResult<T, ParseError>`.
@@ -447,14 +449,13 @@ if (result.isOk()) {
 
 | Member           | Type                                                    | Description                                        |
 | ---------------- | ------------------------------------------------------- | -------------------------------------------------- |
-| `.response`      | `AsyncResult<Response, ResponseError>`                  | The underlying response as an `AsyncResult`        |
 | `.json<T>()`     | `AsyncResult<T, ResponseError \| ParseError>`           | Parse body as JSON                                 |
 | `.text()`        | `AsyncResult<string, ResponseError \| ParseError>`      | Read body as text                                  |
 | `.arrayBuffer()` | `AsyncResult<ArrayBuffer, ResponseError \| ParseError>` | Read body as ArrayBuffer                           |
 | `.blob()`        | `AsyncResult<Blob, ResponseError \| ParseError>`        | Read body as Blob                                  |
 | `.bytes()`       | `AsyncResult<Uint8Array, ResponseError \| ParseError>`  | Read body as bytes                                 |
 | `.formData()`    | `AsyncResult<FormData, ResponseError \| ParseError>`    | Read body as FormData                              |
-| `.then(...)`     | `PromiseLike<Result<Response, ResponseError>>`          | Await directly for raw `Result`                    |
+| `.then(...)`     | `PromiseLike<Result<FetchedResponse, ResponseError>>`   | Await directly for raw `Result`                    |
 | `yield*`         | Returns `FetchedResponse`                               | Use inside `Result.run` to cross the error boundary |
 
 ### `FetchedResponse`

@@ -4,10 +4,11 @@
  * Joyful fetch utilities. Wraps the web standard `fetch` with
  * `@joyful/result` for type-safe error handling.
  *
- * Every call returns a {@linkcode JoyfulResponse} — a thin wrapper whose body
- * methods (`.json()`, `.text()`, etc.) return `AsyncResult` instead of raw
- * promises. Non-2xx responses are automatically treated as errors, and network
- * failures, aborts, and parse errors each get their own tagged error type.
+ * Every call returns a {@linkcode JoyfulResponse} — an
+ * `AsyncResult<FetchedResponse, ResponseError>` with convenience body methods
+ * (`.json()`, `.text()`, etc.). Non-2xx responses are automatically treated as
+ * errors, and network failures, aborts, and parse errors each get their own
+ * tagged error type.
  *
  * @example Basic usage
  * ```ts
@@ -25,14 +26,11 @@
  * @example Reading headers alongside the body
  * ```ts
  * import { jfetch } from "@joyful/fetch";
- * import { Result } from "@joyful/result";
  *
  * const page = await jfetch("/api/users")
- *   .response
- *   .andThen(async (res) => {
+ *   .andThen((res) => {
  *     const total = Number(res.headers.get("x-total-count") ?? "0");
- *     const data = await res.json() as User[];
- *     return Result.ok({ data, total });
+ *     return res.json<User[]>().map((data) => ({ data, total }));
  *   })
  *   .unwrapOr({ data: [], total: 0 });
  * ```
@@ -81,7 +79,7 @@
  * ```
  */
 
-import { AsyncResult, Err, Ok, Result, taggedError } from "@joyful/result";
+import { AsyncResult, Result, taggedError } from "@joyful/result";
 
 /**
  * Default `jfetch` using `globalThis.fetch`.
@@ -110,7 +108,7 @@ import { AsyncResult, Err, Ok, Result, taggedError } from "@joyful/result";
  * }).json<User>();
  * ```
  *
- * @example Await directly for a raw Result<Response, ResponseError>
+ * @example Await directly for a raw `Result<FetchedResponse, ResponseError>`
  * ```ts
  * import { jfetch } from "@joyful/fetch";
  *
@@ -158,19 +156,22 @@ export const jfetch: JFetch = createFetch(globalThis.fetch);
 export function createFetch(fetch: FetchFn): JFetch {
   async function $jfetch(
     ...args: Parameters<FetchFn>
-  ): Promise<Result<Response, ResponseError>> {
+  ): Promise<Result<FetchedResponse, ResponseError>> {
     try {
       const res = await fetch(...args);
+      const wrapped = new FetchedResponse(res);
       if (!res.ok) {
-        const wrapped = new JoyfulResponse(Promise.resolve(Result.ok(res)));
         return Result.err(
-          new HttpError({ response: wrapped, status: res.status }),
+          new HttpError({
+            response: wrapped,
+            status: res.status,
+          }),
         );
       }
 
-      return Result.ok(res);
+      return Result.ok(wrapped);
     } catch (e) {
-      if (e instanceof DOMException) {
+      if (e instanceof DOMException && e.name === "AbortError") {
         return Result.err(new AbortError({ cause: e }));
       }
 
@@ -196,11 +197,13 @@ export type JFetch = (...args: Parameters<FetchFn>) => JoyfulResponse;
 export type ResponseError = NetworkError | AbortError | HttpError;
 
 /**
- * Wraps a `Response` to provide body parsing methods that return `AsyncResult`.
+ * Async result for a fetch request with convenience body readers.
  *
  * You don't normally construct this yourself — it's returned by `jfetch` and
- * `createFetch`. It implements `PromiseLike`, so you can `await` it directly
- * to get a `Result<Response, ResponseError>`.
+ * `createFetch`. `JoyfulResponse` extends
+ * `AsyncResult<FetchedResponse, ResponseError>`, so you can use `map`,
+ * `andThen`, `orElseMatch`, and the rest of the `AsyncResult` API directly on
+ * the request before or instead of reading the body.
  *
  * @example Await directly for the raw response
  * ```ts
@@ -213,64 +216,19 @@ export type ResponseError = NetworkError | AbortError | HttpError;
  * }
  * ```
  *
- * @example Access the underlying AsyncResult via .response
+ * @example Read response metadata without parsing the body
  * ```ts
  * import { jfetch } from "@joyful/fetch";
  *
  * const etag = await jfetch("/api/data")
- *   .response
  *   .map((res) => res.headers.get("etag"))
  *   .unwrapOr(null);
  * ```
  */
-export class JoyfulResponse
-  implements
-    PromiseLike<Result<Response, ResponseError>>,
-    AsyncIterable<Err<never, ResponseError>, FetchedResponse, unknown> {
-  #response: Promise<Result<Response, ResponseError>>;
-
-  constructor(response: Promise<Result<Response, ResponseError>>) {
-    this.#response = response;
-  }
-
-  then<P, Q>(
-    onfulfilled?: (
-      value: Result<Response, ResponseError>,
-    ) => P | PromiseLike<P>,
-    onrejected?: (reason: unknown) => Q | PromiseLike<Q>,
-  ): PromiseLike<P | Q> {
-    return this.#response.then(onfulfilled, onrejected);
-  }
-
-  /** The underlying response as an `AsyncResult`. Use this to read headers
-   * or other response metadata.
-   *
-   * @example Read a header value
-   * ```ts
-   * const contentType = await jfetch("/api/data")
-   *   .response
-   *   .map((res) => res.headers.get("content-type"))
-   *   .unwrapOr(null);
-   * ```
-   *
-   * @example Read headers and body together
-   * ```ts
-   * import { Result } from "@joyful/result";
-   *
-   * const page = await jfetch("/api/users")
-   *   .response
-   *   .andThen(async (res) => {
-   *     const total = Number(res.headers.get("x-total-count") ?? "0");
-   *     const data = await res.json() as User[];
-   *     return Result.ok({ data, total });
-   *   })
-   *   .unwrapOr({ data: [], total: 0 });
-   * ```
-   */
-  get response(): AsyncResult<Response, ResponseError> {
-    return new AsyncResult(this.#response);
-  }
-
+export class JoyfulResponse extends AsyncResult<
+  FetchedResponse,
+  ResponseError
+> {
   /**
    * Parse the response body as JSON.
    *
@@ -290,7 +248,7 @@ export class JoyfulResponse
    * ```
    */
   json<T = unknown>(): AsyncResult<T, ResponseError | ParseError> {
-    return new AsyncResult(this.#read("json"));
+    return this.andThen((res) => res.json());
   }
 
   /**
@@ -304,7 +262,7 @@ export class JoyfulResponse
    * ```
    */
   text(): AsyncResult<string, ResponseError | ParseError> {
-    return new AsyncResult(this.#read("text"));
+    return this.andThen((res) => res.text());
   }
 
   /**
@@ -318,7 +276,7 @@ export class JoyfulResponse
    * ```
    */
   arrayBuffer(): AsyncResult<ArrayBuffer, ResponseError | ParseError> {
-    return new AsyncResult(this.#read("arrayBuffer"));
+    return this.andThen((res) => res.arrayBuffer());
   }
 
   /**
@@ -332,7 +290,7 @@ export class JoyfulResponse
    * ```
    */
   blob(): AsyncResult<Blob, ResponseError | ParseError> {
-    return new AsyncResult(this.#read("blob"));
+    return this.andThen((res) => res.blob());
   }
 
   /**
@@ -346,7 +304,7 @@ export class JoyfulResponse
    * ```
    */
   bytes(): AsyncResult<Uint8Array, ResponseError | ParseError> {
-    return new AsyncResult(this.#read("bytes"));
+    return this.andThen((res) => res.bytes());
   }
 
   /**
@@ -360,70 +318,7 @@ export class JoyfulResponse
    * ```
    */
   formData(): AsyncResult<FormData, ResponseError | ParseError> {
-    return new AsyncResult(this.#read("formData"));
-  }
-
-  /**
-   * Supports `yield*` inside async {@linkcode Result.run} generator workflows.
-   *
-   * Yielding a `JoyfulResponse` directly short-circuits on request-level errors
-   * ({@linkcode NetworkError}, {@linkcode AbortError}, {@linkcode HttpError})
-   * and returns a {@linkcode FetchedResponse} on success. The
-   * `FetchedResponse` exposes synchronous property accessors matching the
-   * native Web `Response` surface and body-reader methods that return
-   * `AsyncResult<T, ParseError>` — with the request-error union already
-   * narrowed away.
-   *
-   * @example
-   * ```ts
-   * import { jfetch } from "@joyful/fetch";
-   * import { Result } from "@joyful/result";
-   *
-   * const result = await Result.run(async function* () {
-   *   const res = yield* jfetch("/api/me");
-   *   const etag = res.headers.get("etag");
-   *   const user = yield* res.json<User>();
-   *   return Result.ok({ etag, user });
-   * });
-   * ```
-   */
-  async *[Symbol.asyncIterator](): AsyncGenerator<
-    Err<never, ResponseError>,
-    FetchedResponse,
-    unknown
-  > {
-    const result = await this.#response;
-    if (result instanceof Ok) return new FetchedResponse(result.value);
-    // @ts-expect-error - we know the value is an error so we can safely cast to
-    // a result with a different Value type. The yield below causes Result.run to
-    // stop iterating and return the error, so the throw on the next line is
-    // never reached.
-    yield result;
-    throw "unreachable";
-  }
-
-  async #read<
-    Method extends
-      | "json"
-      | "text"
-      | "arrayBuffer"
-      | "blob"
-      | "bytes"
-      | "formData",
-  >(
-    method: Method,
-  ): Promise<
-    Result<Awaited<ReturnType<Response[Method]>>, ResponseError | ParseError>
-  > {
-    const res = await this.#response;
-    // @ts-expect-error - we know the value is an error so we can safely cast to a result with a different Value type
-    if (res instanceof Err) return res;
-    try {
-      const data = await res.value[method]();
-      return Result.ok(data);
-    } catch (e) {
-      return Result.err(new ParseError({ cause: e }));
-    }
+    return this.andThen((res) => res.formData());
   }
 }
 
@@ -433,9 +328,7 @@ export class JoyfulResponse
  *
  * Property accessors mirror the native Web `Response` surface so you can
  * inspect status, headers, and other metadata without any extra unwrapping.
- * Body-reader methods return `AsyncResult<T, ParseError>` — the
- * request-error union is already narrowed away because transport and HTTP
- * errors were handled at the `yield*` boundary.
+ * Body-reader methods return `AsyncResult<T, ParseError>`.
  *
  * @example Inspect headers then parse
  * ```ts
@@ -617,7 +510,9 @@ export class FetchedResponse {
       | "blob"
       | "bytes"
       | "formData",
-  >(method: Method): Promise<Result<Awaited<ReturnType<Response[Method]>>, ParseError>> {
+  >(
+    method: Method,
+  ): Promise<Result<Awaited<ReturnType<Response[Method]>>, ParseError>> {
     try {
       const data = await this.response[method]();
       return Result.ok(data);
@@ -678,7 +573,7 @@ export class AbortError extends taggedError("AbortError") {}
  * Thrown when the response has a non-2xx status code.
  *
  * The `status` field contains the HTTP status code, and the `response` field
- * is a fully usable {@linkcode JoyfulResponse} that can be used to read the
+ * is a fully usable {@linkcode FetchedResponse} that can be used to read the
  * error body.
  *
  * @example Check the status code
@@ -710,7 +605,7 @@ export class AbortError extends taggedError("AbortError") {}
  * ```
  */
 export class HttpError extends taggedError("HttpError")<{
-  response: JoyfulResponse;
+  response: FetchedResponse;
   status: number;
 }> {}
 

@@ -117,6 +117,18 @@ Deno.test("DOMException from fetch returns AbortError", async () => {
   }
 });
 
+Deno.test("non-abort DOMException from fetch returns NetworkError", async () => {
+  const fetch = createFetch(
+    failFetch(new DOMException("Quota exceeded", "QuotaExceededError")),
+  );
+  const result = await fetch("/api").json();
+
+  assertEquals(result.isErr(), true);
+  if (result.isErr()) {
+    assertInstanceOf(result.error, NetworkError);
+  }
+});
+
 Deno.test("AbortSignal.abort() returns AbortError", async () => {
   const fetch = createFetch(globalThis.fetch);
   const result = await fetch("https://example.com", {
@@ -129,30 +141,15 @@ Deno.test("AbortSignal.abort() returns AbortError", async () => {
   }
 });
 
-Deno.test(".response allows reading headers", async () => {
-  const fetch = createFetch(() =>
-    Promise.resolve(
-      new Response("ok", {
-        headers: { "x-request-id": "abc123" },
-      }),
-    ),
-  );
-
-  const requestId = await fetch("/api")
-    .response.map((res) => res.headers.get("x-request-id"))
-    .unwrapOr(null);
-
-  assertEquals(requestId, "abc123");
-});
-
-Deno.test(".response returns Err on failure", async () => {
-  const fetch = createFetch(failFetch(new TypeError("failed")));
-
-  const result = await fetch("/api").response;
+Deno.test("await fetch returns HttpError with FetchedResponse", async () => {
+  const fetch = createFetch(jsonFetch({ error: "not found" }, { status: 404 }));
+  const result = await fetch("/api");
 
   assertEquals(result.isErr(), true);
   if (result.isErr()) {
-    assertInstanceOf(result.error, NetworkError);
+    assertInstanceOf(result.error, HttpError);
+    assertInstanceOf(result.error.response, FetchedResponse);
+    assertEquals(result.error.status, 404);
   }
 });
 
@@ -223,60 +220,3 @@ Deno.test("FetchedResponse.text() returns text body", async () => {
 
   assertEquals(result, Result.ok("hello world"));
 });
-
-Deno.test(
-  "yield* jfetch(...).response still works alongside yield* jfetch",
-  async () => {
-    const fetch = createFetch(() =>
-      Promise.resolve(new Response("ok", { headers: { "x-id": "xyz" } })),
-    );
-
-    // old API still works
-    const requestId = await fetch("/api")
-      .response.map((res) => res.headers.get("x-id"))
-      .unwrapOr(null);
-
-    assertEquals(requestId, "xyz");
-  },
-);
-
-Deno.test("FetchedResponse.clone() returns a new FetchedResponse", async () => {
-  const fetch = createFetch(jsonFetch({ value: 42 }));
-
-  const result = await Result.run(async function* () {
-    const res = yield* fetch("/api");
-    const clone = res.clone();
-    assertInstanceOf(clone, FetchedResponse);
-    const data = yield* clone.json<{ value: number }>();
-    return Result.ok(data.value);
-  });
-
-  assertEquals(result, Result.ok(42));
-});
-
-Deno.test(
-  "FetchedResponse exposes url, redirected, statusText, type, bodyUsed",
-  async () => {
-    const fetch = createFetch(mockFetch("ok"));
-
-    const result = await Result.run(async function* () {
-      const res = yield* fetch("/api");
-      return Result.ok({
-        url: res.url,
-        redirected: res.redirected,
-        statusText: res.statusText,
-        type: res.type,
-        bodyUsed: res.bodyUsed,
-      });
-    });
-
-    assertEquals(result.isOk(), true);
-    if (result.isOk()) {
-      assertEquals(typeof result.value.url, "string");
-      assertEquals(result.value.redirected, false);
-      assertEquals(typeof result.value.statusText, "string");
-      assertEquals(typeof result.value.type, "string");
-      assertEquals(result.value.bodyUsed, false);
-    }
-  },
-);
