@@ -209,8 +209,7 @@ Deno.test("Result.wrap", async () => {
       try: (): number => {
         throw new Error("boom");
       },
-      catch: (error) =>
-        error instanceof Error ? error.message : String(error),
+      catch: (error) => error instanceof Error ? error.message : String(error),
     }),
     Result.err("boom"),
   );
@@ -226,8 +225,7 @@ Deno.test("Result.wrap", async () => {
   assertEquals(
     await Result.wrap({
       try: () => Promise.reject(new Error("boom")),
-      catch: (error) =>
-        error instanceof Error ? error.message : String(error),
+      catch: (error) => error instanceof Error ? error.message : String(error),
     }),
     Result.err("boom"),
   );

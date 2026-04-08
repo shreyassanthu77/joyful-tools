@@ -278,6 +278,15 @@
       "jsr:@std/path@*",
       "npm:@ark/attest@*",
       "npm:typescript@^6.0.2"
-    ]
+    ],
+    "members": {
+      "packages/fetch": {
+        "packageJson": {
+          "dependencies": [
+            "npm:@joyful-tools/result@~0.1.5"
+          ]
+        }
+      }
+    }
   }
 }

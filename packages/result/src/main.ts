@@ -45,8 +45,8 @@ export * from "./async-result.ts";
 
 import { AsyncResult } from "./async-result.ts";
 export {
-  taggedError,
   type TaggedError,
+  taggedError,
   type TaggedErrorFactory,
 } from "./errors.ts";
 import { Err, Ok } from "./result.ts";

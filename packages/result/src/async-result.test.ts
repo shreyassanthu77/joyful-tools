@@ -120,7 +120,7 @@ Deno.test("AsyncResult.mapErr", async () => {
 Deno.test("AsyncResult.andThen", async () => {
   assertEquals(
     await new AsyncResult(Promise.resolve(Result.ok(2))).andThen((x) =>
-      Result.ok(x + 1),
+      Result.ok(x + 1)
     ),
     Result.ok(3),
   );
@@ -134,7 +134,7 @@ Deno.test("AsyncResult.andThen", async () => {
 
   assertEquals(
     await new AsyncResult(Promise.resolve(Result.ok(2))).andThen(async (x) =>
-      Result.ok(x + 1),
+      Result.ok(x + 1)
     ),
     Result.ok(3),
   );
@@ -150,7 +150,7 @@ Deno.test("AsyncResult.andThen", async () => {
 Deno.test("AsyncResult.orElse", async () => {
   assertEquals(
     await new AsyncResult(Promise.resolve(Result.ok(2))).orElse((x) =>
-      Result.ok(x + 1),
+      Result.ok(x + 1)
     ),
     Result.ok(2),
   );
@@ -224,8 +224,8 @@ Deno.test("AsyncResult.orElseMatchSome recovers handled errors", async () => {
       Promise.resolve(Result.err(new ValidationError({ field: "email" }))),
     );
 
-  const recovered: Result<number | string, NetworkError> =
-    await result.orElseMatchSome({
+  const recovered: Result<number | string, NetworkError> = await result
+    .orElseMatchSome({
       ValidationError: (error) => Result.ok(`invalid:${error.field}`),
     });
 
@@ -238,8 +238,8 @@ Deno.test("AsyncResult.orElseMatchSome can remap handled errors", async () => {
       Promise.resolve(Result.err(new ValidationError({ field: "email" }))),
     );
 
-  const recovered: Result<number | string, NetworkError | string> =
-    await result.orElseMatchSome({
+  const recovered: Result<number | string, NetworkError | string> = await result
+    .orElseMatchSome({
       ValidationError: async (error) => Result.err(`invalid:${error.field}`),
     });
 
@@ -320,8 +320,9 @@ Deno.test("AsyncResult.wrap", async () => {
   );
 
   assertEquals(
-    await AsyncResult.wrap(Promise.reject(new Error("boom")), (error) =>
-      error instanceof Error ? error.message : String(error),
+    await AsyncResult.wrap(
+      Promise.reject(new Error("boom")),
+      (error) => error instanceof Error ? error.message : String(error),
     ),
     Result.err("boom"),
   );
