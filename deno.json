@@ -3,6 +3,7 @@
   "nodeModulesDir": "auto",
   "imports": {
     "std/assert": "jsr:@std/assert",
+    "std/path": "jsr:@std/path",
     "@deno/dnt": "jsr:@deno/dnt@^0.42.3"
   },
   "tasks": {

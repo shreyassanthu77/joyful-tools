@@ -58,13 +58,13 @@ jobs:
         run: deno task build:npm
 
       - name: Publish @joyful-tools/pipe
-        working-directory: npm/pipe
+        working-directory: .npm/pipe
         run: npm publish --access public || true
 
       - name: Publish @joyful-tools/result
-        working-directory: npm/result
+        working-directory: .npm/result
         run: npm publish --access public || true
 
       - name: Publish @joyful-tools/fetch
-        working-directory: npm/fetch
+        working-directory: .npm/fetch
         run: npm publish --access public || true

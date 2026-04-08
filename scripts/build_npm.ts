@@ -1,8 +1,8 @@
 import { build, emptyDir } from "@deno/dnt";
-import { join } from "jsr:@std/path";
+import { join } from "std/path";
 
 const root = new URL("..", import.meta.url).pathname;
-const outDir = join(root, "npm");
+const outDir = join(root, ".npm");
 
 interface WorkspaceDep {
   /** The workspace package dir (e.g. "result") */
@@ -29,9 +29,10 @@ async function readDenoJson(
   const denoJson = JSON.parse(
     await Deno.readTextFile(join(root, "packages", dir, "deno.json")),
   );
-  const exports = typeof denoJson.exports === "string"
-    ? denoJson.exports
-    : denoJson.exports["."];
+  const exports =
+    typeof denoJson.exports === "string"
+      ? denoJson.exports
+      : denoJson.exports["."];
   return { version: denoJson.version, exports };
 }
 
@@ -53,7 +54,9 @@ async function linkBuiltPackages(builtPkgs: string[]) {
     await Deno.mkdir(scopeDir, { recursive: true });
     try {
       await Deno.remove(linkDir, { recursive: true });
-    } catch { /* doesn't exist yet */ }
+    } catch {
+      /* doesn't exist yet */
+    }
     await Deno.symlink(builtPkgDir, linkDir);
     console.log(`  Linked ${npmName} -> ${builtPkgDir}`);
   }
@@ -132,6 +135,7 @@ for (const pkg of packages) {
     declaration: "separate",
     compilerOptions: {
       lib: ["ESNext", "DOM"],
+      target: "Latest",
       skipLibCheck: true,
     },
     package: {
@@ -156,14 +160,18 @@ for (const pkg of packages) {
       } catch {
         try {
           Deno.copyFileSync(join(root, "LICENSE"), join(pkgOutDir, "LICENSE"));
-        } catch { /* No LICENSE found */ }
+        } catch {
+          /* No LICENSE found */
+        }
       }
       try {
         Deno.copyFileSync(
           join(pkgDir, "README.md"),
           join(pkgOutDir, "README.md"),
         );
-      } catch { /* No README */ }
+      } catch {
+        /* No README */
+      }
     },
   });
 
@@ -174,6 +182,8 @@ for (const pkg of packages) {
 // Clean up the shared node_modules directory
 try {
   await Deno.remove(join(outDir, "node_modules"), { recursive: true });
-} catch { /* ignore */ }
+} catch {
+  /* ignore */
+}
 
 console.log("\n--- All packages built successfully ---\n");

@@ -320,7 +320,8 @@
   "workspace": {
     "dependencies": [
       "jsr:@deno/dnt@~0.42.3",
-      "jsr:@std/assert@*"
+      "jsr:@std/assert@*",
+      "jsr:@std/path@*"
     ],
     "packageJson": {
       "dependencies": [
