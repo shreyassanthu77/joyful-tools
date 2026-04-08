@@ -1,12 +1,8 @@
 name: Publish
 on:
   push:
-    paths:
-      - "deno.jsonc"
-      - "packages/**"
-      - ".github/workflows/publish.yml"
-    branches:
-      - main
+    tags:
+      - "v*"
 
 jobs:
   build-and-test:
@@ -45,19 +41,26 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
       - uses: actions/setup-node@v4
         with:
           node-version: "24"
           registry-url: "https://registry.npmjs.org"
 
+      - name: Install Packages
+        run: deno install
+
+      - name: Build npm packages
+        run: deno run -A scripts/build.ts
+
       - name: Publish @joyful-tools/pipe
-        working-directory: packages/pipe
+        working-directory: dist/pipe
         run: npm publish --access public || true
 
       - name: Publish @joyful-tools/result
-        working-directory: packages/result
+        working-directory: dist/result
         run: npm publish --access public || true
 
       - name: Publish @joyful-tools/fetch
-        working-directory: packages/fetch
+        working-directory: dist/fetch
         run: npm publish --access public || true
