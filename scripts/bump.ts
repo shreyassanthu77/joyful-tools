@@ -186,7 +186,7 @@ if (tag.code !== 0) {
 }
 console.log(`Tagged: ${tagName}`);
 
-const push = await run(["git", "push", "--follow-tags"]);
+const push = await run(["git", "push", "--atomic", "origin", "HEAD", tagName]);
 if (push.code !== 0) {
   console.error("\nFailed to push.\n");
   if (push.stderr) console.error(push.stderr);
