@@ -1,12 +1,16 @@
 {
   "$schema": "https://raw.githubusercontent.com/denoland/deno/refs/heads/main/cli/schemas/config-file.v1.json",
+  "workspace": [
+    "packages/fetch",
+    "packages/pipe",
+    "packages/result",
+    "packages/turboq"
+  ],
   "nodeModulesDir": "auto",
   "imports": {
+    "@deno/graph": "jsr:@deno/graph@^0.107.1",
     "std/assert": "jsr:@std/assert",
-    "std/path": "jsr:@std/path",
-    // dev dependencies
-    "@ark/attest": "npm:@ark/attest",
-    "typescript": "npm:typescript@^6.0.2"
+    "std/path": "jsr:@std/path"
   },
   "tasks": {
     "test": "deno test -A",

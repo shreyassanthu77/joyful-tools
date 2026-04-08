@@ -1,10 +1,10 @@
 {
-  "name": "@joyful-tools/root",
+  "name": "@joyful/tools",
   "private": true,
-  "workspaces": [
-    "packages/pipe",
-    "packages/result",
-    "packages/fetch",
-    "packages/turboq"
-  ]
+  "devDependencies": {
+    "@ark/attest": "^0.56.0",
+    "rolldown": "^1.0.0-rc.13",
+    "rolldown-plugin-dts": "^0.23.2",
+    "typescript": "^6.0.2"
+  }
 }
