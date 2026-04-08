@@ -126,7 +126,8 @@ async function buildPackage(pkg: string) {
         key,
         {
           import: {
-            default: destSourceFile,
+            node: destSourceFile,
+            import: value,
             types: destDtsFile,
           },
         },
