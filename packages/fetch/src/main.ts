@@ -394,7 +394,10 @@ export class JoyfulResponse
   > {
     const result = await this.#response;
     if (result instanceof Ok) return new FetchedResponse(result.value);
-    // @ts-expect-error - we know the value is an error so we can safely cast to a result with a different Value type
+    // @ts-expect-error - we know the value is an error so we can safely cast to
+    // a result with a different Value type. The yield below causes Result.run to
+    // stop iterating and return the error, so the throw on the next line is
+    // never reached.
     yield result;
     throw "unreachable";
   }
