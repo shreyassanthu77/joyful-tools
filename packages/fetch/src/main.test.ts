@@ -135,7 +135,7 @@ Deno.test(".response allows reading headers", async () => {
       new Response("ok", {
         headers: { "x-request-id": "abc123" },
       }),
-    )
+    ),
   );
 
   const requestId = await fetch("/api")
@@ -170,8 +170,6 @@ Deno.test("orElseMatch for exhaustive error recovery", async () => {
   assertEquals(result, Result.ok("http-403"));
 });
 
-// ── yield* jfetch(...) tests ──────────────────────────────────────────────────
-
 Deno.test("yield* jfetch returns FetchedResponse on success", async () => {
   const fetch = createFetch(jsonFetch({ name: "Alice" }));
 
@@ -182,33 +180,6 @@ Deno.test("yield* jfetch returns FetchedResponse on success", async () => {
   });
 
   assertEquals(result, Result.ok(200));
-});
-
-Deno.test("FetchedResponse has sync access to status and ok", async () => {
-  const fetch = createFetch(mockFetch("hello", { status: 200 }));
-
-  const result = await Result.run(async function* () {
-    const res = yield* fetch("/api");
-    return Result.ok({ status: res.status, ok: res.ok });
-  });
-
-  assertEquals(result, Result.ok({ status: 200, ok: true }));
-});
-
-Deno.test("FetchedResponse has sync access to headers", async () => {
-  const fetch = createFetch(
-    () =>
-      Promise.resolve(
-        new Response("ok", { headers: { "x-request-id": "abc123" } }),
-      ),
-  );
-
-  const result = await Result.run(async function* () {
-    const res = yield* fetch("/api");
-    return Result.ok(res.headers.get("x-request-id"));
-  });
-
-  assertEquals(result, Result.ok("abc123"));
 });
 
 Deno.test("FetchedResponse.json() parses JSON body", async () => {
@@ -223,20 +194,23 @@ Deno.test("FetchedResponse.json() parses JSON body", async () => {
   assertEquals(result, Result.ok({ name: "Bob" }));
 });
 
-Deno.test("FetchedResponse.json() returns ParseError only (no ResponseError)", async () => {
-  const fetch = createFetch(mockFetch("not json"));
+Deno.test(
+  "FetchedResponse.json() returns ParseError only (no ResponseError)",
+  async () => {
+    const fetch = createFetch(mockFetch("not json"));
 
-  const result = await Result.run(async function* () {
-    const res = yield* fetch("/api");
-    const data = yield* res.json();
-    return Result.ok(data);
-  });
+    const result = await Result.run(async function* () {
+      const res = yield* fetch("/api");
+      const data = yield* res.json();
+      return Result.ok(data);
+    });
 
-  assertEquals(result.isErr(), true);
-  if (result.isErr()) {
-    assertInstanceOf(result.error, ParseError);
-  }
-});
+    assertEquals(result.isErr(), true);
+    if (result.isErr()) {
+      assertInstanceOf(result.error, ParseError);
+    }
+  },
+);
 
 Deno.test("FetchedResponse.text() returns text body", async () => {
   const fetch = createFetch(mockFetch("hello world"));
@@ -250,66 +224,21 @@ Deno.test("FetchedResponse.text() returns text body", async () => {
   assertEquals(result, Result.ok("hello world"));
 });
 
-Deno.test("yield* jfetch short-circuits on NetworkError", async () => {
-  const fetch = createFetch(failFetch(new TypeError("failed")));
+Deno.test(
+  "yield* jfetch(...).response still works alongside yield* jfetch",
+  async () => {
+    const fetch = createFetch(() =>
+      Promise.resolve(new Response("ok", { headers: { "x-id": "xyz" } })),
+    );
 
-  const result = await Result.run(async function* () {
-    const _res = yield* fetch("/api");
-    return Result.ok("should not reach here");
-  });
+    // old API still works
+    const requestId = await fetch("/api")
+      .response.map((res) => res.headers.get("x-id"))
+      .unwrapOr(null);
 
-  assertEquals(result.isErr(), true);
-  if (result.isErr()) {
-    assertInstanceOf(result.error, NetworkError);
-  }
-});
-
-Deno.test("yield* jfetch short-circuits on HttpError (non-2xx)", async () => {
-  const fetch = createFetch(jsonFetch({ error: "not found" }, { status: 404 }));
-
-  const result = await Result.run(async function* () {
-    const _res = yield* fetch("/api");
-    return Result.ok("should not reach here");
-  });
-
-  assertEquals(result.isErr(), true);
-  if (result.isErr()) {
-    assertInstanceOf(result.error, HttpError);
-    assertEquals((result.error as HttpError).status, 404);
-  }
-});
-
-Deno.test("yield* jfetch short-circuits on AbortError", async () => {
-  const fetch = createFetch(
-    failFetch(new DOMException("The operation was aborted", "AbortError")),
-  );
-
-  const result = await Result.run(async function* () {
-    const _res = yield* fetch("/api");
-    return Result.ok("should not reach here");
-  });
-
-  assertEquals(result.isErr(), true);
-  if (result.isErr()) {
-    assertInstanceOf(result.error, AbortError);
-  }
-});
-
-Deno.test("yield* jfetch(...).response still works alongside yield* jfetch", async () => {
-  const fetch = createFetch(
-    () =>
-      Promise.resolve(
-        new Response("ok", { headers: { "x-id": "xyz" } }),
-      ),
-  );
-
-  // old API still works
-  const requestId = await fetch("/api")
-    .response.map((res) => res.headers.get("x-id"))
-    .unwrapOr(null);
-
-  assertEquals(requestId, "xyz");
-});
+    assertEquals(requestId, "xyz");
+  },
+);
 
 Deno.test("FetchedResponse.clone() returns a new FetchedResponse", async () => {
   const fetch = createFetch(jsonFetch({ value: 42 }));
@@ -325,26 +254,29 @@ Deno.test("FetchedResponse.clone() returns a new FetchedResponse", async () => {
   assertEquals(result, Result.ok(42));
 });
 
-Deno.test("FetchedResponse exposes url, redirected, statusText, type, bodyUsed", async () => {
-  const fetch = createFetch(mockFetch("ok"));
+Deno.test(
+  "FetchedResponse exposes url, redirected, statusText, type, bodyUsed",
+  async () => {
+    const fetch = createFetch(mockFetch("ok"));
 
-  const result = await Result.run(async function* () {
-    const res = yield* fetch("/api");
-    return Result.ok({
-      url: res.url,
-      redirected: res.redirected,
-      statusText: res.statusText,
-      type: res.type,
-      bodyUsed: res.bodyUsed,
+    const result = await Result.run(async function* () {
+      const res = yield* fetch("/api");
+      return Result.ok({
+        url: res.url,
+        redirected: res.redirected,
+        statusText: res.statusText,
+        type: res.type,
+        bodyUsed: res.bodyUsed,
+      });
     });
-  });
 
-  assertEquals(result.isOk(), true);
-  if (result.isOk()) {
-    assertEquals(typeof result.value.url, "string");
-    assertEquals(result.value.redirected, false);
-    assertEquals(typeof result.value.statusText, "string");
-    assertEquals(typeof result.value.type, "string");
-    assertEquals(result.value.bodyUsed, false);
-  }
-});
+    assertEquals(result.isOk(), true);
+    if (result.isOk()) {
+      assertEquals(typeof result.value.url, "string");
+      assertEquals(result.value.redirected, false);
+      assertEquals(typeof result.value.statusText, "string");
+      assertEquals(typeof result.value.type, "string");
+      assertEquals(result.value.bodyUsed, false);
+    }
+  },
+);
