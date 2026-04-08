@@ -4,8 +4,9 @@
  * 1. Checks that the working directory is clean
  * 2. Asks which package to bump and bump type (major/minor/patch)
  * 3. Runs tests
- * 4. Updates both deno.json and package.json
+ * 4. Updates deno.json
  * 5. Commits the version bump
+ * 6. Creates a git tag and pushes it
  *
  * Usage: deno task bump
  */
@@ -44,24 +45,22 @@ if (status.stdout !== "") {
 }
 console.log("Working directory is clean.\n");
 
-const workspacePkgJson = JSON.parse(
-  await Deno.readTextFile(join(root, "package.json")),
+const workspaceConfig = JSON.parse(
+  await Deno.readTextFile(join(root, "deno.json")),
 );
-const workspaces: string[] = workspacePkgJson.workspaces;
+const workspaces: string[] = workspaceConfig.workspace;
 
 type Package = {
   dir: string;
   name: string;
   version: string;
   denoJsonPath: string;
-  pkgJsonPath: string;
 };
 
 // Gather all packages with versions
 const packages: Package[] = [];
 for (const dir of workspaces) {
   const denoJsonPath = join(root, dir, "deno.json");
-  const pkgJsonPath = join(root, dir, "package.json");
 
   let denoJson: { name?: string; version?: string };
   try {
@@ -72,19 +71,11 @@ for (const dir of workspaces) {
 
   if (!denoJson.version || !denoJson.name) continue;
 
-  let pkgJson: { name?: string };
-  try {
-    pkgJson = JSON.parse(await Deno.readTextFile(pkgJsonPath));
-  } catch {
-    continue;
-  }
-
   packages.push({
     dir,
-    name: pkgJson.name ?? denoJson.name ?? dir,
+    name: denoJson.name,
     version: denoJson.version,
     denoJsonPath,
-    pkgJsonPath,
   });
 }
 
@@ -164,14 +155,6 @@ for (const pkg of toBump) {
     JSON.stringify(denoJson, null, 2) + "\n",
   );
 
-  // Update package.json
-  const pkgJson = JSON.parse(await Deno.readTextFile(pkg.pkgJsonPath));
-  pkgJson.version = newVersion;
-  await Deno.writeTextFile(
-    pkg.pkgJsonPath,
-    JSON.stringify(pkgJson, null, 2) + "\n",
-  );
-
   console.log(`${pkg.name}: ${pkg.version} -> ${newVersion}`);
   bumped.push({ name: pkg.name, from: pkg.version, to: newVersion });
 }
@@ -189,6 +172,26 @@ if (commit.code !== 0) {
   if (commit.stderr) console.error(commit.stderr);
   Deno.exit(1);
 }
-
 console.log(`\nCommitted: ${commitMsg}`);
+
+// 5. Create git tag and push
+const sha = await run(["git", "rev-parse", "--short", "HEAD"]);
+const tagName = `release-${sha.stdout}`;
+
+const tag = await run(["git", "tag", tagName]);
+if (tag.code !== 0) {
+  console.error(`\nFailed to create tag ${tagName}.\n`);
+  if (tag.stderr) console.error(tag.stderr);
+  Deno.exit(1);
+}
+console.log(`Tagged: ${tagName}`);
+
+const push = await run(["git", "push", "--follow-tags"]);
+if (push.code !== 0) {
+  console.error("\nFailed to push.\n");
+  if (push.stderr) console.error(push.stderr);
+  Deno.exit(1);
+}
+console.log("Pushed commit and tag.");
+
 console.log("\nDone!");
