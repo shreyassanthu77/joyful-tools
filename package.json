@@ -1,8 +1,10 @@
 {
-  "name": "@joyful/tools",
+  "name": "@joyful-tools/root",
   "private": true,
-  "devDependencies": {
-    "@ark/attest": "^0.56.0",
-    "typescript": "^6.0.2"
-  }
+  "workspaces": [
+    "packages/pipe",
+    "packages/result",
+    "packages/fetch",
+    "packages/turboq"
+  ]
 }

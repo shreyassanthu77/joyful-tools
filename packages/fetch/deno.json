@@ -8,6 +8,6 @@
     ".": "./src/main.ts"
   },
   "publish": {
-    "include": ["LICENSE", "README.md", "src/main.ts", "src/errors.ts"]
+    "include": ["LICENSE", "README.md", "src/main.ts"]
   }
 }

@@ -1,0 +1,18 @@
+{
+  "name": "@joyful-tools/turboq",
+  "version": "0.0.1",
+  "type": "module",
+  "license": "MIT",
+  "private": true,
+  "description": "A durable queue with CAS-based storage, heartbeat timeouts, and retry logic",
+  "exports": {
+    ".": {
+      "default": "./src/main.ts"
+    }
+  },
+  "files": [
+    "src/main.ts",
+    "LICENSE",
+    "README.md"
+  ]
+}

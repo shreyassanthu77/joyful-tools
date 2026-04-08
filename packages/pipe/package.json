@@ -1,0 +1,13 @@
+{
+  "name": "@joyful-tools/pipe",
+  "version": "0.0.8",
+  "type": "module",
+  "license": "MIT",
+  "description": "A type-safe pipe function for left-to-right function composition",
+  "exports": {
+    ".": {
+      "default": "./src/main.ts"
+    }
+  },
+  "files": ["src/main.ts", "LICENSE", "README.md"]
+}
