@@ -397,3 +397,15 @@ Deno.test(
     attest(res).type.toString.snap("AsyncResult<number, B>");
   },
 );
+
+Deno.test("Async Result.wrap with signal adds Cancelled", () => {
+  const res = Result.wrap(
+    {
+      try: async (_sig) => 1,
+      catch: () => "boom" as const,
+    },
+    { signal: new AbortController().signal },
+  );
+
+  attest<AsyncResult<number, Result.Cancelled | "boom">>(res);
+});

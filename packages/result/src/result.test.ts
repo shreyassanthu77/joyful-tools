@@ -229,6 +229,24 @@ Deno.test("Result.wrap", async () => {
     }),
     Result.err("boom"),
   );
+
+  const aborted = AbortSignal.abort("timeout");
+  const cancelled = await Result.wrap(
+    {
+      // deno-lint-ignore require-await
+      try: async (signal) => {
+        signal.throwIfAborted?.();
+        return 1;
+      },
+      catch: () => "boom",
+    },
+    { signal: aborted },
+  );
+
+  assertEquals(cancelled.isErr(), true);
+  if (cancelled.isErr()) {
+    assertInstanceOf(cancelled.error, Result.Cancelled);
+  }
 });
 
 Deno.test("taggedError", () => {

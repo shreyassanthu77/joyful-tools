@@ -44,12 +44,14 @@ export * from "./result.ts";
 export * from "./async-result.ts";
 
 import { AsyncResult } from "./async-result.ts";
+import { taggedError, type TaggedErrorFactory } from "./errors.ts";
 export {
   type TaggedError,
   taggedError,
   type TaggedErrorFactory,
 } from "./errors.ts";
 import { Err, Ok } from "./result.ts";
+
 /**
  * A value that is either a successful {@link Ok} or a failed {@link Err}.
  *
@@ -114,55 +116,87 @@ export namespace Result {
     catch: (e: unknown) => E;
   }
 
-  /**
-   * Wraps an async computation and converts promise rejections into an error result.
-   *
-   * This overload is selected when `try` returns a `Promise`.
-   *
-   * @param options Async operation and error-mapping callback.
-   * @returns An {@link AsyncResult} that resolves to `Ok` on success or `Err` on rejection.
-   *
-   * @example
-   * ```typescript
-   * const user = await Result.wrap({
-   *   try: async () => {
-   *     const response = await fetch("/api/user");
-   *     return response.json();
-   *   },
-   *   catch: (error) =>
-   *     error instanceof Error ? error.message : String(error),
-   * });
-   * ```
-   */
-  export function wrap<T, E>(
-    options: WrapOptions<Promise<T>, E>,
-  ): AsyncResult<T, E>;
+  export interface WrapOptionsAsync<T, E> {
+    /** Function to execute and capture as a result. */
+    try: (signal: AbortSignal) => T;
+    /** Converts a thrown or rejected value into the result error type. */
+    catch: (e: unknown) => E;
+  }
 
-  /**
-   * Wraps a synchronous computation and converts thrown exceptions into an error result.
-   *
-   * Use this when you need to integrate existing throw-based code into a
-   * `Result` flow without leaving errors as exceptions.
-   *
-   * @param options Operation and error-mapping callback.
-   * @returns An {@link Ok} on success or an {@link Err} if `try` throws.
-   *
-   * @example
-   * ```typescript
-   * const parsed = Result.wrap({
-   *   try: () => JSON.parse('{"port":3000}') as { port: number },
-   *   catch: () => "invalid json",
-   * });
-   * ```
-   */
+  export function wrap<T extends Promise<unknown>, E>(
+    options: WrapOptionsAsync<T, E>,
+  ): AsyncResult<Awaited<T>, E>;
+  export function wrap<T extends Promise<unknown>, E>(
+    options: WrapOptionsAsync<T, E>,
+    runOptions: { signal: AbortSignal },
+  ): AsyncResult<Awaited<T>, E | Cancelled>;
   export function wrap<T, E>(options: WrapOptions<T, E>): Result<T, E>;
   export function wrap<T, E>(
-    options: WrapOptions<T, E>,
-  ): Result<T, E> | AsyncResult<T, E> {
+    options: WrapOptions<T, E> | WrapOptionsAsync<T, E>,
+    runOptions?: { signal: AbortSignal },
+  ): Result<T, E> | AsyncResult<T, E | Cancelled> {
+    const signal = runOptions?.signal;
+
+    if (signal?.aborted) {
+      return Result.err(
+        new Cancelled({
+          message:
+            signal.reason instanceof Error
+              ? `Cancelled: ${signal.reason.message}`
+              : typeof signal.reason === "string"
+                ? `Cancelled: ${signal.reason}`
+                : "Cancelled",
+          cause: signal.reason,
+        }),
+      ).async();
+    }
+
     try {
-      const value = options.try();
+      const value = options.try(signal ?? new AbortController().signal);
       if (value instanceof Promise) {
-        return AsyncResult.wrap(value, options.catch);
+        if (!signal) return AsyncResult.wrap(value, options.catch);
+
+        const { promise, resolve } =
+          Promise.withResolvers<Result<T, E | Cancelled>>();
+        // deno-lint-ignore no-inner-declarations
+        function abort() {
+          resolve(
+            Result.err(
+              new Cancelled({
+                message:
+                  signal.reason instanceof Error
+                    ? `Cancelled: ${signal.reason.message}`
+                    : typeof signal.reason === "string"
+                      ? `Cancelled: ${signal.reason}`
+                      : "Cancelled",
+                cause: signal.reason,
+              }),
+            ),
+          );
+        }
+        signal.addEventListener("abort", abort, { once: true });
+        value
+          .then(
+            (res) => resolve(new Ok(res)),
+            (rej) => {
+              // check if the promise is rejected with an AbortError
+              if (rej instanceof Error && rej.name === "AbortError") {
+                resolve(
+                  new Err(
+                    new Cancelled({
+                      message: rej.message,
+                      cause: rej,
+                    }),
+                  ),
+                );
+                return;
+              }
+
+              resolve(new Err(options.catch(rej)));
+            },
+          )
+          .finally(() => signal.removeEventListener("abort", abort));
+        return new AsyncResult(promise);
       }
       return new Ok(value);
     } catch (e) {
@@ -175,6 +209,12 @@ export namespace Result {
 
   /** Extracts the error type from an {@link Err} value. */
   export type ExtractErr<T> = T extends Err<unknown, infer E> ? E : never;
+
+  const CancelledBase = taggedError(
+    "Cancelled",
+  ) as TaggedErrorFactory<"Cancelled">;
+  /** Shared cancellation outcome used by signal-aware async helpers. */
+  export class Cancelled extends CancelledBase {}
 
   /**
    * Runs a generator that uses `yield*` with {@link Result} values.

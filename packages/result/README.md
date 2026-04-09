@@ -45,6 +45,7 @@ deno add jsr:@joyful/result
 - Recover tagged errors with `orElseMatch()` and `orElseMatchSome()`.
 - Model domain failures with `Result.taggedError()`.
 - Wrap throwing or rejecting code with `Result.wrap()`.
+- Propagate cancellation with `Result.Cancelled` in signal-aware async helpers.
 - Compose complex flows with `Result.run()` and `yield*`.
 - Use the same model for async code with `AsyncResult`.
 
@@ -360,14 +361,15 @@ const value = await Result.ok(2)
 ### Wrapping async work
 
 When you already have a promise-producing function and want to capture
-rejections as data, `Result.wrap()` can return an `AsyncResult` directly:
+rejections as data, `Result.wrap()` can return an `AsyncResult` directly. For
+async work, the `try` callback always receives an `AbortSignal`:
 
 ```typescript
 import { Result } from "@joyful/result";
 
 const config = await Result.wrap({
-  try: async () => {
-    const response = await fetch("https://example.com/config.json");
+  try: async (signal) => {
+    const response = await fetch("https://example.com/config.json", { signal });
     if (!response.ok) {
       throw new Error(`request failed: ${response.status}`);
     }
@@ -377,6 +379,46 @@ const config = await Result.wrap({
   catch: (error) => error instanceof Error ? error.message : String(error),
 });
 ```
+
+Pass `{ signal }` when you want cancellation to be reflected in the result type
+as `Result.Cancelled`:
+
+```typescript
+import { Result } from "@joyful/result";
+
+const signal = AbortSignal.timeout(5000);
+
+const config = await Result.wrap({
+  try: async (signal) => {
+    const response = await fetch("https://example.com/config.json", { signal });
+    return response.json();
+  },
+  catch: (error) => error instanceof Error ? error.message : String(error),
+}, { signal });
+
+if (config.isErr() && config.error instanceof Result.Cancelled) {
+  console.error("request cancelled");
+}
+```
+
+If you omit `{ signal }`, async `Result.wrap()` still passes a signal-shaped
+callback into your async boundary, but cancellation does not widen the error
+type:
+
+```typescript
+import { Result } from "@joyful/result";
+
+const config = await Result.wrap({
+  try: async (signal) => {
+    const response = await fetch("https://example.com/config.json", { signal });
+    return response.json();
+  },
+  catch: (error) => error instanceof Error ? error.message : String(error),
+});
+```
+
+That form is useful when the wrapped API expects an `AbortSignal`, but you do
+not need cancellation to widen the error type to `Result.Cancelled`.
 
 You can still build an `AsyncResult` manually when you need to work at the
 `Promise<Result<T, E>>` level:
@@ -464,12 +506,42 @@ const result = await Result.run(async function* () {
 // Ok(42)
 ```
 
+For cancellable async flows, keep `Result.run()` as plain composition and use
+`Result.wrap()` at the boundary where promise-based work is created:
+
+```typescript
+import { Result } from "@joyful/result";
+
+const signal = AbortSignal.timeout(5000);
+
+const result = await Result.run(async function* () {
+  const config = yield* Result.wrap({
+    try: async (signal) => {
+      const response = await fetch("https://example.com/config.json", {
+        signal,
+      });
+      return response.json();
+    },
+    catch: (error) => error instanceof Error ? error.message : String(error),
+  }, { signal });
+
+  return Result.ok(config.theme);
+});
+
+if (result.isErr() && result.error instanceof Result.Cancelled) {
+  console.error("cancelled");
+}
+```
+
 ## API Overview
 
 - `Result<T, E>`: union type of `Ok<T, E>` and `Err<T, E>`.
 - `Result.ok(value)`: create a successful result.
 - `Result.err(error)`: create a failed result.
 - `Result.taggedError(tag)`: create tagged `Error` subclasses for domain errors.
+- `Result.Cancelled`: shared cancellation outcome for async
+  `Result.wrap(..., {
+  signal })`.
 - `Result.wrap(options)`: convert throwing or rejecting code into a result.
 - `Ok` and `Err`: concrete classes with `.value` and `.error` fields.
 - `map()` and `mapErr()`: transform success and error values.
