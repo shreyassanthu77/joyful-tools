@@ -4,15 +4,18 @@
 
 - Monorepo managed by Deno workspace (`deno.json` at repo root).
 - Build/publish scripts live in `scripts/`.
-- NPM-ready artifacts are generated into `dist/` (do not hand-edit generated files).
+- NPM-ready artifacts are generated into `dist/` (do not hand-edit generated
+  files).
 - Tests live next to source files as `*.test.ts`.
 
 ## Environment And Tooling
 
 - Runtime/tooling: Deno 2.x.
 - Language: TypeScript (ESM, explicit `.ts` local import specifiers).
-- Node/npm are required for build packaging (`scripts/build.ts` runs `npm install` inside `dist/*`).
-- Deno lockfile is committed (`deno.lock`); keep it consistent with dependency changes.
+- Node/npm are required for build packaging (`scripts/build.ts` runs
+  `npm install` inside `dist/*`).
+- Deno lockfile is committed (`deno.lock`); keep it consistent with dependency
+  changes.
 
 ## Commands
 
@@ -62,11 +65,14 @@ deno check packages/fetch/src/main.ts
 ## Test Authoring Conventions
 
 - Use `Deno.test("descriptive name", ...)` with sentence-style names.
-- Use assertions from `std/assert` (`assertEquals`, `assertInstanceOf`, `assertThrows`, `assertRejects`).
+- Use assertions from `std/assert` (`assertEquals`, `assertInstanceOf`,
+  `assertThrows`, `assertRejects`).
 - Keep unit tests deterministic; mock `fetch` in `fetch` package tests.
-- For result-flow tests, verify both value and type narrowing behavior when relevant.
+- For result-flow tests, verify both value and type narrowing behavior when
+  relevant.
 - Type-level tests use `@ark/attest` in `packages/result/src/types.test.ts`.
-- If adding type-level assertions, follow existing `setup()` / `teardown()` pattern.
+- If adding type-level assertions, follow existing `setup()` / `teardown()`
+  pattern.
 - Prefer focused test files near the implementation under test.
 
 ## Code Style Guidelines
@@ -80,16 +86,19 @@ deno check packages/fetch/src/main.ts
 
 - Prefer `Result` / `AsyncResult` for expected failures.
 - Prefer `taggedError("Tag")` for domain errors that need structured matching.
-- Keep `_tag`-based matching exhaustive via `orElseMatch` when all cases must be handled.
+- Keep `_tag`-based matching exhaustive via `orElseMatch` when all cases must be
+  handled.
 - Use `orElseMatchSome` when intentionally handling only part of an error union.
-- Reserve throwing for truly exceptional/programmer-error paths or script-fatal conditions.
+- Reserve throwing for truly exceptional/programmer-error paths or script-fatal
+  conditions.
 - Preserve original error causes (`cause`) when wrapping failures.
 
 ### Classes And State
 
 - Use `#privateField` for internal mutable state in classes (as in `Turboq`).
 - Keep public methods small and explicit about side effects.
-- Emit typed events for lifecycle/state transitions when extending event-driven APIs.
+- Emit typed events for lifecycle/state transitions when extending event-driven
+  APIs.
 
 ### Documentation
 
@@ -102,5 +111,6 @@ deno check packages/fetch/src/main.ts
 - Run targeted tests for touched files first.
 - Run full `deno task test` for broad or cross-package changes.
 - Run `deno fmt` and `deno lint` before finalizing non-trivial edits.
-- If exports change, update package `README.md` and relevant `src/main.ts` exports.
+- If exports change, update package `README.md` and relevant `src/main.ts`
+  exports.
 - If build/publish behavior changes, validate with `deno task build`.

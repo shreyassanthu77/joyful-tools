@@ -1,7 +1,7 @@
 import { dts } from "rolldown-plugin-dts";
 import { build } from "rolldown";
-import { join, basename, dirname, relative } from "node:path";
-import { pathToFileURL, fileURLToPath } from "node:url";
+import { basename, dirname, join, relative } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { createGraph } from "@deno/graph";
 
 const cwd = Deno.cwd();
@@ -148,7 +148,7 @@ async function buildPackage(pkg: string) {
   start = performance.now();
   await build({
     input: Object.values(config.exports).map((path) =>
-      join(packageDestDir, path),
+      join(packageDestDir, path)
     ),
     cwd: packageDestDir,
     external: Array.from(deps),
