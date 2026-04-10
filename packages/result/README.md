@@ -45,6 +45,7 @@ deno add jsr:@joyful/result
 - Recover tagged errors with `orElseMatch()` and `orElseMatchSome()`.
 - Model domain failures with `taggedError()`.
 - Wrap throwing or rejecting code with `Result.wrap()`.
+- Retry transient failures with configurable backoff via `Result.retry()`.
 - Propagate cancellation with `Result.Cancelled` in signal-aware async helpers.
 - Compose complex flows with `Result.run()` and `yield*`.
 - Use the same model for async code with `AsyncResult`.
@@ -284,6 +285,158 @@ const parsed = Result.wrap({
 });
 
 // Err("Unexpected token 'o', \"not json\" is not valid JSON")
+```
+
+## Retrying Fallible Operations With `Result.retry`
+
+`Result.retry()` calls a result-returning factory function repeatedly until it
+succeeds or a retry schedule is exhausted. It is modeled after the Deno KV queue
+backoff pattern: you supply a `schedule` array of delays (in ms), where the
+array length determines the maximum number of retries and each element is the
+delay before that retry.
+
+### Basic retry with default schedule
+
+Without options, `Result.retry()` uses the default schedule of
+`[1000, 5000, 10000]` (up to 3 retries with 1 s, 5 s, and 10 s delays):
+
+```typescript
+import { Result } from "@joyful/result";
+
+const result = await Result.retry(
+  (attempt) =>
+    Result.wrap({
+      try: () => fetch("/api/data"),
+      catch: (e) => (e instanceof Error ? e.message : String(e)),
+    }),
+);
+```
+
+The factory receives the current `attempt` number (0-indexed). On the first
+call, `attempt` is `0`.
+
+### Custom schedule
+
+Pass `schedule` to control backoff durations and the number of retries:
+
+```typescript
+import { Result } from "@joyful/result";
+
+const result = await Result.retry(
+  (attempt) =>
+    Result.wrap({
+      try: () => fetch("/api/data"),
+      catch: (e) => (e instanceof Error ? e.message : String(e)),
+    }),
+  { schedule: [100, 200, 400] },
+);
+```
+
+An empty schedule (`[]`) means no retries — the factory runs exactly once.
+
+### Early exit with `while`
+
+The `while` predicate is called after each failure. Return `false` to stop
+retrying immediately. This is useful when certain errors are not transient:
+
+```typescript
+import { Result, taggedError } from "@joyful/result";
+
+class NotFoundError extends taggedError("NotFoundError")<{
+  url: string;
+}> {}
+
+class TimeoutError extends taggedError("TimeoutError")<{
+  ms: number;
+}> {}
+
+const result = await Result.retry(
+  (attempt) =>
+    Result.wrap({
+      try: () => fetch("/api/data"),
+      catch: classifyError,
+    }),
+  {
+    schedule: [500, 1000, 2000],
+    while: (err) => err._tag !== "NotFoundError",
+  },
+);
+```
+
+When `while` returns `false`, the current error is returned as-is (not wrapped
+in `RetriesExhausted`).
+
+The `while` callback also supports returning a `Promise<boolean>`, which is
+useful when the retry decision depends on async checks:
+
+```typescript
+const result = await Result.retry(
+  (attempt) =>
+    Result.wrap({
+      try: () => fetch("/api/data"),
+      catch: classifyError,
+    }),
+  {
+    while: async (err, attempt) => {
+      const healthy = await checkServiceHealth();
+      return healthy;
+    },
+  },
+);
+```
+
+### Handling `RetriesExhausted`
+
+When the schedule is fully exhausted, the final error is wrapped in
+`Result.RetriesExhausted`. This tagged error carries the total number of
+attempts and the last error encountered:
+
+```typescript
+import { Result } from "@joyful/result";
+
+const result = await Result.retry(
+  () =>
+    Result.wrap({
+      try: () => fetch("/api/data"),
+      catch: (e) => (e instanceof Error ? e.message : String(e)),
+    }),
+  { schedule: [100, 200] },
+);
+
+if (result.isErr() && result.error instanceof Result.RetriesExhausted) {
+  console.log(result.error.attempts); // 3 (1 initial + 2 retries)
+  console.log(result.error.lastError); // the error from the final attempt
+}
+```
+
+You can also match on `RetriesExhausted` with `orElseMatchSome()`:
+
+```typescript
+const recovered = result.orElseMatchSome({
+  RetriesExhausted: (err) => Result.ok(fallbackValue),
+});
+```
+
+### Composing with `Result.run`
+
+`Result.retry()` returns an `AsyncResult`, so it composes naturally with
+`yield*` inside `Result.run`:
+
+```typescript
+import { Result } from "@joyful/result";
+
+const result = await Result.run(async function* () {
+  const data = yield* Result.retry(
+    () =>
+      Result.wrap({
+        try: () => fetch("/api/data").then((r) => r.json()),
+        catch: (e) => (e instanceof Error ? e.message : String(e)),
+      }),
+    { schedule: [500, 1000] },
+  );
+
+  return Result.ok(data);
+});
 ```
 
 ## Generator Composition With `Result.run`
@@ -543,6 +696,9 @@ if (result.isErr() && result.error instanceof Result.Cancelled) {
   `Result.wrap(..., {
   signal })`.
 - `Result.wrap(options)`: convert throwing or rejecting code into a result.
+- `Result.retry(fn, options?)`: retry a result-returning function with
+  configurable backoff.
+- `Result.RetriesExhausted`: tagged error when all retry attempts are exhausted.
 - `Ok` and `Err`: concrete classes with `.value` and `.error` fields.
 - `map()` and `mapErr()`: transform success and error values.
 - `andThen()` and `orElse()`: compose additional result-returning operations.
