@@ -79,7 +79,12 @@
  * ```
  */
 
-import { AsyncResult, Result, taggedError } from "@joyful/result";
+import {
+  AsyncResult,
+  Result,
+  taggedError,
+  type TaggedErrorFactory,
+} from "@joyful/result";
 
 /**
  * Default `jfetch` using `globalThis.fetch`.
@@ -536,7 +541,8 @@ export class FetchedResponse {
   }
 }
 
-const NetworkErrorBase = taggedError("NetworkError");
+const NetworkErrorBase: TaggedErrorFactory<"NetworkError"> =
+  taggedError("NetworkError");
 /**
  * Thrown when `fetch` itself fails — DNS resolution, CORS, network unreachable, etc.
  *
@@ -552,7 +558,7 @@ const NetworkErrorBase = taggedError("NetworkError");
  */
 export class NetworkError extends NetworkErrorBase {}
 
-const HttpErrorBase = taggedError("HttpError");
+const HttpErrorBase: TaggedErrorFactory<"HttpError"> = taggedError("HttpError");
 /**
  * Thrown when the response has a non-2xx status code.
  *
@@ -593,7 +599,8 @@ export class HttpError extends HttpErrorBase<{
   status: number;
 }> {}
 
-const ParseErrorBase = taggedError("ParseError");
+const ParseErrorBase: TaggedErrorFactory<"ParseError"> =
+  taggedError("ParseError");
 /**
  * Thrown when body parsing fails (e.g. `response.json()` on invalid JSON).
  *
