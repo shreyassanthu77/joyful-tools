@@ -140,12 +140,11 @@ export namespace Result {
     if (signal?.aborted) {
       return Result.err(
         new Cancelled({
-          message:
-            signal.reason instanceof Error
-              ? `Cancelled: ${signal.reason.message}`
-              : typeof signal.reason === "string"
-                ? `Cancelled: ${signal.reason}`
-                : "Cancelled",
+          message: signal.reason instanceof Error
+            ? `Cancelled: ${signal.reason.message}`
+            : typeof signal.reason === "string"
+            ? `Cancelled: ${signal.reason}`
+            : "Cancelled",
           cause: signal.reason,
         }),
       ).async();
@@ -156,19 +155,19 @@ export namespace Result {
       if (value instanceof Promise) {
         if (!signal) return AsyncResult.wrap(value, options.catch);
 
-        const { promise, resolve } =
-          Promise.withResolvers<Result<T, E | Cancelled>>();
+        const { promise, resolve } = Promise.withResolvers<
+          Result<T, E | Cancelled>
+        >();
         // deno-lint-ignore no-inner-declarations
         function abort() {
           resolve(
             Result.err(
               new Cancelled({
-                message:
-                  signal.reason instanceof Error
-                    ? `Cancelled: ${signal.reason.message}`
-                    : typeof signal.reason === "string"
-                      ? `Cancelled: ${signal.reason}`
-                      : "Cancelled",
+                message: signal.reason instanceof Error
+                  ? `Cancelled: ${signal.reason.message}`
+                  : typeof signal.reason === "string"
+                  ? `Cancelled: ${signal.reason}`
+                  : "Cancelled",
                 cause: signal.reason,
               }),
             ),
