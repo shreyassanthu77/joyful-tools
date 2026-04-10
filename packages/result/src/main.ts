@@ -215,6 +215,142 @@ export namespace Result {
   /** Shared cancellation outcome used by signal-aware async helpers. */
   export class Cancelled extends CancelledBase {}
 
+  const RetriesExhaustedBase = taggedError(
+    "RetriesExhausted",
+  ) as TaggedErrorFactory<"RetriesExhausted">;
+
+  /**
+   * Error returned when all retry attempts have been exhausted.
+   *
+   * Contains the total number of attempts and the last error encountered.
+   *
+   * @example
+   * ```typescript
+   * import { Result } from "@joyful/result";
+   *
+   * const result = await Result.retry(
+   *   () => Result.wrap({ try: () => fetch(url), catch: classifyError }),
+   *   { schedule: [500, 2000] },
+   * );
+   *
+   * if (result.isErr() && result.error._tag === "RetriesExhausted") {
+   *   console.log(`Failed after ${result.error.attempts} attempts`);
+   * }
+   * ```
+   */
+  export class RetriesExhausted<E> extends RetriesExhaustedBase<{
+    attempts: number;
+    lastError: E;
+  }> {}
+
+  /**
+   * Options for {@link Result.retry}.
+   */
+  export interface RetryOptions<E> {
+    /**
+     * Array of delay durations in milliseconds between retries.
+     *
+     * The length of this array determines the maximum number of retries.
+     * Each element is the delay before the corresponding retry attempt.
+     *
+     * @default [1000, 5000, 10000]
+     */
+    schedule?: number[];
+
+    /**
+     * Predicate that decides whether to continue retrying.
+     *
+     * Called with the error from the latest failed attempt and the attempt
+     * number (0-indexed). Return `false` to stop retrying early and return the
+     * current error as-is (not wrapped in {@link RetriesExhausted}).
+     *
+     * @default () => true
+     */
+    while?: (error: E, attempt: number) => boolean;
+  }
+
+  /** Default backoff schedule: 1s, 5s, 10s. */
+  const DEFAULT_SCHEDULE = [1000, 5000, 10000];
+
+  /**
+   * Retries a result-returning function with configurable backoff.
+   *
+   * The factory function is called with an `attempt` number starting at `0`.
+   * On failure, the function waits according to the `schedule` array before
+   * the next attempt. If all retries are exhausted, the result is wrapped in
+   * {@link RetriesExhausted}. If the `while` predicate returns `false`, the
+   * current error is returned immediately without wrapping.
+   *
+   * @param fn Factory that produces a result for each attempt.
+   * @param options Retry options including schedule and predicate.
+   * @returns An async result that resolves to the first success or the final error.
+   *
+   * @example
+   * ```typescript
+   * // Retry with default schedule (1s, 5s, 10s)
+   * const result = await Result.retry(
+   *   (attempt) => Result.wrap({
+   *     try: () => fetch("/api/data"),
+   *     catch: (e) => new FetchError({ cause: e }),
+   *   }),
+   * );
+   *
+   * // Retry with custom schedule and early-exit predicate
+   * const result = await Result.retry(
+   *   (attempt) => Result.wrap({
+   *     try: () => fetch("/api/data"),
+   *     catch: classifyError,
+   *   }),
+   *   {
+   *     schedule: [100, 200, 400],
+   *     while: (err, attempt) => err._tag !== "NotFound",
+   *   },
+   * );
+   * ```
+   */
+  export function retry<T, E>(
+    fn: (attempt: number) => Result<T, E> | AsyncResult<T, E>,
+    options?: RetryOptions<E>,
+  ): AsyncResult<T, E | RetriesExhausted<E>> {
+    const schedule = options?.schedule ?? DEFAULT_SCHEDULE;
+    const shouldRetry = options?.while ?? (() => true);
+
+    return new AsyncResult(retryLoop(fn, schedule, shouldRetry));
+  }
+
+  async function retryLoop<T, E>(
+    fn: (attempt: number) => Result<T, E> | AsyncResult<T, E>,
+    schedule: number[],
+    shouldRetry: (error: E, attempt: number) => boolean,
+  ): Promise<Result<T, E | RetriesExhausted<E>>> {
+    for (let attempt = 0; attempt <= schedule.length; attempt++) {
+      const resultOrAsync = fn(attempt);
+      const result: Result<T, E> = "then" in resultOrAsync
+        ? await resultOrAsync
+        : resultOrAsync;
+
+      if (result instanceof Ok) return result;
+      if (!shouldRetry(result.error, attempt)) return result;
+
+      if (attempt < schedule.length) {
+        await delay(schedule[attempt]);
+      } else {
+        return new Err(
+          new RetriesExhausted<E>({
+            attempts: attempt + 1,
+            lastError: result.error,
+          }),
+        );
+      }
+    }
+
+    throw new Error("unreachable");
+  }
+
+  function delay(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
   /**
    * Runs a generator that uses `yield*` with {@link Result} values.
    *
