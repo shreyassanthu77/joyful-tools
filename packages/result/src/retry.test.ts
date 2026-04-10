@@ -193,3 +193,29 @@ Deno.test(
     }
   },
 );
+
+Deno.test("Result.retry supports async while predicate", async () => {
+  let calls = 0;
+  const result = await Result.retry(
+    () => {
+      calls++;
+      return Result.err(
+        new PermanentError({ reason: "not found" }),
+      );
+    },
+    {
+      schedule: [10, 20, 30],
+      while: async (err) => {
+        // Simulate async check (e.g. probing a device)
+        await new Promise((r) => setTimeout(r, 5));
+        return err._tag !== "PermanentError";
+      },
+    },
+  );
+
+  assertEquals(result.isErr(), true);
+  if (result.isErr()) {
+    assertInstanceOf(result.error, PermanentError);
+  }
+  assertEquals(calls, 1);
+});

@@ -266,7 +266,7 @@ export namespace Result {
      *
      * @default () => true
      */
-    while?: (error: E, attempt: number) => boolean;
+    while?: (error: E, attempt: number) => boolean | Promise<boolean>;
   }
 
   /** Default backoff schedule: 1s, 5s, 10s. */
@@ -321,7 +321,7 @@ export namespace Result {
   async function retryLoop<T, E>(
     fn: (attempt: number) => Result<T, E> | AsyncResult<T, E>,
     schedule: number[],
-    shouldRetry: (error: E, attempt: number) => boolean,
+    shouldRetry: (error: E, attempt: number) => boolean | Promise<boolean>,
   ): Promise<Result<T, E | RetriesExhausted<E>>> {
     for (let attempt = 0; attempt <= schedule.length; attempt++) {
       const resultOrAsync = fn(attempt);
@@ -330,7 +330,7 @@ export namespace Result {
         : resultOrAsync;
 
       if (result instanceof Ok) return result;
-      if (!shouldRetry(result.error, attempt)) return result;
+      if (!(await shouldRetry(result.error, attempt))) return result;
 
       if (attempt < schedule.length) {
         await delay(schedule[attempt]);
