@@ -1,7 +1,7 @@
 import { assertEquals, assertInstanceOf } from "std/assert";
 import { Result } from "@joyful/result";
 import {
-  AbortError,
+  Cancelled,
   createFetch,
   FetchedResponse,
   HttpError,
@@ -105,7 +105,7 @@ Deno.test("generic error from fetch returns NetworkError", async () => {
   }
 });
 
-Deno.test("DOMException from fetch returns AbortError", async () => {
+Deno.test("DOMException from fetch returns Cancelled", async () => {
   const fetch = createFetch(
     failFetch(new DOMException("The operation was aborted", "AbortError")),
   );
@@ -113,23 +113,26 @@ Deno.test("DOMException from fetch returns AbortError", async () => {
 
   assertEquals(result.isErr(), true);
   if (result.isErr()) {
-    assertInstanceOf(result.error, AbortError);
+    assertInstanceOf(result.error, Cancelled);
   }
 });
 
-Deno.test("non-abort DOMException from fetch returns NetworkError", async () => {
-  const fetch = createFetch(
-    failFetch(new DOMException("Quota exceeded", "QuotaExceededError")),
-  );
-  const result = await fetch("/api").json();
+Deno.test(
+  "non-abort DOMException from fetch returns NetworkError",
+  async () => {
+    const fetch = createFetch(
+      failFetch(new DOMException("Quota exceeded", "QuotaExceededError")),
+    );
+    const result = await fetch("/api").json();
 
-  assertEquals(result.isErr(), true);
-  if (result.isErr()) {
-    assertInstanceOf(result.error, NetworkError);
-  }
-});
+    assertEquals(result.isErr(), true);
+    if (result.isErr()) {
+      assertInstanceOf(result.error, NetworkError);
+    }
+  },
+);
 
-Deno.test("AbortSignal.abort() returns AbortError", async () => {
+Deno.test("AbortSignal.abort() returns Cancelled", async () => {
   const fetch = createFetch(globalThis.fetch);
   const result = await fetch("https://example.com", {
     signal: AbortSignal.abort(),
@@ -137,7 +140,7 @@ Deno.test("AbortSignal.abort() returns AbortError", async () => {
 
   assertEquals(result.isErr(), true);
   if (result.isErr()) {
-    assertInstanceOf(result.error, AbortError);
+    assertInstanceOf(result.error, Cancelled);
   }
 });
 
@@ -159,7 +162,7 @@ Deno.test("orElseMatch for exhaustive error recovery", async () => {
     .json<string>()
     .orElseMatch({
       NetworkError: () => Result.ok("network-fallback"),
-      AbortError: () => Result.ok("abort-fallback"),
+      Cancelled: () => Result.ok("abort-fallback"),
       HttpError: (e) => Result.ok(`http-${e.status}`),
       ParseError: () => Result.ok("parse-fallback"),
     });
@@ -192,7 +195,7 @@ Deno.test("FetchedResponse.json() parses JSON body", async () => {
 });
 
 Deno.test(
-  "FetchedResponse.json() returns ParseError only (no ResponseError)",
+  "FetchedResponse.json() returns ParseError or Cancelled (no ResponseError)",
   async () => {
     const fetch = createFetch(mockFetch("not json"));
 
@@ -205,6 +208,31 @@ Deno.test(
     assertEquals(result.isErr(), true);
     if (result.isErr()) {
       assertInstanceOf(result.error, ParseError);
+    }
+  },
+);
+
+Deno.test(
+  "FetchedResponse.json() returns Cancelled on body-read abort",
+  async () => {
+    const response = new Response(
+      new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.error(new DOMException("Body aborted", "AbortError"));
+        },
+      }),
+    );
+
+    const fetch = createFetch(() => Promise.resolve(response));
+    const result = await Result.run(async function* () {
+      const res = yield* fetch("/api");
+      const data = yield* res.json();
+      return Result.ok(data);
+    });
+
+    assertEquals(result.isErr(), true);
+    if (result.isErr()) {
+      assertInstanceOf(result.error, Cancelled);
     }
   },
 );

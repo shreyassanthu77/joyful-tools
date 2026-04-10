@@ -7,7 +7,7 @@
  * Every call returns a {@linkcode JoyfulResponse} — an
  * `AsyncResult<FetchedResponse, ResponseError>` with convenience body methods
  * (`.json()`, `.text()`, etc.). Non-2xx responses are automatically treated as
- * errors, and network failures, aborts, and parse errors each get their own
+ * errors, and network failures, cancellations, and parse errors each get their own
  * tagged error type.
  *
  * @example Basic usage
@@ -44,7 +44,7 @@
  *   .json<Config>()
  *   .orElseMatch({
  *     NetworkError: () => Result.ok(DEFAULT_CONFIG),
- *     AbortError: () => Result.ok(DEFAULT_CONFIG),
+ *     Cancelled: () => Result.ok(DEFAULT_CONFIG),
  *     HttpError: (e) => {
  *       if (e.status === 404) return Result.ok(DEFAULT_CONFIG);
  *       return Result.err(e);
@@ -172,9 +172,13 @@ export function createFetch(fetch: FetchFn): JFetch {
       return Result.ok(wrapped);
     } catch (e) {
       if (e instanceof DOMException && e.name === "AbortError") {
-        return Result.err(new AbortError({ cause: e }));
+        return Result.err(
+          new Result.Cancelled({
+            message: `Cancelled: ${e.message}`,
+            cause: e,
+          }),
+        );
       }
-
       return Result.err(new NetworkError({ cause: e }));
     }
   }
@@ -192,9 +196,9 @@ export type JFetch = (...args: Parameters<FetchFn>) => JoyfulResponse;
 
 /**
  * Union of all errors that can occur before body parsing — network failures,
- * aborted requests, and non-2xx HTTP responses.
+ * cancelled requests, and non-2xx HTTP responses.
  */
-export type ResponseError = NetworkError | AbortError | HttpError;
+export type ResponseError = NetworkError | Result.Cancelled | HttpError;
 
 /**
  * Async result for a fetch request with convenience body readers.
@@ -328,7 +332,7 @@ export class JoyfulResponse extends AsyncResult<
  *
  * Property accessors mirror the native Web `Response` surface so you can
  * inspect status, headers, and other metadata without any extra unwrapping.
- * Body-reader methods return `AsyncResult<T, ParseError>`.
+ * Body-reader methods return `AsyncResult<T, ParseError | Cancelled>`.
  *
  * @example Inspect headers then parse
  * ```ts
@@ -418,7 +422,7 @@ export class FetchedResponse {
    * });
    * ```
    */
-  json<T = unknown>(): AsyncResult<T, ParseError> {
+  json<T = unknown>(): AsyncResult<T, ParseError | Result.Cancelled> {
     return new AsyncResult(this.#read("json"));
   }
 
@@ -434,7 +438,7 @@ export class FetchedResponse {
    * });
    * ```
    */
-  text(): AsyncResult<string, ParseError> {
+  text(): AsyncResult<string, ParseError | Result.Cancelled> {
     return new AsyncResult(this.#read("text"));
   }
 
@@ -450,7 +454,7 @@ export class FetchedResponse {
    * });
    * ```
    */
-  arrayBuffer(): AsyncResult<ArrayBuffer, ParseError> {
+  arrayBuffer(): AsyncResult<ArrayBuffer, ParseError | Result.Cancelled> {
     return new AsyncResult(this.#read("arrayBuffer"));
   }
 
@@ -466,7 +470,7 @@ export class FetchedResponse {
    * });
    * ```
    */
-  blob(): AsyncResult<Blob, ParseError> {
+  blob(): AsyncResult<Blob, ParseError | Result.Cancelled> {
     return new AsyncResult(this.#read("blob"));
   }
 
@@ -482,7 +486,7 @@ export class FetchedResponse {
    * });
    * ```
    */
-  bytes(): AsyncResult<Uint8Array, ParseError> {
+  bytes(): AsyncResult<Uint8Array, ParseError | Result.Cancelled> {
     return new AsyncResult(this.#read("bytes"));
   }
 
@@ -498,7 +502,7 @@ export class FetchedResponse {
    * });
    * ```
    */
-  formData(): AsyncResult<FormData, ParseError> {
+  formData(): AsyncResult<FormData, ParseError | Result.Cancelled> {
     return new AsyncResult(this.#read("formData"));
   }
 
@@ -512,16 +516,27 @@ export class FetchedResponse {
       | "formData",
   >(
     method: Method,
-  ): Promise<Result<Awaited<ReturnType<Response[Method]>>, ParseError>> {
+  ): Promise<
+    Result<Awaited<ReturnType<Response[Method]>>, ParseError | Result.Cancelled>
+  > {
     try {
       const data = await this.response[method]();
       return Result.ok(data);
     } catch (e) {
+      if (e instanceof DOMException && e.name === "AbortError") {
+        return Result.err(
+          new Result.Cancelled({
+            message: `Cancelled: ${e.message}`,
+            cause: e,
+          }),
+        );
+      }
       return Result.err(new ParseError({ cause: e }));
     }
   }
 }
 
+const NetworkErrorBase = taggedError("NetworkError");
 /**
  * Thrown when `fetch` itself fails — DNS resolution, CORS, network unreachable, etc.
  *
@@ -535,40 +550,9 @@ export class FetchedResponse {
  * }
  * ```
  */
-export class NetworkError extends taggedError("NetworkError") {}
+export class NetworkError extends NetworkErrorBase {}
 
-/**
- * Thrown when the request is aborted via `AbortSignal` or times out via
- * `AbortSignal.timeout()`.
- *
- * @example Timeout after 5 seconds
- * ```ts
- * import { jfetch, AbortError } from "@joyful/fetch";
- *
- * const result = await jfetch("/api/slow", {
- *   signal: AbortSignal.timeout(5000),
- * }).json<Data>();
- *
- * if (result.isErr() && result.error instanceof AbortError) {
- *   console.error("Request timed out");
- * }
- * ```
- *
- * @example Manual abort
- * ```ts
- * import { jfetch } from "@joyful/fetch";
- *
- * const controller = new AbortController();
- * const request = jfetch("/api/stream", { signal: controller.signal }).text();
- *
- * controller.abort();
- *
- * const result = await request;
- * // result.error._tag === "AbortError"
- * ```
- */
-export class AbortError extends taggedError("AbortError") {}
-
+const HttpErrorBase = taggedError("HttpError");
 /**
  * Thrown when the response has a non-2xx status code.
  *
@@ -604,11 +588,12 @@ export class AbortError extends taggedError("AbortError") {}
  *   });
  * ```
  */
-export class HttpError extends taggedError("HttpError")<{
+export class HttpError extends HttpErrorBase<{
   response: FetchedResponse;
   status: number;
 }> {}
 
+const ParseErrorBase = taggedError("ParseError");
 /**
  * Thrown when body parsing fails (e.g. `response.json()` on invalid JSON).
  *
@@ -622,4 +607,36 @@ export class HttpError extends taggedError("HttpError")<{
  * }
  * ```
  */
-export class ParseError extends taggedError("ParseError") {}
+export class ParseError extends ParseErrorBase {}
+
+/**
+ * Shared cancellation outcome re-exported from `@joyful/result` for request and
+ * body-read cancellation.
+ *
+ * @example Timeout after 5 seconds
+ * ```ts
+ * import { Cancelled, jfetch } from "@joyful/fetch";
+ *
+ * const result = await jfetch("/api/slow", {
+ *   signal: AbortSignal.timeout(5000),
+ * }).json<Data>();
+ *
+ * if (result.isErr() && result.error instanceof Cancelled) {
+ *   console.error("Request timed out");
+ * }
+ * ```
+ *
+ * @example Manual abort
+ * ```ts
+ * import { jfetch } from "@joyful/fetch";
+ *
+ * const controller = new AbortController();
+ * const request = jfetch("/api/stream", { signal: controller.signal }).text();
+ *
+ * controller.abort();
+ *
+ * const result = await request;
+ * // result.error._tag === "Cancelled"
+ * ```
+ */
+export const Cancelled = Result.Cancelled;
