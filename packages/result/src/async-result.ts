@@ -112,7 +112,7 @@ export class AsyncResult<T, E = unknown>
    * @param defaultValue Value to use when the wrapped result is an error.
    * @returns The success value or `defaultValue`.
    */
-  async unwrapOr(defaultValue: T): Promise<T> {
+  async unwrapOr<U>(defaultValue: U): Promise<T | U> {
     const result = await this;
     return result.unwrapOr(defaultValue);
   }

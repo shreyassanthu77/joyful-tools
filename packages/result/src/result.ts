@@ -13,7 +13,7 @@ interface BaseResult<T, E = unknown>
   extends Iterable<Err<never, E>, T, unknown> {
   isOk(): this is Ok<T, E>;
   isErr(): this is Err<T, E>;
-  unwrapOr(defaultValue: T): T;
+  unwrapOr<U>(defaultValue: U): T | U;
   expect(message: string): T;
   expectErr(message: string): E;
   map<U>(f: (value: T) => U): Result<U, E>;
@@ -75,7 +75,7 @@ export class Ok<T, E = never> implements BaseResult<T, E> {
    * @param defaultValue Fallback value for the error case.
    * @returns The success value or `defaultValue`.
    */
-  unwrapOr(defaultValue: T): T {
+  unwrapOr<U>(defaultValue: U): T | U {
     void defaultValue;
     return this.value;
   }
@@ -318,7 +318,7 @@ export class Err<T, E = never> implements BaseResult<T, E> {
    * @param defaultValue Value to return for the error case.
    * @returns The success value or `defaultValue`.
    */
-  unwrapOr(defaultValue: T): T {
+  unwrapOr<U>(defaultValue: U): T | U {
     return defaultValue;
   }
 

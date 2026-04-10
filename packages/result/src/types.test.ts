@@ -21,6 +21,16 @@ Deno.test("Result.mapErr should change the error type", () => {
   attest<Result<number, number>>(err.mapErr((error) => error.length));
 });
 
+Deno.test("Result.unwrapOr should widen the return type", () => {
+  const ok: Result<string, Error> = Result.ok("hello");
+  attest<string | null>(ok.unwrapOr(null));
+  attest<string | 42>(ok.unwrapOr(42));
+
+  const err: Result<string, Error> = Result.err(new Error("boom"));
+  attest<string | null>(err.unwrapOr(null));
+  attest<string | undefined>(err.unwrapOr(undefined));
+});
+
 Deno.test(
   "Result.andThen should change the success type and extend the error type",
   () => {
@@ -131,6 +141,16 @@ Deno.test("AsyncResult<T, E>.(map | mapErr)", async () => {
 
   const err: AsyncResult<number, string> = Result.err("boom").async();
   attest<AsyncResult<number, number>>(err.mapErr((error) => error.length));
+});
+
+Deno.test("AsyncResult.unwrapOr should widen the return type", async () => {
+  const ok: AsyncResult<string, Error> = Result.ok("hello").async();
+  attest<Promise<string | null>>(ok.unwrapOr(null));
+  attest<Promise<string | number>>(ok.unwrapOr(42));
+
+  const err: AsyncResult<string, Error> = Result.err(new Error("boom")).async();
+  attest<Promise<string | null>>(err.unwrapOr(null));
+  attest<Promise<string | undefined>>(err.unwrapOr(undefined));
 });
 
 Deno.test(
