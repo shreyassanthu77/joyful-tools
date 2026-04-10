@@ -309,7 +309,9 @@ export namespace Result {
    * ```
    */
   export function retry<T, E>(
-    fn: (attempt: number) => Result<T, E> | AsyncResult<T, E>,
+    fn: (
+      attempt: number,
+    ) => Result<T, E> | AsyncResult<T, E> | Promise<Result<T, E>>,
     options?: RetryOptions<E>,
   ): AsyncResult<T, E | RetriesExhausted<E>> {
     const schedule = options?.schedule ?? DEFAULT_SCHEDULE;
@@ -319,7 +321,9 @@ export namespace Result {
   }
 
   async function retryLoop<T, E>(
-    fn: (attempt: number) => Result<T, E> | AsyncResult<T, E>,
+    fn: (
+      attempt: number,
+    ) => Result<T, E> | AsyncResult<T, E> | Promise<Result<T, E>>,
     schedule: number[],
     shouldRetry: (error: E, attempt: number) => boolean | Promise<boolean>,
   ): Promise<Result<T, E | RetriesExhausted<E>>> {
