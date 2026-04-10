@@ -93,7 +93,7 @@ console.log(`  ${packages.length + 1}) All packages`);
 
 const pkgChoice = prompt(`\nChoice [1-${packages.length + 1}]:`);
 const pkgIndices = pkgChoice
-  .split(/\s*,\s*/)
+  .split(/[\s,]+/)
   .map((s) => parseInt(s, 10))
   .filter((i) => !isNaN(i) && i > 0 && i <= packages.length + 1);
 
