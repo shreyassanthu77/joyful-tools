@@ -92,16 +92,14 @@ for (let i = 0; i < packages.length; i++) {
 console.log(`  ${packages.length + 1}) All packages`);
 
 const pkgChoice = prompt(`\nChoice [1-${packages.length + 1}]:`);
-const pkgIndex = parseInt(pkgChoice ?? "", 10);
+const pkgIndices = pkgChoice
+  .split(/\s*,\s*/)
+  .map((s) => parseInt(s, 10))
+  .filter((i) => !isNaN(i) && i > 0 && i <= packages.length + 1);
 
-if (isNaN(pkgIndex) || pkgIndex < 1 || pkgIndex > packages.length + 1) {
-  console.error("Invalid choice.");
-  Deno.exit(1);
-}
-
-const toBump = pkgIndex === packages.length + 1
+const toBump = pkgIndices.some((i) => i === packages.length + 1)
   ? packages
-  : [packages[pkgIndex - 1]];
+  : pkgIndices.map((i) => packages[i - 1]);
 
 // Ask bump type
 console.log("\nBump type?\n");
@@ -161,9 +159,10 @@ for (const pkg of toBump) {
 
 // 4. Commit the version bump
 const commitLines = bumped.map((b) => `${b.name}@${b.to}`);
-const commitMsg = bumped.length === 1
-  ? `bump ${commitLines[0]}`
-  : `bump ${commitLines.join(", ")}`;
+const commitMsg =
+  bumped.length === 1
+    ? `bump ${commitLines[0]}`
+    : `bump ${commitLines.join(", ")}`;
 
 await run(["git", "add", "-A"]);
 const commit = await run(["git", "commit", "-m", commitMsg]);
