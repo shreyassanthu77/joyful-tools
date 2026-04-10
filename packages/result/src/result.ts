@@ -419,23 +419,23 @@ export class Err<T, E = never> implements BaseResult<T, E> {
    * @returns The matched recovery result or the original success value.
    *
    * @example
-   * ```typescript
-   * class ValidationError extends Result.taggedError("ValidationError")<{
-   *   field: string;
-   * }> {}
-   * class NetworkError extends Result.taggedError("NetworkError")<{
-   *   status: number;
-   * }> {}
-   *
-   * const result = Result.err<number, ValidationError | NetworkError>(
-   *   new ValidationError({ field: "email" }),
-   * );
-   *
-   * const recovered = result.orElseMatch({
-   *   ValidationError: (error) => Result.ok(error.field.length),
-   *   NetworkError: (error) => Result.err(`retry:${error.status}`),
-   * });
-   * ```
+    * ```typescript
+    * class ValidationError extends taggedError("ValidationError")<{
+    *   field: string;
+    * }> {}
+    * class NetworkError extends taggedError("NetworkError")<{
+    *   status: number;
+    * }> {}
+    *
+    * const result = Result.err<number, ValidationError | NetworkError>(
+    *   new ValidationError({ field: "email" }),
+    * );
+    *
+    * const recovered = result.orElseMatch({
+    *   ValidationError: (error) => Result.ok(error.field.length),
+    *   NetworkError: (error) => Result.err(`retry:${error.status}`),
+    * });
+    * ```
    */
   orElseMatch<
     const Handlers extends E extends MatchableError ? MatchHandlers<E> : never,
@@ -462,23 +462,23 @@ export class Err<T, E = never> implements BaseResult<T, E> {
    * @returns The matched recovery result, the original success value, or the unhandled error.
    *
    * @example
-   * ```typescript
-   * class ValidationError extends Result.taggedError("ValidationError")<{
-   *   field: string;
-   * }> {}
-   * class NetworkError extends Result.taggedError("NetworkError")<{
-   *   status: number;
-   * }> {}
-   *
-   * const result = Result.err<number, ValidationError | NetworkError>(
-   *   new NetworkError({ status: 503 }),
-   * );
-   *
-   * const recovered = result.orElseMatchSome({
-   *   ValidationError: (error) => Result.ok(error.field.length),
-   * });
-   * // Err(NetworkError)
-   * ```
+    * ```typescript
+    * class ValidationError extends taggedError("ValidationError")<{
+    *   field: string;
+    * }> {}
+    * class NetworkError extends taggedError("NetworkError")<{
+    *   status: number;
+    * }> {}
+    *
+    * const result = Result.err<number, ValidationError | NetworkError>(
+    *   new NetworkError({ status: 503 }),
+    * );
+    *
+    * const recovered = result.orElseMatchSome({
+    *   ValidationError: (error) => Result.ok(error.field.length),
+    * });
+    * // Err(NetworkError)
+    * ```
    */
   orElseMatchSome<
     const Handlers extends E extends MatchableError ? MatchSomeHandlers<E>

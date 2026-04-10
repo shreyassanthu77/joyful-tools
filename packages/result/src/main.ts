@@ -10,7 +10,7 @@
  * then compose them with methods like `map`, `andThen`, `orElse`,
  * `orElseMatch`, `orElseMatchSome`, and `unwrapOr`. Use {@link Result.wrap}
  * when you want to convert throwing code or rejecting promises into result
- * values. Use {@link Result.taggedError} when you want structured `Error`
+ * values. Use {@link taggedError} when you want structured `Error`
  * values with a stable `_tag` for narrowing and logging. When the computation
  * is asynchronous, use {@link AsyncResult} or call `result.async()` to keep
  * the same style of composition. For generator-based composition, use

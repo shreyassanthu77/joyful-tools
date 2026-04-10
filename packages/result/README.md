@@ -43,7 +43,7 @@ deno add jsr:@joyful/result
 - Transform success and error values with `map()` and `mapErr()`.
 - Chain dependent operations with `andThen()` and recover with `orElse()`.
 - Recover tagged errors with `orElseMatch()` and `orElseMatchSome()`.
-- Model domain failures with `Result.taggedError()`.
+- Model domain failures with `taggedError()`.
 - Wrap throwing or rejecting code with `Result.wrap()`.
 - Propagate cancellation with `Result.Cancelled` in signal-aware async helpers.
 - Compose complex flows with `Result.run()` and `yield*`.
@@ -96,17 +96,17 @@ const err = new Err("boom");
 
 ## Tagged Errors
 
-Use `Result.taggedError()` when you want rich `Error` objects with a stable
-`_tag` that can be matched later.
+Use `taggedError()` when you want rich `Error` objects with a stable `_tag` that
+can be matched later.
 
 ```typescript
-import { Result } from "@joyful/result";
+import { taggedError } from "@joyful/result";
 
-class ValidationError extends Result.taggedError("ValidationError")<{
+class ValidationError extends taggedError("ValidationError")<{
   field: string;
 }> {}
 
-class NetworkError extends Result.taggedError("NetworkError")<{
+class NetworkError extends taggedError("NetworkError")<{
   status: number;
 }> {}
 
@@ -201,13 +201,13 @@ Use `orElseMatch()` when your error type is a tagged error union and you want an
 exhaustive recovery map.
 
 ```typescript
-import { Result } from "@joyful/result";
+import { Result, taggedError } from "@joyful/result";
 
-class ValidationError extends Result.taggedError("ValidationError")<{
+class ValidationError extends taggedError("ValidationError")<{
   field: string;
 }> {}
 
-class NetworkError extends Result.taggedError("NetworkError")<{
+class NetworkError extends taggedError("NetworkError")<{
   status: number;
 }> {}
 
@@ -231,13 +231,13 @@ Use `orElseMatchSome()` when you only want to handle part of a tagged error
 union and leave the rest untouched.
 
 ```typescript
-import { Result } from "@joyful/result";
+import { Result, taggedError } from "@joyful/result";
 
-class ValidationError extends Result.taggedError("ValidationError")<{
+class ValidationError extends taggedError("ValidationError")<{
   field: string;
 }> {}
 
-class NetworkError extends Result.taggedError("NetworkError")<{
+class NetworkError extends taggedError("NetworkError")<{
   status: number;
 }> {}
 
@@ -465,13 +465,13 @@ const value = await Result.ok(2)
 Handlers may return a `Result`, an `AsyncResult`, or a `Promise<Result>`.
 
 ```typescript
-import { Result } from "@joyful/result";
+import { Result, taggedError } from "@joyful/result";
 
-class ValidationError extends Result.taggedError("ValidationError")<{
+class ValidationError extends taggedError("ValidationError")<{
   field: string;
 }> {}
 
-class NetworkError extends Result.taggedError("NetworkError")<{
+class NetworkError extends taggedError("NetworkError")<{
   status: number;
 }> {}
 
@@ -538,7 +538,7 @@ if (result.isErr() && result.error instanceof Result.Cancelled) {
 - `Result<T, E>`: union type of `Ok<T, E>` and `Err<T, E>`.
 - `Result.ok(value)`: create a successful result.
 - `Result.err(error)`: create a failed result.
-- `Result.taggedError(tag)`: create tagged `Error` subclasses for domain errors.
+- `taggedError(tag)`: create tagged `Error` subclasses for domain errors.
 - `Result.Cancelled`: shared cancellation outcome for async
   `Result.wrap(..., {
   signal })`.
