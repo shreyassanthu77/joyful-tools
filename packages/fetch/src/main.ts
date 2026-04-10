@@ -541,8 +541,9 @@ export class FetchedResponse {
   }
 }
 
-const NetworkErrorBase: TaggedErrorFactory<"NetworkError"> =
-  taggedError("NetworkError");
+const NetworkErrorBase: TaggedErrorFactory<"NetworkError"> = taggedError(
+  "NetworkError",
+);
 /**
  * Thrown when `fetch` itself fails — DNS resolution, CORS, network unreachable, etc.
  *
@@ -599,8 +600,9 @@ export class HttpError extends HttpErrorBase<{
   status: number;
 }> {}
 
-const ParseErrorBase: TaggedErrorFactory<"ParseError"> =
-  taggedError("ParseError");
+const ParseErrorBase: TaggedErrorFactory<"ParseError"> = taggedError(
+  "ParseError",
+);
 /**
  * Thrown when body parsing fails (e.g. `response.json()` on invalid JSON).
  *

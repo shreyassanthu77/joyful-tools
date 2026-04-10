@@ -159,10 +159,9 @@ for (const pkg of toBump) {
 
 // 4. Commit the version bump
 const commitLines = bumped.map((b) => `${b.name}@${b.to}`);
-const commitMsg =
-  bumped.length === 1
-    ? `bump ${commitLines[0]}`
-    : `bump ${commitLines.join(", ")}`;
+const commitMsg = bumped.length === 1
+  ? `bump ${commitLines[0]}`
+  : `bump ${commitLines.join(", ")}`;
 
 await run(["git", "add", "-A"]);
 const commit = await run(["git", "commit", "-m", commitMsg]);

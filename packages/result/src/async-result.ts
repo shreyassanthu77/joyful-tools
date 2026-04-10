@@ -241,27 +241,27 @@ export class AsyncResult<T, E = unknown>
    * @returns A new async result for the recovery computation.
    *
    * @example
-    * ```typescript
-    * class ValidationError extends taggedError("ValidationError")<{
-    *   field: string;
-    * }> {}
-    * class NetworkError extends taggedError("NetworkError")<{
-    *   status: number;
-    * }> {}
-    *
-    * const result = new AsyncResult(
-    *   Promise.resolve(
-    *     Result.err<number, ValidationError | NetworkError>(
-    *       new ValidationError({ field: "email" }),
-    *     ),
-    *   ),
-    * );
-    *
-    * const recovered = result.orElseMatch({
-    *   ValidationError: (error) => Result.ok(error.field.length),
-    *   NetworkError: (error) => Result.err(`retry:${error.status}`),
-    * });
-    * ```
+   * ```typescript
+   * class ValidationError extends taggedError("ValidationError")<{
+   *   field: string;
+   * }> {}
+   * class NetworkError extends taggedError("NetworkError")<{
+   *   status: number;
+   * }> {}
+   *
+   * const result = new AsyncResult(
+   *   Promise.resolve(
+   *     Result.err<number, ValidationError | NetworkError>(
+   *       new ValidationError({ field: "email" }),
+   *     ),
+   *   ),
+   * );
+   *
+   * const recovered = result.orElseMatch({
+   *   ValidationError: (error) => Result.ok(error.field.length),
+   *   NetworkError: (error) => Result.err(`retry:${error.status}`),
+   * });
+   * ```
    */
   orElseMatch<
     const Handlers extends E extends MatchableError ? MatchHandlers<E> : never,
@@ -307,27 +307,27 @@ export class AsyncResult<T, E = unknown>
    * @returns A new async result for the recovery computation.
    *
    * @example
-    * ```typescript
-    * class ValidationError extends taggedError("ValidationError")<{
-    *   field: string;
-    * }> {}
-    * class NetworkError extends taggedError("NetworkError")<{
-    *   status: number;
-    * }> {}
-    *
-    * const result = new AsyncResult(
-    *   Promise.resolve(
-    *     Result.err<number, ValidationError | NetworkError>(
-    *       new NetworkError({ status: 503 }),
-    *     ),
-    *   ),
-    * );
-    *
-    * const recovered = result.orElseMatchSome({
-    *   ValidationError: (error) => Result.ok(error.field.length),
-    * });
-    * // AsyncResult<number, NetworkError>
-    * ```
+   * ```typescript
+   * class ValidationError extends taggedError("ValidationError")<{
+   *   field: string;
+   * }> {}
+   * class NetworkError extends taggedError("NetworkError")<{
+   *   status: number;
+   * }> {}
+   *
+   * const result = new AsyncResult(
+   *   Promise.resolve(
+   *     Result.err<number, ValidationError | NetworkError>(
+   *       new NetworkError({ status: 503 }),
+   *     ),
+   *   ),
+   * );
+   *
+   * const recovered = result.orElseMatchSome({
+   *   ValidationError: (error) => Result.ok(error.field.length),
+   * });
+   * // AsyncResult<number, NetworkError>
+   * ```
    */
   orElseMatchSome<
     const Handlers extends E extends MatchableError ? MatchSomeHandlers<E>
