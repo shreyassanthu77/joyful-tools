@@ -47,6 +47,12 @@ import { pipe } from "@joyful/pipe";
 const result = pipe(4, double, square, addFive); // 69
 ```
 
+## Joypack
+
+### [@joypack/waba](./joypack/waba)
+
+WhatsApp Business API tooling.
+
 ## Install
 
 Each package is published independently. The current stable installs are the

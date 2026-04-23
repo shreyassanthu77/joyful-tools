@@ -1,0 +1,19 @@
+{
+  "$schema": "https://raw.githubusercontent.com/denoland/deno/refs/heads/main/cli/schemas/config-file.v1.json",
+  "name": "@joypack/waba",
+  "version": "0.0.0",
+  "license": "MIT",
+  "imports": {},
+  "exports": {
+    ".": "./src/main.ts"
+  },
+  "publish": {
+    "include": [
+      "LICENSE",
+      "README.md",
+      "src/client.ts",
+      "src/main.ts",
+      "src/webhooks.ts"
+    ]
+  }
+}
