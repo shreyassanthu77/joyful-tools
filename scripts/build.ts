@@ -1,47 +1,80 @@
 import { dts } from "rolldown-plugin-dts";
 import { build } from "rolldown";
-import { basename, dirname, join, relative } from "node:path";
+import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { createGraph } from "@deno/graph";
 
-const cwd = Deno.cwd();
+import {
+  type BuildableWorkspacePackage,
+  loadWorkspacePackages,
+  repoRoot,
+  resolveWorkspacePackageSpecifier,
+  type VersionedWorkspacePackage,
+} from "./packages.ts";
+
 const DIST = "dist";
-const destDir = join(cwd, DIST);
-const jsrOrg = "@joyful";
-const npmOrg = "@joyful-tools";
+const destDir = join(repoRoot, DIST);
 const repo = "https://github.com/shreyassanthu77/joyful-tools";
-async function buildPackage(pkg: string) {
-  const configPath = join(cwd, pkg, "deno.json");
-  const config = JSON.parse(await Deno.readTextFile(configPath)) as {
-    name?: string;
-    version?: string;
-    license?: string;
-    exports: Record<string, string>;
-    publish: {
-      include: string[];
-    };
-  };
-  const configDir = relative(cwd, dirname(configPath));
-  const packageDirname = basename(configDir);
-  if (!config.name || !config.version) {
-    console.log(`%cSkipping ${pkg}`, "color: gray; font-weight: thin");
-    return;
-  }
-  console.log(`%cBuilding ${pkg}`, "color: blue; font-weight: thin");
-  const packageDestDir = join(destDir, packageDirname);
+
+const workspacePackages = (await loadWorkspacePackages()).filter(
+  (pkg): pkg is BuildableWorkspacePackage =>
+    Boolean(
+      pkg.name &&
+        pkg.version &&
+        pkg.npmName &&
+        Object.keys(pkg.exports).length > 0,
+    ),
+);
+const versionMap = new Map(
+  workspacePackages.map((pkg) => [pkg.npmName, pkg.version]),
+);
+
+const start = performance.now();
+console.info(`%cCleaning ${destDir}`, "color: blue; font-weight: thin");
+await Deno.remove(destDir, { recursive: true }).catch(() => {});
+await Deno.mkdir(destDir, { recursive: true });
+await Deno.writeTextFile(
+  join(destDir, "package.json"),
+  JSON.stringify(
+    {
+      name: "@joyful-tools/root",
+      private: true,
+      workspaces: workspacePackages.map((pkg) => pkg.packageDirname),
+    },
+    null,
+    2,
+  ),
+);
+await Promise.all(
+  workspacePackages.map((pkg) =>
+    buildPackage(pkg, workspacePackages, versionMap)
+  ),
+);
+const end = performance.now();
+console.log(
+  `%c[build] ${workspacePackages.length} packages in %sms`,
+  "color: green;",
+  (end - start).toFixed(2),
+);
+
+async function buildPackage(
+  pkg: BuildableWorkspacePackage,
+  packages: readonly VersionedWorkspacePackage[],
+  versionMap: ReadonlyMap<string, string>,
+) {
+  console.log(`%cBuilding ${pkg.dir}`, "color: blue; font-weight: thin");
+  const packageDestDir = join(destDir, pkg.packageDirname);
   await Deno.mkdir(packageDestDir, { recursive: true });
 
-  // create package.json
-  const name = config.name.replace(`${jsrOrg}`, npmOrg);
   const packageJSON = {
-    name,
-    version: config.version,
+    name: pkg.npmName,
+    version: pkg.version,
     type: "module",
-    license: config.license ?? "MIT",
+    license: pkg.license ?? "MIT",
     repository: {
       type: "git",
       url: `${repo}.git`,
-      directory: configDir,
+      directory: pkg.dir,
     },
     bugs: {
       url: `${repo}/issues`,
@@ -50,36 +83,39 @@ async function buildPackage(pkg: string) {
     exports: {} as Record<string, unknown>,
   };
 
-  // copy src files
-  const dirs = new Set<string>(
-    config.publish.include.map((file) => dirname(file)),
-  );
+  const dirs = new Set<string>(pkg.publishInclude.map((file) => dirname(file)));
   for (const dir of dirs) {
+    if (dir === ".") continue;
     await Deno.mkdir(join(packageDestDir, dir), { recursive: true });
   }
   await Promise.all(
-    config.publish.include.map(async (file) => {
-      const src = join(cwd, configDir, file);
+    pkg.publishInclude.map(async (file) => {
+      const src = join(repoRoot, pkg.dir, file);
       const dest = join(packageDestDir, file);
       await Deno.copyFile(src, dest);
     }),
   );
 
   let start = performance.now();
-  const toResolve: Map<string, Set<string>> = new Map();
+  const toResolve = new Map<
+    string,
+    Map<string, { replacement: string; dependencyName: string }>
+  >();
   await createGraph(
-    Object.values(config.exports).map(
+    Object.values(pkg.exports).map(
       (path) => pathToFileURL(join(packageDestDir, path)).href,
     ),
     {
       resolve(specifier, referrer) {
-        if (!specifier.startsWith(jsrOrg)) return specifier;
-        const existing = toResolve.get(referrer);
-        if (!existing) {
-          toResolve.set(referrer, new Set([specifier]));
-        } else {
-          existing.add(specifier);
-        }
+        const resolved = resolveWorkspacePackageSpecifier(specifier, packages);
+        if (!resolved || resolved.pkg.name === pkg.name) return specifier;
+
+        const existing = toResolve.get(referrer) ?? new Map();
+        existing.set(specifier, {
+          replacement: resolved.npmSpecifier,
+          dependencyName: resolved.pkg.npmName,
+        });
+        toResolve.set(referrer, existing);
 
         return specifier;
       },
@@ -88,13 +124,12 @@ async function buildPackage(pkg: string) {
 
   const deps = new Set<string>();
   await Promise.all(
-    toResolve.entries().map(async ([referrer, specifiers]) => {
+    [...toResolve.entries()].map(async ([referrer, specifiers]) => {
       const referrerPath = fileURLToPath(referrer);
       let contents = await Deno.readTextFile(referrerPath);
-      for (const specifier of specifiers) {
-        const replaceWith = specifier.replace(jsrOrg, npmOrg);
-        contents = contents.replaceAll(specifier, replaceWith);
-        deps.add(replaceWith);
+      for (const [specifier, rewrite] of specifiers) {
+        contents = contents.replaceAll(specifier, rewrite.replacement);
+        deps.add(rewrite.dependencyName);
       }
       await Deno.writeTextFile(referrerPath, contents);
     }),
@@ -102,7 +137,7 @@ async function buildPackage(pkg: string) {
 
   let end = performance.now();
   console.log(
-    `%c[resolve] ${pkg} in %sms`,
+    `%c[resolve] ${pkg.dir} in %sms`,
     "color: blue; font-weight: thin",
     (end - start).toFixed(2),
   );
@@ -116,22 +151,8 @@ async function buildPackage(pkg: string) {
   }
 
   packageJSON.exports = Object.fromEntries(
-    Object.entries(config.exports).map(([key, value]) => {
-      if (!value.endsWith(".ts")) return [key, value];
-      const srcDir = basename(dirname(value));
-      const destFile = value.replace(srcDir, DIST);
-      const destSourceFile = destFile.replace(".ts", ".js");
-      const destDtsFile = destFile.replace(".ts", ".d.ts");
-      return [
-        key,
-        {
-          import: {
-            node: destSourceFile,
-            import: value,
-            types: destDtsFile,
-          },
-        },
-      ];
+    Object.entries(pkg.exports).map(([key, value]) => {
+      return [key, toNpmExport(value)];
     }),
   );
 
@@ -147,11 +168,13 @@ async function buildPackage(pkg: string) {
 
   start = performance.now();
   await build({
-    input: Object.values(config.exports).map((path) =>
-      join(packageDestDir, path)
-    ),
+    input: Object.values(pkg.exports).map((path) => join(packageDestDir, path)),
     cwd: packageDestDir,
-    external: Array.from(deps),
+    external(source) {
+      return [...deps].some((dep) =>
+        source === dep || source.startsWith(`${dep}/`)
+      );
+    },
     output: {
       dir: DIST,
     },
@@ -159,46 +182,30 @@ async function buildPackage(pkg: string) {
   });
   end = performance.now();
   console.log(
-    `%c[build] ${pkg} in %sms`,
+    `%c[build] ${pkg.dir} in %sms`,
     "color: green;",
     (end - start).toFixed(2),
   );
 }
 
-import workspaceConfig from "../deno.json" with { type: "json" };
+function toNpmExport(value: string): string | Record<string, unknown> {
+  if (!value.endsWith(".ts")) return value;
 
-// Build a map of npm package name -> version from all workspace deno.json files
-const versionMap = new Map<string, string>();
-for (const pkg of workspaceConfig.workspace) {
-  const cfg = JSON.parse(
-    await Deno.readTextFile(join(cwd, pkg, "deno.json")),
-  ) as { name?: string; version?: string };
-  if (cfg.name && cfg.version) {
-    const npmName = cfg.name.replace(jsrOrg, npmOrg);
-    versionMap.set(npmName, cfg.version);
-  }
+  const distFile = toBuildArtifactPath(value);
+  return {
+    types: distFile.replace(/\.ts$/, ".d.ts"),
+    import: {
+      node: distFile.replace(/\.ts$/, ".js"),
+      default: value,
+    },
+    default: value,
+  };
 }
 
-const start = performance.now();
-console.info(`%cCleaning ${destDir}`, "color: blue; font-weight: thin");
-await Deno.remove(destDir, { recursive: true }).catch(() => {});
-await Deno.mkdir(destDir, { recursive: true });
-await Deno.writeTextFile(
-  join(destDir, "package.json"),
-  JSON.stringify(
-    {
-      name: `${npmOrg}/root`,
-      private: true,
-      workspaces: workspaceConfig.workspace.map((pkg) => basename(pkg)),
-    },
-    null,
-    2,
-  ),
-);
-await Promise.all(workspaceConfig.workspace.map(buildPackage));
-const end = performance.now();
-console.log(
-  `%c[build] ${workspaceConfig.workspace.length} packages in %sms`,
-  "color: green;",
-  (end - start).toFixed(2),
-);
+function toBuildArtifactPath(sourcePath: string): string {
+  if (!sourcePath.endsWith(".ts")) return sourcePath;
+  if (sourcePath.startsWith("./src/")) {
+    return sourcePath.replace("./src/", `./${DIST}/`);
+  }
+  return `./${DIST}/${sourcePath.replace(/^\.\//, "")}`;
+}

@@ -11,29 +11,22 @@
  * Usage: deno task bump
  */
 
-import { join } from "std/path";
+import {
+  loadWorkspacePackages,
+  repoRoot,
+  run,
+  type VersionedWorkspacePackage,
+} from "./packages.ts";
 
-const root = new URL("../", import.meta.url).pathname;
+const root = repoRoot;
 
-async function run(
-  cmd: string[],
-  opts?: { cwd?: string; quiet?: boolean },
-): Promise<{ code: number; stdout: string; stderr: string }> {
-  const proc = new Deno.Command(cmd[0], {
-    args: cmd.slice(1),
-    cwd: opts?.cwd ?? root,
-    stdout: "piped",
-    stderr: "piped",
-  }).spawn();
-  const { code, stdout, stderr } = await proc.output();
-  return {
-    code,
-    stdout: new TextDecoder().decode(stdout).trim(),
-    stderr: new TextDecoder().decode(stderr).trim(),
-  };
-}
+type Package = {
+  dir: string;
+  name: string;
+  version: string;
+  denoJsonPath: string;
+};
 
-// 1. Check working directory is clean
 console.log("Checking working directory...");
 const status = await run(["git", "status", "--porcelain"]);
 if (status.stdout !== "") {
@@ -45,46 +38,22 @@ if (status.stdout !== "") {
 }
 console.log("Working directory is clean.\n");
 
-const workspaceConfig = JSON.parse(
-  await Deno.readTextFile(join(root, "deno.json")),
-);
-const workspaces: string[] = workspaceConfig.workspace;
-
-type Package = {
-  dir: string;
-  name: string;
-  version: string;
-  denoJsonPath: string;
-};
-
-// Gather all packages with versions
-const packages: Package[] = [];
-for (const dir of workspaces) {
-  const denoJsonPath = join(root, dir, "deno.json");
-
-  let denoJson: { name?: string; version?: string };
-  try {
-    denoJson = JSON.parse(await Deno.readTextFile(denoJsonPath));
-  } catch {
-    continue;
-  }
-
-  if (!denoJson.version || !denoJson.name) continue;
-
-  packages.push({
-    dir,
-    name: denoJson.name,
-    version: denoJson.version,
-    denoJsonPath,
-  });
-}
+const packages: Package[] = (await loadWorkspacePackages(root))
+  .filter((pkg): pkg is VersionedWorkspacePackage =>
+    Boolean(pkg.name && pkg.version && pkg.npmName)
+  )
+  .map((pkg) => ({
+    dir: pkg.dir,
+    name: pkg.name,
+    version: pkg.version,
+    denoJsonPath: pkg.configPath,
+  }));
 
 if (packages.length === 0) {
   console.error("No packages found.");
   Deno.exit(1);
 }
 
-// Ask which package to bump
 console.log("\nWhich package to bump?\n");
 for (let i = 0; i < packages.length; i++) {
   console.log(`  ${i + 1}) ${packages[i].name} (${packages[i].version})`);
@@ -101,7 +70,6 @@ const toBump = pkgIndices.some((i) => i === packages.length + 1)
   ? packages
   : pkgIndices.map((i) => packages[i - 1]);
 
-// Ask bump type
 console.log("\nBump type?\n");
 console.log("  1) patch");
 console.log("  2) minor");
@@ -115,18 +83,6 @@ const bumpType = (["patch", "minor", "major"] as const)[
 if (!bumpType) {
   console.error("Invalid choice.");
   Deno.exit(1);
-}
-
-function bump(version: string, type: "major" | "minor" | "patch"): string {
-  const [major, minor, patch] = version.split(".").map(Number);
-  switch (type) {
-    case "major":
-      return `${major + 1}.0.0`;
-    case "minor":
-      return `${major}.${minor + 1}.0`;
-    case "patch":
-      return `${major}.${minor}.${patch + 1}`;
-  }
 }
 
 // 2. Run tests before bumping
@@ -193,3 +149,15 @@ if (push.code !== 0) {
 console.log("Pushed commit and tag.");
 
 console.log("\nDone!");
+
+function bump(version: string, type: "major" | "minor" | "patch"): string {
+  const [major, minor, patch] = version.split(".").map(Number);
+  switch (type) {
+    case "major":
+      return `${major + 1}.0.0`;
+    case "minor":
+      return `${major}.${minor + 1}.0`;
+    case "patch":
+      return `${major}.${minor}.${patch + 1}`;
+  }
+}

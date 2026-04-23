@@ -14,5 +14,10 @@
       "src/result.ts",
       "src/async-result.ts"
     ]
+  },
+  "xPublish": {
+    "npm": {
+      "name": "@joyful-tools/result"
+    }
   }
 }

@@ -12,5 +12,10 @@
       "README.md",
       "src/main.ts"
     ]
+  },
+  "xPublish": {
+    "npm": {
+      "name": "@joyful-tools/pipe"
+    }
   }
 }

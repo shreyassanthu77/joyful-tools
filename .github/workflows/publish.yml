@@ -28,8 +28,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Publish to JSR
-        run: npx jsr publish
+      - uses: denoland/setup-deno@v2
+
+      - name: Install Packages
+        run: deno install
+
+      - name: Publish JSR packages
+        run: deno run -A scripts/publish.ts jsr
 
   publish-npm:
     runs-on: ubuntu-latest
@@ -53,14 +58,5 @@ jobs:
       - name: Build npm packages
         run: deno run -A scripts/build.ts
 
-      - name: Publish @joyful-tools/pipe
-        working-directory: dist/pipe
-        run: npm publish --access public || true
-
-      - name: Publish @joyful-tools/result
-        working-directory: dist/result
-        run: npm publish --access public || true
-
-      - name: Publish @joyful-tools/fetch
-        working-directory: dist/fetch
-        run: npm publish --access public || true
+      - name: Publish npm packages
+        run: deno run -A scripts/publish.ts npm
