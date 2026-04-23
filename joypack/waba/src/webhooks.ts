@@ -136,6 +136,14 @@ export type WebhookHandler = (request: Request) => Promise<Response>;
  * delivery `POST` request on the same route so the surrounding framework keeps
  * full routing control.
  *
+ * If `appSecret` is provided, the handler validates `X-Hub-Signature-256`
+ * before parsing the payload. Each message or status item is flattened into its
+ * own {@link WebhookEvent} before `onEvent` runs.
+ *
+ * @param onEvent Called once for every normalized webhook event.
+ * @param options Verification token and optional app secret.
+ * @returns A fetch-style request handler that can be mounted on a webhook route.
+ *
  * @example
  * ```ts
  * import { handleWebhooks } from "@joypack/waba";
@@ -174,6 +182,9 @@ export function handleWebhooks(
 /**
  * Flattens a raw webhook payload into normalized per-message and per-status
  * events.
+ *
+ * This is useful when you already have the parsed payload and want the same
+ * normalization logic that {@link handleWebhooks} uses internally.
  *
  * @example
  * ```ts

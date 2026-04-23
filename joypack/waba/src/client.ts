@@ -1,9 +1,9 @@
 import {
-  type FetchedResponse,
   HttpError,
   type JFetch,
   jfetch,
   type NetworkError,
+  ParseError,
 } from "@joyful/fetch";
 import {
   type AsyncResult,
@@ -28,27 +28,26 @@ const DEFAULT_BASE_URL = "https://graph.facebook.com";
  * ```
  */
 export interface WabaClientOptions {
+  /** Permanent or temporary access token for the WhatsApp Cloud API. */
   accessToken: string;
+  /** Graph API version prefix such as `v22.0`. */
   apiVersion?: string;
+  /** Optional injected fetch wrapper, useful for tests or custom transport. */
   fetch?: JFetch;
 }
 
+/** Creates a new {@link WabaClient}. */
 export function createWabaClient(options: WabaClientOptions): WabaClient {
   return new WabaClient(options);
 }
 
-export type WabaRequestOptions = {
-  path: string;
-  method?: string;
-  headers?: HeadersInit;
-  searchParams?: WabaSearchParams;
-  signal?: AbortSignal;
-} & (
-  | { json?: unknown; body?: never }
-  | { body?: BodyInit | null; json?: never }
-  | { json?: undefined; body?: undefined }
-);
-
+/**
+ * Minimal WhatsApp Cloud API client.
+ *
+ * The client only handles base URL construction, bearer auth, JSON request
+ * bodies, and Meta error mapping. Everything else is left as normal Graph API
+ * paths and payloads.
+ */
 export class WabaClient {
   readonly accessToken: string;
   readonly apiVersion?: string;
@@ -60,16 +59,46 @@ export class WabaClient {
     this.fetch = options.fetch ?? jfetch;
   }
 
-  request(
+  /**
+   * Sends a request to the WhatsApp Cloud API.
+   *
+   * Non-2xx responses are mapped from `HttpError` into
+   * {@link WhatsAppError}. Successful responses are parsed as JSON.
+   *
+   * @param options Request path, method, headers, query string, and optional
+   * JSON/body payload.
+   * @returns An async result containing the parsed JSON response body.
+   *
+   * @example Send a text message
+   * ```ts
+   * import { createWabaClient } from "@joypack/waba";
+   *
+   * const waba = createWabaClient({
+   *   accessToken: Deno.env.get("WHATSAPP_ACCESS_TOKEN")!,
+   *   apiVersion: "v22.0",
+   * });
+   *
+   * const sent = await waba.request<{ messages: Array<{ id: string }> }>({
+   *   path: "/1234567890/messages",
+   *   json: {
+   *     messaging_product: "whatsapp",
+   *     to: "15551234567",
+   *     type: "text",
+   *     text: { body: "hello" },
+   *   },
+   * });
+   * ```
+   */
+  request<T = unknown>(
     options: WabaRequestOptions,
-  ): AsyncResult<FetchedResponse, WabaResponseError> {
+  ): AsyncResult<T, WabaRequestError> {
     const apiVersion = this.apiVersion?.replace(/^\/+|\/+$/g, "");
     const path = options.path.replace(/^\/+/, "");
     const url = new URL(
       apiVersion == null ||
-      apiVersion.length === 0 ||
-      path === apiVersion ||
-      path.startsWith(`${apiVersion}/`)
+        apiVersion.length === 0 ||
+        path === apiVersion ||
+        path.startsWith(`${apiVersion}/`)
         ? `/${path}`
         : `/${apiVersion}/${path}`,
       DEFAULT_BASE_URL,
@@ -101,30 +130,72 @@ export class WabaClient {
       headers,
       body,
       signal: options.signal,
-    }).mapErr(
-      (err): PromiseOr<NetworkError | Result.Cancelled | WhatsAppApiError> => {
-        if (err instanceof HttpError) return toWhatsAppApiError(err);
-        return err;
-      },
-    );
+    })
+      .json<T>()
+      .mapErr((error): PromiseOr<WabaRequestError> => {
+        if (error instanceof HttpError) return toWhatsAppError(error);
+        if (error instanceof ParseError) {
+          return new WhatsAppError({
+            message: "WhatsApp API returned an invalid JSON response",
+            cause: error,
+          });
+        }
+        return error;
+      });
   }
 }
 
-export type WabaResponseError =
-  | NetworkError
-  | Result.Cancelled
-  | WhatsAppApiError;
+/** Options for {@link WabaClient.request}. */
+export type WabaRequestOptions =
+  & {
+    /**
+     * Graph path relative to `https://graph.facebook.com`, for example
+     * `"/1234567890/messages"`.
+     */
+    path: string;
+    /** HTTP method. Defaults to `GET` or `POST` when a body is present. */
+    method?: string;
+    /** Extra request headers merged with the bearer token header. */
+    headers?: HeadersInit;
+    /** Query-string values appended to the request URL. */
+    searchParams?: WabaSearchParams;
+    /** Optional abort signal passed through to the underlying fetch call. */
+    signal?: AbortSignal;
+  }
+  & (
+    | { json?: unknown; body?: never }
+    | { body?: BodyInit | null; json?: never }
+    | { json?: undefined; body?: undefined }
+  );
 
-const WhatsAppApiErrorBase: TaggedErrorFactory<"WhatsAppApiError"> =
-  taggedError("WhatsAppApiError");
+/** Errors that can happen before, during, or after a WhatsApp API request. */
+export type WabaRequestError = NetworkError | Result.Cancelled | WhatsAppError;
 
-export class WhatsAppApiError extends WhatsAppApiErrorBase<{
-  status: number;
+const WhatsAppErrorBase: TaggedErrorFactory<"WhatsAppError"> = taggedError(
+  "WhatsAppError",
+);
+
+/**
+ * Structured error for WhatsApp API failures.
+ *
+ * Non-2xx responses include `status` and any structured Meta error fields that
+ * were present in the JSON body. Parse failures are also normalized into this
+ * error so callers do not have to handle `ParseError` directly.
+ */
+export class WhatsAppError extends WhatsAppErrorBase<{
+  /** HTTP status code returned by Meta, when the server responded. */
+  status?: number;
+  /** Meta error type, when present. */
   type?: string;
+  /** Meta error code, when present. */
   code?: number;
+  /** Meta error subcode, when present. */
   subcode?: number;
+  /** Meta trace id useful when debugging with Meta support. */
   fbtraceId?: string;
+  /** User-facing or nested detail string from the error payload. */
   details?: string;
+  /** Parsed JSON error body returned by Meta, when available. */
   body?: MetaErrorResponse;
 }> {}
 
@@ -148,11 +219,12 @@ type MetaErrorResponse = {
   };
 };
 
-async function toWhatsAppApiError(error: HttpError): Promise<WhatsAppApiError> {
-  const fallbackMessage = `WhatsApp API request failed with status ${error.status}`;
+async function toWhatsAppError(error: HttpError): Promise<WhatsAppError> {
+  const fallbackMessage =
+    `WhatsApp API request failed with status ${error.status}`;
   const payload = await error.response.json<MetaErrorEnvelope>();
   if (payload.isErr()) {
-    return new WhatsAppApiError({
+    return new WhatsAppError({
       message: fallbackMessage,
       status: error.status,
       cause: error,
@@ -160,7 +232,7 @@ async function toWhatsAppApiError(error: HttpError): Promise<WhatsAppApiError> {
   }
 
   const metaError = payload.value.error ?? {};
-  return new WhatsAppApiError({
+  return new WhatsAppError({
     message: metaError.message ?? fallbackMessage,
     status: error.status,
     type: metaError.type,
@@ -173,8 +245,10 @@ async function toWhatsAppApiError(error: HttpError): Promise<WhatsAppApiError> {
   });
 }
 
+/** Primitive query-string value accepted by {@link WabaRequestOptions.searchParams}. */
 export type WabaSearchParamValue = string | number | boolean | null | undefined;
 
+/** Query-string input accepted by {@link WabaClient.request}. */
 export type WabaSearchParams =
   | URLSearchParams
   | Record<string, WabaSearchParamValue>;
