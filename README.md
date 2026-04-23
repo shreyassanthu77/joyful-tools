@@ -49,7 +49,7 @@ const result = pipe(4, double, square, addFive); // 69
 
 ## Joypack
 
-### [@joypack/waba](./joypack/waba)
+### [@joypack/whatsapp](./joypack/whatsapp)
 
 WhatsApp Business API tooling.
 

@@ -11,24 +11,24 @@ import {
   taggedError,
   type TaggedErrorFactory,
 } from "@joyful/result";
-import type { WabaSendOptions, WabaSendResponse } from "./messages.ts";
+import type { WhatsAppSendOptions, WhatsAppSendResponse } from "./messages.ts";
 
 const DEFAULT_BASE_URL = "https://graph.facebook.com";
 
 /**
- * Options for {@link createWabaClient}.
+ * Options for {@link createWhatsAppClient}.
  *
  * @example
  * ```ts
- * import { createWabaClient } from "@joypack/waba";
+ * import { createWhatsAppClient } from "@joypack/whatsapp";
  *
- * const waba = createWabaClient({
+ * const whatsapp = createWhatsAppClient({
  *   accessToken: Deno.env.get("WHATSAPP_ACCESS_TOKEN")!,
  *   apiVersion: "v22.0",
  * });
  * ```
  */
-export interface WabaClientOptions {
+export interface WhatsAppClientOptions {
   /** Permanent or temporary access token for the WhatsApp Cloud API. */
   accessToken: string;
   /** Graph API version prefix such as `v22.0`. */
@@ -37,9 +37,11 @@ export interface WabaClientOptions {
   fetch?: JFetch;
 }
 
-/** Creates a new {@link WabaClient}. */
-export function createWabaClient(options: WabaClientOptions): WabaClient {
-  return new WabaClient(options);
+/** Creates a new {@link WhatsAppClient}. */
+export function createWhatsAppClient(
+  options: WhatsAppClientOptions,
+): WhatsAppClient {
+  return new WhatsAppClient(options);
 }
 
 /**
@@ -49,12 +51,12 @@ export function createWabaClient(options: WabaClientOptions): WabaClient {
  * bodies, a small `send()` convenience, and Meta error mapping. Everything
  * else is left as normal Graph API paths and payloads.
  */
-export class WabaClient {
+export class WhatsAppClient {
   readonly accessToken: string;
   readonly apiVersion?: string;
   readonly fetch: JFetch;
 
-  constructor(options: WabaClientOptions) {
+  constructor(options: WhatsAppClientOptions) {
     this.accessToken = options.accessToken;
     this.apiVersion = options.apiVersion;
     this.fetch = options.fetch ?? jfetch;
@@ -63,20 +65,20 @@ export class WabaClient {
   /**
    * Sends a WhatsApp message via `POST /{phone-number-id}/messages`.
    *
-   * This is a thin convenience over {@link WabaClient.request}. It selects the
+   * This is a thin convenience over {@link WhatsAppClient.request}. It selects the
    * standard messages endpoint and injects `messaging_product: "whatsapp"`,
    * while leaving the rest of the payload close to Meta's JSON shape.
    *
    * @example Send a text message
    * ```ts
-   * import { createWabaClient } from "@joypack/waba";
+   * import { createWhatsAppClient } from "@joypack/whatsapp";
    *
-   * const waba = createWabaClient({
+   * const whatsapp = createWhatsAppClient({
    *   accessToken: Deno.env.get("WHATSAPP_ACCESS_TOKEN")!,
    *   apiVersion: "v22.0",
    * });
    *
-   * const sent = await waba.send({
+   * const sent = await whatsapp.send({
    *   phoneNumberId: "1234567890",
    *   to: "15551234567",
    *   type: "text",
@@ -85,11 +87,11 @@ export class WabaClient {
    * ```
    */
   send(
-    options: WabaSendOptions,
-  ): AsyncResult<WabaSendResponse, WabaRequestError> {
+    options: WhatsAppSendOptions,
+  ): AsyncResult<WhatsAppSendResponse, WhatsAppRequestError> {
     const { phoneNumberId, signal, ...message } = options;
 
-    return this.request<WabaSendResponse>({
+    return this.request<WhatsAppSendResponse>({
       path: `/${phoneNumberId}/messages`,
       method: "POST",
       json: {
@@ -112,14 +114,14 @@ export class WabaClient {
    *
    * @example Send a text message
    * ```ts
-   * import { createWabaClient } from "@joypack/waba";
+   * import { createWhatsAppClient } from "@joypack/whatsapp";
    *
-   * const waba = createWabaClient({
+   * const whatsapp = createWhatsAppClient({
    *   accessToken: Deno.env.get("WHATSAPP_ACCESS_TOKEN")!,
    *   apiVersion: "v22.0",
    * });
    *
-   * const sent = await waba.request<{ messages: Array<{ id: string }> }>({
+   * const sent = await whatsapp.request<{ messages: Array<{ id: string }> }>({
    *   path: "/1234567890/messages",
    *   json: {
    *     messaging_product: "whatsapp",
@@ -131,8 +133,8 @@ export class WabaClient {
    * ```
    */
   request<T = unknown>(
-    options: WabaRequestOptions,
-  ): AsyncResult<T, WabaRequestError> {
+    options: WhatsAppRequestOptions,
+  ): AsyncResult<T, WhatsAppRequestError> {
     const apiVersion = this.apiVersion?.replace(/^\/+|\/+$/g, "");
     const path = options.path.replace(/^\/+/, "");
     const url = new URL(
@@ -173,7 +175,7 @@ export class WabaClient {
       signal: options.signal,
     })
       .json<T>()
-      .mapErr((error): PromiseOr<WabaRequestError> => {
+      .mapErr((error): PromiseOr<WhatsAppRequestError> => {
         if (error instanceof HttpError) return toWhatsAppError(error);
         if (error instanceof ParseError) {
           return new WhatsAppError({
@@ -186,8 +188,8 @@ export class WabaClient {
   }
 }
 
-/** Options for {@link WabaClient.request}. */
-export type WabaRequestOptions =
+/** Options for {@link WhatsAppClient.request}. */
+export type WhatsAppRequestOptions =
   & {
     /**
      * Graph path relative to `https://graph.facebook.com`, for example
@@ -199,7 +201,7 @@ export type WabaRequestOptions =
     /** Extra request headers merged with the bearer token header. */
     headers?: HeadersInit;
     /** Query-string values appended to the request URL. */
-    searchParams?: WabaSearchParams;
+    searchParams?: WhatsAppSearchParams;
     /** Optional abort signal passed through to the underlying fetch call. */
     signal?: AbortSignal;
   }
@@ -210,7 +212,10 @@ export type WabaRequestOptions =
   );
 
 /** Errors that can happen before, during, or after a WhatsApp API request. */
-export type WabaRequestError = NetworkError | Result.Cancelled | WhatsAppError;
+export type WhatsAppRequestError =
+  | NetworkError
+  | Result.Cancelled
+  | WhatsAppError;
 
 const WhatsAppErrorBase: TaggedErrorFactory<"WhatsAppError"> = taggedError(
   "WhatsAppError",
@@ -286,12 +291,17 @@ async function toWhatsAppError(error: HttpError): Promise<WhatsAppError> {
   });
 }
 
-/** Primitive query-string value accepted by {@link WabaRequestOptions.searchParams}. */
-export type WabaSearchParamValue = string | number | boolean | null | undefined;
+/** Primitive query-string value accepted by {@link WhatsAppRequestOptions.searchParams}. */
+export type WhatsAppSearchParamValue =
+  | string
+  | number
+  | boolean
+  | null
+  | undefined;
 
-/** Query-string input accepted by {@link WabaClient.request}. */
-export type WabaSearchParams =
+/** Query-string input accepted by {@link WhatsAppClient.request}. */
+export type WhatsAppSearchParams =
   | URLSearchParams
-  | Record<string, WabaSearchParamValue>;
+  | Record<string, WhatsAppSearchParamValue>;
 
 type PromiseOr<T> = T | Promise<T>;

@@ -146,7 +146,7 @@ export type WebhookHandler = (request: Request) => Promise<Response>;
  *
  * @example
  * ```ts
- * import { handleWebhooks } from "@joypack/waba";
+ * import { handleWebhooks } from "@joypack/whatsapp";
  *
  * const webhook = handleWebhooks(
  *   async ({ event }) => {
@@ -188,7 +188,7 @@ export function handleWebhooks(
  *
  * @example
  * ```ts
- * import { webhookEvents } from "@joypack/waba";
+ * import { webhookEvents } from "@joypack/whatsapp";
  *
  * const events = webhookEvents(payload);
  * for (const event of events) {

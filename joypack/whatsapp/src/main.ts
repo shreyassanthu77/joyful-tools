@@ -3,25 +3,25 @@
  * `@joyful/result`.
  *
  * The package is split into two small pieces:
- * - {@link createWabaClient} for outbound WhatsApp Cloud API requests
+ * - {@link createWhatsAppClient} for outbound WhatsApp Cloud API requests
  * - {@link handleWebhooks} and {@link webhookEvents} for inbound webhook
  *   verification and event handling
  *
- * The request side stays intentionally small. {@link WabaClient.send} covers
+ * The request side stays intentionally small. {@link WhatsAppClient.send} covers
  * standard text, interactive reply-button, template, and reaction messages,
- * while {@link WabaClient.request} stays available for direct Graph API calls.
+ * while {@link WhatsAppClient.request} stays available for direct Graph API calls.
  * Webhook helpers handle Meta's verification and delivery requests.
  *
  * @example Send a WhatsApp message
  * ```ts
- * import { createWabaClient } from "@joypack/waba";
+ * import { createWhatsAppClient } from "@joypack/whatsapp";
  *
- * const waba = createWabaClient({
+ * const whatsapp = createWhatsAppClient({
  *   accessToken: Deno.env.get("WHATSAPP_ACCESS_TOKEN")!,
  *   apiVersion: "v22.0",
  * });
  *
- * const result = await waba.send({
+ * const result = await whatsapp.send({
  *   phoneNumberId: "1234567890",
  *   to: "15551234567",
  *   type: "text",
@@ -37,7 +37,7 @@
  *
  * @example Handle a webhook route
  * ```ts
- * import { handleWebhooks } from "@joypack/waba";
+ * import { handleWebhooks } from "@joypack/whatsapp";
  *
  * export const webhook = handleWebhooks(
  *   async ({ event }) => {
