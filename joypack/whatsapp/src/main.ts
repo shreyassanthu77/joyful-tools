@@ -42,7 +42,9 @@
  * export const webhook = handleWebhooks(
  *   async ({ event }) => {
  *     if (event.kind !== "message") return;
- *     console.log(event.message.id, event.contacts[0]?.wa_id);
+ *     if (event.messageKind === "interactive_button_reply") {
+ *       console.log(event.message.interactive.button_reply.id);
+ *     }
  *   },
  *   {
  *     verifyToken: Deno.env.get("WHATSAPP_VERIFY_TOKEN")!,

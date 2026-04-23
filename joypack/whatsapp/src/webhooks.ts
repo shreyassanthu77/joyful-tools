@@ -53,13 +53,78 @@ export interface WhatsAppWebhookContact {
   [key: string]: unknown;
 }
 
+/** Context block included on replies to earlier messages. */
+export interface WhatsAppWebhookMessageContext {
+  from?: string;
+  id?: string;
+  [key: string]: unknown;
+}
+
+/** Text message body from an inbound webhook event. */
+export interface WhatsAppWebhookText {
+  body?: string;
+  [key: string]: unknown;
+}
+
+/** Interactive reply button selection from an inbound webhook event. */
+export interface WhatsAppWebhookInteractiveButtonReply {
+  id?: string;
+  title?: string;
+  [key: string]: unknown;
+}
+
+/** Interactive list selection from an inbound webhook event. */
+export interface WhatsAppWebhookInteractiveListReply {
+  id?: string;
+  title?: string;
+  description?: string;
+  [key: string]: unknown;
+}
+
+/** Interactive content block from an inbound webhook event. */
+export interface WhatsAppWebhookInteractive {
+  type?: string;
+  button_reply?: WhatsAppWebhookInteractiveButtonReply;
+  list_reply?: WhatsAppWebhookInteractiveListReply;
+  [key: string]: unknown;
+}
+
 /** Incoming WhatsApp message payload. */
 export interface WhatsAppWebhookMessage {
   from?: string;
   id?: string;
   timestamp?: string;
   type?: string;
+  context?: WhatsAppWebhookMessageContext;
+  text?: WhatsAppWebhookText;
+  interactive?: WhatsAppWebhookInteractive;
   [key: string]: unknown;
+}
+
+/** Inbound text message. */
+export interface WhatsAppWebhookTextMessage extends WhatsAppWebhookMessage {
+  type: "text";
+  text: WhatsAppWebhookText;
+}
+
+/** Inbound interactive button reply message. */
+export interface WhatsAppWebhookInteractiveButtonReplyMessage
+  extends WhatsAppWebhookMessage {
+  type: "interactive";
+  interactive: WhatsAppWebhookInteractive & {
+    type: "button_reply";
+    button_reply: WhatsAppWebhookInteractiveButtonReply;
+  };
+}
+
+/** Inbound interactive list reply message. */
+export interface WhatsAppWebhookInteractiveListReplyMessage
+  extends WhatsAppWebhookMessage {
+  type: "interactive";
+  interactive: WhatsAppWebhookInteractive & {
+    type: "list_reply";
+    list_reply: WhatsAppWebhookInteractiveListReply;
+  };
 }
 
 /** Outbound message status update payload. */
@@ -77,31 +142,47 @@ export interface WhatsAppWebhookStatus {
  * Each message or status entry becomes its own event, while unsupported change
  * shapes are surfaced as `unknown` so callers can still inspect the raw value.
  */
+export type WhatsAppWebhookMessageKind =
+  | "text"
+  | "interactive_button_reply"
+  | "interactive_list_reply"
+  | "unknown";
+
+type WebhookEventBase = {
+  entry: WhatsAppWebhookEntry;
+  change: WhatsAppWebhookChange;
+  value: WhatsAppWebhookValue;
+  metadata?: WhatsAppWebhookMetadata;
+};
+
+type MessageWebhookEvent<
+  TMessageKind extends WhatsAppWebhookMessageKind,
+  TMessage extends WhatsAppWebhookMessage,
+> = WebhookEventBase & {
+  kind: "message";
+  contacts: WhatsAppWebhookContact[];
+  messageKind: TMessageKind;
+  message: TMessage;
+};
+
 export type WebhookEvent =
-  | {
-    kind: "message";
-    entry: WhatsAppWebhookEntry;
-    change: WhatsAppWebhookChange;
-    value: WhatsAppWebhookValue;
-    metadata?: WhatsAppWebhookMetadata;
-    contacts: WhatsAppWebhookContact[];
-    message: WhatsAppWebhookMessage;
-  }
-  | {
+  | MessageWebhookEvent<"text", WhatsAppWebhookTextMessage>
+  | MessageWebhookEvent<
+    "interactive_button_reply",
+    WhatsAppWebhookInteractiveButtonReplyMessage
+  >
+  | MessageWebhookEvent<
+    "interactive_list_reply",
+    WhatsAppWebhookInteractiveListReplyMessage
+  >
+  | MessageWebhookEvent<"unknown", WhatsAppWebhookMessage>
+  | (WebhookEventBase & {
     kind: "status";
-    entry: WhatsAppWebhookEntry;
-    change: WhatsAppWebhookChange;
-    value: WhatsAppWebhookValue;
-    metadata?: WhatsAppWebhookMetadata;
     status: WhatsAppWebhookStatus;
-  }
-  | {
+  })
+  | (WebhookEventBase & {
     kind: "unknown";
-    entry: WhatsAppWebhookEntry;
-    change: WhatsAppWebhookChange;
-    value: WhatsAppWebhookValue;
-    metadata?: WhatsAppWebhookMetadata;
-  };
+  });
 
 /** Context passed to a {@link WebhookEventHandler}. */
 export interface WebhookEventContext {
@@ -150,8 +231,8 @@ export type WebhookHandler = (request: Request) => Promise<Response>;
  *
  * const webhook = handleWebhooks(
  *   async ({ event }) => {
- *     if (event.kind === "message") {
- *       console.log(event.message.text);
+ *     if (event.kind === "message" && event.messageKind === "text") {
+ *       console.log(event.message.text.body);
  *     }
  *   },
  *   {
@@ -206,19 +287,46 @@ export function webhookEvents(
     for (const change of changes) {
       const value = change.value ?? {};
       const metadata = value.metadata;
+      const contacts = value.contacts ?? [];
 
       let emitted = false;
 
       for (const message of value.messages ?? []) {
-        events.push({
-          kind: "message",
+        const baseEvent = {
+          kind: "message" as const,
           entry,
           change,
           value,
           metadata,
-          contacts: value.contacts ?? [],
-          message,
-        });
+          contacts,
+        };
+
+        if (isTextMessage(message)) {
+          events.push({
+            ...baseEvent,
+            messageKind: "text",
+            message,
+          });
+        } else if (isInteractiveButtonReplyMessage(message)) {
+          events.push({
+            ...baseEvent,
+            messageKind: "interactive_button_reply",
+            message,
+          });
+        } else if (isInteractiveListReplyMessage(message)) {
+          events.push({
+            ...baseEvent,
+            messageKind: "interactive_list_reply",
+            message,
+          });
+        } else {
+          events.push({
+            ...baseEvent,
+            messageKind: "unknown",
+            message,
+          });
+        }
+
         emitted = true;
       }
 
@@ -306,6 +414,28 @@ function parseWebhookPayload(
   } catch {
     return null;
   }
+}
+
+function isTextMessage(
+  message: WhatsAppWebhookMessage,
+): message is WhatsAppWebhookTextMessage {
+  return message.type === "text" && message.text != null;
+}
+
+function isInteractiveButtonReplyMessage(
+  message: WhatsAppWebhookMessage,
+): message is WhatsAppWebhookInteractiveButtonReplyMessage {
+  return message.type === "interactive" &&
+    message.interactive?.type === "button_reply" &&
+    message.interactive.button_reply != null;
+}
+
+function isInteractiveListReplyMessage(
+  message: WhatsAppWebhookMessage,
+): message is WhatsAppWebhookInteractiveListReplyMessage {
+  return message.type === "interactive" &&
+    message.interactive?.type === "list_reply" &&
+    message.interactive.list_reply != null;
 }
 
 async function verifySignature(

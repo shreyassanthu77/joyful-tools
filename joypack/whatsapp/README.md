@@ -235,8 +235,15 @@ import { handleWebhooks } from "@joypack/whatsapp";
 
 export const webhook = handleWebhooks(
   async ({ event }) => {
-    if (event.kind === "message") {
-      console.log(event.message.id, event.contacts[0]?.wa_id);
+    if (event.kind === "message" && event.messageKind === "text") {
+      console.log(event.message.text.body, event.contacts[0]?.wa_id);
+    }
+
+    if (
+      event.kind === "message" &&
+      event.messageKind === "interactive_button_reply"
+    ) {
+      console.log(event.message.interactive.button_reply.id);
     }
   },
   {
@@ -254,5 +261,8 @@ The returned handler accepts both requests Meta sends to the same route:
 When `appSecret` is set, the handler also validates `X-Hub-Signature-256`.
 
 Each incoming message or status update is flattened into its own normalized
-event before your callback runs. If you want that normalization without the HTTP
-handler, use `webhookEvents(payload)` directly.
+event before your callback runs. Message events are lightly classified as
+`text`, `interactive_button_reply`, `interactive_list_reply`, or `unknown`
+through `event.messageKind`, while the raw payload types stay permissive so new
+upstream fields still flow through without a package update. If you want that
+normalization without the HTTP handler, use `webhookEvents(payload)` directly.
