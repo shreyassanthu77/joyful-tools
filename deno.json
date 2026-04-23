@@ -1,10 +1,10 @@
 {
   "$schema": "https://raw.githubusercontent.com/denoland/deno/refs/heads/main/cli/schemas/config-file.v1.json",
   "workspace": [
-    "packages/fetch",
-    "packages/pipe",
-    "packages/result",
-    "packages/turboq"
+    "joyful/fetch",
+    "joyful/pipe",
+    "joyful/result",
+    "joyful/turboq"
   ],
   "nodeModulesDir": "auto",
   "exclude": ["dist/**/*"],

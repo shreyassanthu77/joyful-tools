@@ -1,5 +1,6 @@
 name: Publish
 on:
+  workflow_dispatch:
   push:
     tags:
       - "release-*"
@@ -11,7 +12,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: denoland/setup-deno@v2
 
-      - name: Install Packages
+      - name: Install Workspace Deps
         run: deno install
 
       - name: Run tests
@@ -30,10 +31,10 @@ jobs:
 
       - uses: denoland/setup-deno@v2
 
-      - name: Install Packages
+      - name: Install Workspace Deps
         run: deno install
 
-      - name: Publish JSR packages
+      - name: Publish JSR Workspace
         run: deno run -A scripts/publish.ts jsr
 
   publish-npm:
@@ -52,11 +53,11 @@ jobs:
           node-version: "24"
           registry-url: "https://registry.npmjs.org"
 
-      - name: Install Packages
+      - name: Install Workspace Deps
         run: deno install
 
-      - name: Build npm packages
+      - name: Build npm Dist Packages
         run: deno run -A scripts/build.ts
 
-      - name: Publish npm packages
+      - name: Publish npm Dist Packages
         run: deno run -A scripts/publish.ts npm

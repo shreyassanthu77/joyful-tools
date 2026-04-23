@@ -39,7 +39,7 @@ await Deno.writeTextFile(
     {
       name: "@joyful-tools/root",
       private: true,
-      workspaces: workspacePackages.map((pkg) => pkg.packageDirname),
+      workspaces: workspacePackages.map((pkg) => pkg.distDirname),
     },
     null,
     2,
@@ -63,7 +63,7 @@ async function buildPackage(
   versionMap: ReadonlyMap<string, string>,
 ) {
   console.log(`%cBuilding ${pkg.dir}`, "color: blue; font-weight: thin");
-  const packageDestDir = join(destDir, pkg.packageDirname);
+  const packageDestDir = join(destDir, pkg.distDirname);
   await Deno.mkdir(packageDestDir, { recursive: true });
 
   const packageJSON = {

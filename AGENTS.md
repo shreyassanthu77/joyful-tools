@@ -3,6 +3,7 @@
 ## Repository Shape
 
 - Monorepo managed by Deno workspace (`deno.json` at repo root).
+- Source packages are grouped by family under `joyful/` and `joypack/`.
 - Build/publish scripts live in `scripts/`.
 - NPM-ready artifacts are generated into `dist/` (do not hand-edit generated
   files).
@@ -32,16 +33,16 @@ deno task test
 deno test -A
 
 # run tests for a single package
-deno test -A packages/result/src
-deno test -A packages/fetch/src
-deno test -A packages/pipe/src
+deno test -A joyful/result/src
+deno test -A joyful/fetch/src
+deno test -A joyful/pipe/src
 
 # run one test file
-deno test -A packages/result/src/result.test.ts
+deno test -A joyful/result/src/result.test.ts
 
 # run one test case by name (substring/regex)
-deno test -A packages/result/src/result.test.ts --filter "Result.run"
-deno test -A packages/fetch/src/main.test.ts --filter "HttpError.response"
+deno test -A joyful/result/src/result.test.ts --filter "Result.run"
+deno test -A joyful/fetch/src/main.test.ts --filter "HttpError.response"
 
 # lint (no dedicated task defined; run directly)
 deno lint
@@ -50,8 +51,8 @@ deno lint
 deno fmt
 
 # type-check examples
-deno check packages/result/src/main.ts
-deno check packages/fetch/src/main.ts
+deno check joyful/result/src/main.ts
+deno check joyful/fetch/src/main.ts
 ```
 
 ## CI Notes
@@ -70,7 +71,7 @@ deno check packages/fetch/src/main.ts
 - Keep unit tests deterministic; mock `fetch` in `fetch` package tests.
 - For result-flow tests, verify both value and type narrowing behavior when
   relevant.
-- Type-level tests use `@ark/attest` in `packages/result/src/types.test.ts`.
+- Type-level tests use `@ark/attest` in `joyful/result/src/types.test.ts`.
 - If adding type-level assertions, follow existing `setup()` / `teardown()`
   pattern.
 - Prefer focused test files near the implementation under test.

@@ -1,4 +1,4 @@
-import { basename, join } from "node:path";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import publishConfig from "../publish.config.json" with { type: "json" };
@@ -22,7 +22,7 @@ type RawPackageConfig = {
 export type WorkspacePackage = {
   dir: string;
   configPath: string;
-  packageDirname: string;
+  distDirname: string;
   name?: string;
   version?: string;
   license?: string;
@@ -90,7 +90,7 @@ export async function loadWorkspacePackages(
     packages.push({
       dir,
       configPath,
-      packageDirname: basename(dir),
+      distDirname: toDistDirname(config.name ?? dir),
       name: config.name,
       version: config.version,
       license: config.license,
@@ -119,4 +119,10 @@ export function resolveWorkspacePackageSpecifier(
     pkg: matched,
     npmSpecifier: `${matched.npmName}${specifier.slice(matched.name.length)}`,
   };
+}
+
+function toDistDirname(nameOrDir: string): string {
+  return nameOrDir
+    .replace(/^@/, "")
+    .replace(/[\\/]/g, "__");
 }

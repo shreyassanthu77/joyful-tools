@@ -5,9 +5,11 @@ A collection of small, typed TypeScript utilities for joyful development.
 Available on [JSR](https://jsr.io/@joyful) as `@joyful/*` and on
 [npm](https://www.npmjs.com/org/joyful-tools) as `@joyful-tools/*`.
 
-## Packages
+Source packages are grouped by family under `joyful/` and `joypack/`.
 
-### [@joyful/result](./packages/result)
+## Joyful
+
+### [@joyful/result](./joyful/result)
 
 Rust-inspired `Result<T, E>` type for explicit error handling. Model success and
 failure as data instead of throwing exceptions.
@@ -22,7 +24,7 @@ const result = Result.run(function* () {
 });
 ```
 
-### [@joyful/fetch](./packages/fetch)
+### [@joyful/fetch](./joyful/fetch)
 
 Thin wrapper around `fetch` that returns `Result` types. Every outcome --
 network error, HTTP error, parse failure, cancellation -- is typed data.
@@ -34,7 +36,7 @@ const user = await jfetch("/api/me").json<User>();
 // AsyncResult<User, NetworkError | HttpError | Cancelled | ParseError>
 ```
 
-### [@joyful/pipe](./packages/pipe)
+### [@joyful/pipe](./joyful/pipe)
 
 Simple left-to-right `pipe(value, ...fns)` with full type inference up to 15
 functions.
@@ -47,7 +49,8 @@ const result = pipe(4, double, square, addFive); // 69
 
 ## Install
 
-Each package is published independently. Pick what you need:
+Each package is published independently. The current stable installs are the
+`@joyful/*` core utilities:
 
 ```sh
 # JSR
