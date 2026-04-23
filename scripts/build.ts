@@ -102,9 +102,9 @@ async function buildPackage(
     Map<string, { replacement: string; dependencyName: string }>
   >();
   await createGraph(
-    Object.values(pkg.exports).map(
-      (path) => pathToFileURL(join(packageDestDir, path)).href,
-    ),
+    pkg.publishInclude
+      .filter((file) => file.endsWith(".ts"))
+      .map((file) => pathToFileURL(join(packageDestDir, file)).href),
     {
       resolve(specifier, referrer) {
         const resolved = resolveWorkspacePackageSpecifier(specifier, packages);
