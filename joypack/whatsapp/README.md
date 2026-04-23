@@ -34,13 +34,206 @@ yarn add jsr:@joypack/whatsapp
 deno add jsr:@joypack/whatsapp
 ```
 
+## Quick Start
+
+`handleWebhooks()` returns a plain fetch-style handler.
+That means you can use it in any runtime or framework that speaks the Web Fetch
+API. The example below uses Hono for routing, but the webhook handler itself is
+not Hono-specific.
+
+The example below mounts a single `/webhook` route for Meta verification and
+delivery, then replies to `/start` with buttons and follows up on button and
+list replies.
+
+```ts
+import { Hono } from "hono";
+import { createWhatsAppClient, handleWebhooks } from "@joypack/whatsapp";
+
+const env = {
+  WHATSAPP_ACCESS_TOKEN: "<access-token>",
+  WHATSAPP_PHONE_NUMBER_ID: "<phone-number-id>",
+  WHATSAPP_VERIFY_TOKEN: "<verify-token>",
+  WHATSAPP_APP_SECRET: "<app-secret>",
+};
+
+const app = new Hono();
+const phoneNumberId = env.WHATSAPP_PHONE_NUMBER_ID;
+
+const whatsapp = createWhatsAppClient({
+  accessToken: env.WHATSAPP_ACCESS_TOKEN,
+});
+
+const webhookHandler = handleWebhooks(
+  async ({ event }) => {
+    switch (event.kind) {
+      case "message": {
+        const from = event.contacts[0]?.wa_id;
+        if (from == null) return;
+
+        switch (event.messageKind) {
+          case "text": {
+            const { body } = event.message.text;
+            if (body !== "/start") return;
+
+            await whatsapp.send({
+              type: "interactive",
+              phoneNumberId,
+              to: from,
+              interactive: {
+                type: "button",
+                body: {
+                  text: "What is your favorite color?",
+                },
+                action: {
+                  buttons: [
+                    {
+                      type: "reply",
+                      reply: { id: "color-red", title: "Red" },
+                    },
+                    {
+                      type: "reply",
+                      reply: { id: "color-blue", title: "Blue" },
+                    },
+                    {
+                      type: "reply",
+                      reply: { id: "color-other", title: "Other" },
+                    },
+                  ],
+                },
+              },
+            });
+            break;
+          }
+          case "interactive_button_reply": {
+            const { id, title } = event.message.interactive.button_reply;
+            if (!id?.startsWith("color-")) return;
+
+            if (id !== "color-other") {
+              await whatsapp.send({
+                type: "text",
+                phoneNumberId,
+                to: from,
+                text: {
+                  body: `You selected ${title}`,
+                },
+              });
+              return;
+            }
+
+            await whatsapp.send({
+              type: "interactive",
+              phoneNumberId,
+              to: from,
+              interactive: {
+                type: "list",
+                body: {
+                  text: "Alright, pick one of the following",
+                },
+                action: {
+                  button: "View colors",
+                  sections: [
+                    {
+                      title: "More color options",
+                      rows: [
+                        { id: "color-red", title: "Red" },
+                        { id: "color-blue", title: "Blue" },
+                        { id: "color-green", title: "Green" },
+                        { id: "color-yellow", title: "Yellow" },
+                        { id: "color-orange", title: "Orange" },
+                        { id: "color-purple", title: "Purple" },
+                      ],
+                    },
+                  ],
+                },
+              },
+            });
+            break;
+          }
+          case "interactive_list_reply": {
+            const { id, title } = event.message.interactive.list_reply;
+            if (!id?.startsWith("color-")) return;
+
+            await whatsapp.send({
+              type: "text",
+              phoneNumberId,
+              to: from,
+              text: {
+                body: `You selected ${title}`,
+              },
+            });
+            break;
+          }
+          default: {
+            console.log("Unhandled message", event.message);
+          }
+        }
+
+        break;
+      }
+      case "status": {
+        console.log("status", event.status.status, event.status.id);
+        break;
+      }
+      case "unknown": {
+        console.log("unknown event", event.value);
+        break;
+      }
+    }
+  },
+  {
+    verifyToken: env.WHATSAPP_VERIFY_TOKEN,
+    appSecret: env.WHATSAPP_APP_SECRET,
+  },
+);
+
+app.on(["GET", "POST"], "/webhook", (c) => webhookHandler(c.req.raw));
+
+app.post("/send-test", async (c) => {
+  const sent = await whatsapp.send({
+    phoneNumberId,
+    to: "15551234567",
+    type: "text",
+    text: { body: "hello from hono" },
+  });
+
+  if (sent.isErr()) {
+    return c.json(
+      {
+        error: sent.error.message,
+        tag: sent.error._tag,
+      },
+      500,
+    );
+  }
+
+  return c.json(sent.value, 200);
+});
+
+export default app;
+```
+
+If you are not using Hono, the integration point is the same: pass your incoming
+`Request` to `webhookHandler(...)` and return the resulting `Response`.
+
+Quick start flow:
+
+1. Create a WhatsApp client with `createWhatsAppClient()`.
+2. Build one fetch-style webhook handler with `handleWebhooks(...)`.
+3. Mount that handler on `GET` and `POST` for the same `/webhook` route.
+4. Point your Meta webhook configuration at that public route.
+5. Send a WhatsApp message containing `/start` to trigger the interactive flow.
+
 ## Send messages
 
 ```ts
 import { createWhatsAppClient } from "@joypack/whatsapp";
 
+const env = {
+  WHATSAPP_ACCESS_TOKEN: "<access-token>",
+};
+
 const whatsapp = createWhatsAppClient({
-  accessToken: Deno.env.get("WHATSAPP_ACCESS_TOKEN")!,
+  accessToken: env.WHATSAPP_ACCESS_TOKEN,
   apiVersion: "v22.0",
 });
 
@@ -233,6 +426,11 @@ and `body` when available.
 ```ts
 import { handleWebhooks } from "@joypack/whatsapp";
 
+const env = {
+  WHATSAPP_VERIFY_TOKEN: "<verify-token>",
+  WHATSAPP_APP_SECRET: "<app-secret>",
+};
+
 export const webhook = handleWebhooks(
   async ({ event }) => {
     if (event.kind === "message" && event.messageKind === "text") {
@@ -247,8 +445,8 @@ export const webhook = handleWebhooks(
     }
   },
   {
-    verifyToken: Deno.env.get("WHATSAPP_VERIFY_TOKEN")!,
-    appSecret: Deno.env.get("WHATSAPP_APP_SECRET"),
+    verifyToken: env.WHATSAPP_VERIFY_TOKEN,
+    appSecret: env.WHATSAPP_APP_SECRET,
   },
 );
 ```
