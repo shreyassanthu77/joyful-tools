@@ -60,6 +60,104 @@ if (sent.isErr()) {
 `messaging_product: "whatsapp"` for you and returns an
 `AsyncResult<WabaSendResponse, WabaRequestError>`.
 
+Inside the user-initiated 24-hour window, you can also send arbitrary
+interactive messages with `type: "interactive"`, including reply buttons, lists,
+and flows:
+
+```ts
+await waba.send({
+  phoneNumberId: "1234567890",
+  to: "15551234567",
+  type: "interactive",
+  interactive: {
+    type: "button",
+    body: {
+      text: "Pick one:",
+    },
+    footer: {
+      text: "You can change this later",
+    },
+    action: {
+      buttons: [
+        {
+          type: "reply",
+          reply: {
+            id: "plan_basic",
+            title: "Basic",
+          },
+        },
+        {
+          type: "reply",
+          reply: {
+            id: "plan_pro",
+            title: "Pro",
+          },
+        },
+      ],
+    },
+  },
+});
+```
+
+```ts
+await waba.send({
+  phoneNumberId: "1234567890",
+  to: "15551234567",
+  type: "interactive",
+  interactive: {
+    type: "list",
+    header: { type: "text", text: "Choose a plan" },
+    body: { text: "Available options:" },
+    footer: { text: "More plans on the web" },
+    action: {
+      button: "Browse",
+      sections: [
+        {
+          title: "Plans",
+          rows: [
+            {
+              id: "plan_basic",
+              title: "Basic",
+              description: "Starter tier",
+            },
+          ],
+        },
+      ],
+    },
+  },
+});
+```
+
+```ts
+await waba.send({
+  phoneNumberId: "1234567890",
+  to: "15551234567",
+  type: "interactive",
+  interactive: {
+    type: "flow",
+    header: { type: "text", text: "Complete signup" },
+    body: { text: "Open the flow to continue." },
+    footer: { text: "Takes less than a minute" },
+    action: {
+      name: "flow",
+      parameters: {
+        flow_message_version: "3",
+        flow_id: "123456789012345",
+        flow_cta: "Open Flow!",
+        flow_token: "signup-session-token",
+        flow_action: "navigate",
+        flow_action_payload: {
+          screen: "WELCOME",
+          data: {
+            userId: "usr_123",
+          },
+        },
+      },
+    },
+  },
+});
+```
+
 Template messages are typed to match Meta's official message examples more
 closely, including `header`, `body`, `quick_reply`, `CATALOG`, and `flow` button
 components:

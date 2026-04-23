@@ -8,9 +8,9 @@
  *   verification and event handling
  *
  * The request side stays intentionally small. {@link WabaClient.send} covers
- * the standard outbound messages endpoint, while {@link WabaClient.request}
- * stays available for direct Graph API calls. Webhook helpers handle Meta's
- * verification and delivery requests.
+ * standard text, interactive reply-button, template, and reaction messages,
+ * while {@link WabaClient.request} stays available for direct Graph API calls.
+ * Webhook helpers handle Meta's verification and delivery requests.
  *
  * @example Send a WhatsApp message
  * ```ts

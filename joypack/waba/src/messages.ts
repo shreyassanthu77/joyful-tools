@@ -214,6 +214,113 @@ export interface WabaReactionMessageBody {
   emoji: string;
 }
 
+/** Body text for an interactive message. */
+export interface WabaInteractiveBody {
+  text: string;
+}
+
+/** Footer text for an interactive message. */
+export interface WabaInteractiveFooter {
+  text: string;
+}
+
+/** Header text for an interactive message. */
+export interface WabaInteractiveTextHeader {
+  type: "text";
+  text: string;
+}
+
+/** Reply button option for an interactive button message. */
+export interface WabaInteractiveReplyButton {
+  type: "reply";
+  reply: {
+    id: string;
+    title: string;
+  };
+}
+
+/** Reply-button interactive message payload. */
+export interface WabaInteractiveButtonMessage {
+  type: "button";
+  body: WabaInteractiveBody;
+  action: {
+    buttons: [WabaInteractiveReplyButton, ...WabaInteractiveReplyButton[]];
+  };
+  footer?: WabaInteractiveFooter;
+  header?: WabaInteractiveTextHeader;
+}
+
+/** Row option inside an interactive list section. */
+export interface WabaInteractiveListRow {
+  id: string;
+  title: string;
+  description?: string;
+}
+
+/** Section inside an interactive list message. */
+export interface WabaInteractiveListSection {
+  title?: string;
+  rows: [WabaInteractiveListRow, ...WabaInteractiveListRow[]];
+}
+
+/** List interactive message payload. */
+export interface WabaInteractiveListMessage {
+  type: "list";
+  body: WabaInteractiveBody;
+  action: {
+    button: string;
+    sections: [WabaInteractiveListSection, ...WabaInteractiveListSection[]];
+  };
+  footer?: WabaInteractiveFooter;
+  header?: WabaInteractiveTextHeader;
+}
+
+/** Flow launch payload for an interactive flow message. */
+export interface WabaInteractiveFlowParametersBase {
+  flow_message_version: "3";
+  flow_token: string;
+  flow_cta: string;
+  flow_action: "navigate";
+  flow_action_payload?: {
+    screen?: string;
+    data?: Record<string, unknown>;
+  };
+}
+
+/** Flow launch payload addressed by flow id. */
+export interface WabaInteractiveFlowParametersById
+  extends WabaInteractiveFlowParametersBase {
+  flow_id: string;
+  flow_name?: never;
+}
+
+/** Flow launch payload addressed by flow name. */
+export interface WabaInteractiveFlowParametersByName
+  extends WabaInteractiveFlowParametersBase {
+  flow_name: string;
+  flow_id?: never;
+}
+
+/** Flow interactive message payload. */
+export interface WabaInteractiveFlowMessage {
+  type: "flow";
+  body: WabaInteractiveBody;
+  action: {
+    name: "flow";
+    parameters:
+      | WabaInteractiveFlowParametersById
+      | WabaInteractiveFlowParametersByName;
+  };
+  footer?: WabaInteractiveFooter;
+  header?: WabaInteractiveTextHeader;
+}
+
+/** Interactive message payloads supported by `send()`. */
+export type WabaInteractiveMessage =
+  | WabaInteractiveButtonMessage
+  | WabaInteractiveListMessage
+  | WabaInteractiveFlowMessage;
+
 /** Common fields accepted by outbound WhatsApp messages. */
 export interface WabaSendBase {
   phoneNumberId: string;
@@ -229,6 +336,10 @@ export type WabaSendOptions =
   | (WabaSendBase & {
     type: "text";
     text: WabaTextMessageBody;
+  })
+  | (WabaSendBase & {
+    type: "interactive";
+    interactive: WabaInteractiveMessage;
   })
   | (WabaSendBase & {
     type: "template";
