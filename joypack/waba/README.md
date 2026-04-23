@@ -6,7 +6,7 @@ Built on top of `@joyful/fetch` and `@joyful/result`.
 
 The package does two things:
 
-- makes outbound WhatsApp Cloud API requests with `createWabaClient()`
+- sends outbound WhatsApp Cloud API messages with `createWabaClient()`
 - handles inbound webhook verification and delivery with `handleWebhooks()`
 
 ## Installation
@@ -34,7 +34,7 @@ yarn add jsr:@joypack/waba
 deno add jsr:@joypack/waba
 ```
 
-## Request API
+## Send messages
 
 ```ts
 import { createWabaClient } from "@joypack/waba";
@@ -44,19 +44,83 @@ const waba = createWabaClient({
   apiVersion: "v22.0",
 });
 
-const sent = await waba.request<{ messages: Array<{ id: string }> }>({
-  path: "/1234567890/messages",
-  json: {
-    messaging_product: "whatsapp",
-    to: "15551234567",
-    type: "text",
-    text: { body: "hello" },
-  },
+const sent = await waba.send({
+  phoneNumberId: "1234567890",
+  to: "15551234567",
+  type: "text",
+  text: { body: "hello" },
 });
 
 if (sent.isErr()) {
   console.error(sent.error._tag, sent.error.message);
 }
+```
+
+`send()` is a thin convenience for `POST /{phone-number-id}/messages`. It adds
+`messaging_product: "whatsapp"` for you and returns an
+`AsyncResult<WabaSendResponse, WabaRequestError>`.
+
+Template messages are typed to match Meta's official message examples more
+closely, including `header`, `body`, `quick_reply`, `CATALOG`, and `flow` button
+components:
+
+```ts
+await waba.send({
+  phoneNumberId: "1234567890",
+  to: "15551234567",
+  type: "template",
+  template: {
+    name: "order_update",
+    language: { code: "en_US" },
+    components: [
+      {
+        type: "body",
+        parameters: [
+          { type: "text", text: "Shreyas" },
+          {
+            type: "currency",
+            currency: {
+              fallback_value: "$19.99",
+              code: "USD",
+              amount_1000: 19990,
+            },
+          },
+        ],
+      },
+      {
+        type: "button",
+        sub_type: "quick_reply",
+        index: "0",
+        parameters: [{ type: "payload", payload: "confirm-order" }],
+      },
+      {
+        type: "button",
+        sub_type: "CATALOG",
+        index: 1,
+        parameters: [
+          {
+            type: "action",
+            action: {
+              thumbnail_product_retailer_id: "2lc20305pt",
+            },
+          },
+        ],
+      },
+    ],
+  },
+});
+```
+
+## Request API
+
+If you need another Graph endpoint or a payload `send()` does not cover yet, use
+`request<T>()` directly:
+
+```ts
+const profile = await waba.request<{ verified_name?: string }>({
+  path: "/1234567890/whatsapp_business_profile",
+  searchParams: { fields: "verified_name" },
+});
 ```
 
 `request<T>()` returns an `AsyncResult<T, WabaRequestError>` and parses the

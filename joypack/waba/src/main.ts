@@ -7,9 +7,10 @@
  * - {@link handleWebhooks} and {@link webhookEvents} for inbound webhook
  *   verification and event handling
  *
- * The request side stays intentionally small. {@link WabaClient.request}
- * returns parsed JSON directly, while webhook helpers handle Meta's verification
- * and delivery requests.
+ * The request side stays intentionally small. {@link WabaClient.send} covers
+ * the standard outbound messages endpoint, while {@link WabaClient.request}
+ * stays available for direct Graph API calls. Webhook helpers handle Meta's
+ * verification and delivery requests.
  *
  * @example Send a WhatsApp message
  * ```ts
@@ -20,14 +21,11 @@
  *   apiVersion: "v22.0",
  * });
  *
- * const result = await waba.request<{ messages: Array<{ id: string }> }>({
- *   path: "/1234567890/messages",
- *   json: {
- *     messaging_product: "whatsapp",
- *     to: "15551234567",
- *     type: "text",
- *     text: { body: "hello from joyful-tools" },
- *   },
+ * const result = await waba.send({
+ *   phoneNumberId: "1234567890",
+ *   to: "15551234567",
+ *   type: "text",
+ *   text: { body: "hello from joyful-tools" },
  * });
  *
  * if (result.isOk()) {
@@ -57,4 +55,5 @@
  */
 
 export * from "./client.ts";
+export * from "./messages.ts";
 export * from "./webhooks.ts";

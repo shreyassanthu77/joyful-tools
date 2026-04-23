@@ -13,6 +13,7 @@
       "README.md",
       "src/client.ts",
       "src/main.ts",
+      "src/messages.ts",
       "src/webhooks.ts"
     ]
   }

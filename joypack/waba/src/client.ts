@@ -11,6 +11,7 @@ import {
   taggedError,
   type TaggedErrorFactory,
 } from "@joyful/result";
+import type { WabaSendOptions, WabaSendResponse } from "./messages.ts";
 
 const DEFAULT_BASE_URL = "https://graph.facebook.com";
 
@@ -45,8 +46,8 @@ export function createWabaClient(options: WabaClientOptions): WabaClient {
  * Minimal WhatsApp Cloud API client.
  *
  * The client only handles base URL construction, bearer auth, JSON request
- * bodies, and Meta error mapping. Everything else is left as normal Graph API
- * paths and payloads.
+ * bodies, a small `send()` convenience, and Meta error mapping. Everything
+ * else is left as normal Graph API paths and payloads.
  */
 export class WabaClient {
   readonly accessToken: string;
@@ -57,6 +58,46 @@ export class WabaClient {
     this.accessToken = options.accessToken;
     this.apiVersion = options.apiVersion;
     this.fetch = options.fetch ?? jfetch;
+  }
+
+  /**
+   * Sends a WhatsApp message via `POST /{phone-number-id}/messages`.
+   *
+   * This is a thin convenience over {@link WabaClient.request}. It selects the
+   * standard messages endpoint and injects `messaging_product: "whatsapp"`,
+   * while leaving the rest of the payload close to Meta's JSON shape.
+   *
+   * @example Send a text message
+   * ```ts
+   * import { createWabaClient } from "@joypack/waba";
+   *
+   * const waba = createWabaClient({
+   *   accessToken: Deno.env.get("WHATSAPP_ACCESS_TOKEN")!,
+   *   apiVersion: "v22.0",
+   * });
+   *
+   * const sent = await waba.send({
+   *   phoneNumberId: "1234567890",
+   *   to: "15551234567",
+   *   type: "text",
+   *   text: { body: "hello" },
+   * });
+   * ```
+   */
+  send(
+    options: WabaSendOptions,
+  ): AsyncResult<WabaSendResponse, WabaRequestError> {
+    const { phoneNumberId, signal, ...message } = options;
+
+    return this.request<WabaSendResponse>({
+      path: `/${phoneNumberId}/messages`,
+      method: "POST",
+      json: {
+        messaging_product: "whatsapp",
+        ...message,
+      },
+      signal,
+    });
   }
 
   /**
