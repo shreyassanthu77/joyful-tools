@@ -36,10 +36,9 @@ deno add jsr:@joypack/whatsapp
 
 ## Quick Start
 
-`handleWebhooks()` returns a plain fetch-style handler.
-That means you can use it in any runtime or framework that speaks the Web Fetch
-API. The example below uses Hono for routing, but the webhook handler itself is
-not Hono-specific.
+`handleWebhooks()` returns a plain fetch-style handler. That means you can use
+it in any runtime or framework that speaks the Web Fetch API. The example below
+uses Hono for routing, but the webhook handler itself is not Hono-specific.
 
 The example below mounts a single `/webhook` route for Meta verification and
 delivery, then replies to `/start` with buttons and follows up on button and
