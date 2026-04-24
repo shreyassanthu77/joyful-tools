@@ -270,6 +270,34 @@ export interface WhatsAppWebhookStatus {
   [key: string]: unknown;
 }
 
+/** Known outbound message delivery states normalized from status webhooks. */
+export type WhatsAppWebhookStatusKind =
+  | "sent"
+  | "delivered"
+  | "read"
+  | "failed"
+  | "unknown";
+
+/** Outbound message status update for a sent message. */
+export interface WhatsAppWebhookSentStatus extends WhatsAppWebhookStatus {
+  status: "sent";
+}
+
+/** Outbound message status update for a delivered message. */
+export interface WhatsAppWebhookDeliveredStatus extends WhatsAppWebhookStatus {
+  status: "delivered";
+}
+
+/** Outbound message status update for a read message. */
+export interface WhatsAppWebhookReadStatus extends WhatsAppWebhookStatus {
+  status: "read";
+}
+
+/** Outbound message status update for a failed message. */
+export interface WhatsAppWebhookFailedStatus extends WhatsAppWebhookStatus {
+  status: "failed";
+}
+
 /**
  * Normalized per-item webhook event.
  *
@@ -306,6 +334,15 @@ type MessageWebhookEvent<
   message: TMessage;
 };
 
+type StatusWebhookEvent<
+  TStatusKind extends WhatsAppWebhookStatusKind,
+  TStatus extends WhatsAppWebhookStatus,
+> = WebhookEventBase & {
+  kind: "status";
+  statusKind: TStatusKind;
+  status: TStatus;
+};
+
 export type WebhookEvent =
   | MessageWebhookEvent<"text", WhatsAppWebhookTextMessage>
   | MessageWebhookEvent<"image", WhatsAppWebhookImageMessage>
@@ -324,10 +361,11 @@ export type WebhookEvent =
     WhatsAppWebhookInteractiveListReplyMessage
   >
   | MessageWebhookEvent<"unknown", WhatsAppWebhookMessage>
-  | (WebhookEventBase & {
-    kind: "status";
-    status: WhatsAppWebhookStatus;
-  })
+  | StatusWebhookEvent<"sent", WhatsAppWebhookSentStatus>
+  | StatusWebhookEvent<"delivered", WhatsAppWebhookDeliveredStatus>
+  | StatusWebhookEvent<"read", WhatsAppWebhookReadStatus>
+  | StatusWebhookEvent<"failed", WhatsAppWebhookFailedStatus>
+  | StatusWebhookEvent<"unknown", WhatsAppWebhookStatus>
   | (WebhookEventBase & {
     kind: "unknown";
   });
@@ -449,65 +487,77 @@ export function webhookEvents(
           contacts,
         };
 
-        if (isTextMessage(message)) {
+        if (message.type === "text" && message.text != null) {
           events.push({
             ...baseEvent,
             messageKind: "text",
-            message,
+            message: message as WhatsAppWebhookTextMessage,
           });
-        } else if (isImageMessage(message)) {
+        } else if (message.type === "image" && message.image != null) {
           events.push({
             ...baseEvent,
             messageKind: "image",
-            message,
+            message: message as WhatsAppWebhookImageMessage,
           });
-        } else if (isAudioMessage(message)) {
+        } else if (message.type === "audio" && message.audio != null) {
           events.push({
             ...baseEvent,
             messageKind: "audio",
-            message,
+            message: message as WhatsAppWebhookAudioMessage,
           });
-        } else if (isVideoMessage(message)) {
+        } else if (message.type === "video" && message.video != null) {
           events.push({
             ...baseEvent,
             messageKind: "video",
-            message,
+            message: message as WhatsAppWebhookVideoMessage,
           });
-        } else if (isDocumentMessage(message)) {
+        } else if (message.type === "document" && message.document != null) {
           events.push({
             ...baseEvent,
             messageKind: "document",
-            message,
+            message: message as WhatsAppWebhookDocumentMessage,
           });
-        } else if (isStickerMessage(message)) {
+        } else if (message.type === "sticker" && message.sticker != null) {
           events.push({
             ...baseEvent,
             messageKind: "sticker",
-            message,
+            message: message as WhatsAppWebhookStickerMessage,
           });
-        } else if (isLocationMessage(message)) {
+        } else if (message.type === "location" && message.location != null) {
           events.push({
             ...baseEvent,
             messageKind: "location",
-            message,
+            message: message as WhatsAppWebhookLocationMessage,
           });
-        } else if (isContactsMessage(message)) {
+        } else if (
+          message.type === "contacts" &&
+          Array.isArray(message.contacts) &&
+          message.contacts.length > 0
+        ) {
           events.push({
             ...baseEvent,
             messageKind: "contacts",
-            message,
+            message: message as WhatsAppWebhookContactsMessage,
           });
-        } else if (isInteractiveButtonReplyMessage(message)) {
+        } else if (
+          message.type === "interactive" &&
+          message.interactive?.type === "button_reply" &&
+          message.interactive.button_reply != null
+        ) {
           events.push({
             ...baseEvent,
             messageKind: "interactive_button_reply",
-            message,
+            message: message as WhatsAppWebhookInteractiveButtonReplyMessage,
           });
-        } else if (isInteractiveListReplyMessage(message)) {
+        } else if (
+          message.type === "interactive" &&
+          message.interactive?.type === "list_reply" &&
+          message.interactive.list_reply != null
+        ) {
           events.push({
             ...baseEvent,
             messageKind: "interactive_list_reply",
-            message,
+            message: message as WhatsAppWebhookInteractiveListReplyMessage,
           });
         } else {
           events.push({
@@ -521,14 +571,45 @@ export function webhookEvents(
       }
 
       for (const status of value.statuses ?? []) {
-        events.push({
-          kind: "status",
+        const baseEvent = {
+          kind: "status" as const,
           entry,
           change,
           value,
           metadata,
-          status,
-        });
+        };
+
+        if (status.status === "sent") {
+          events.push({
+            ...baseEvent,
+            statusKind: "sent",
+            status: status as WhatsAppWebhookSentStatus,
+          });
+        } else if (status.status === "delivered") {
+          events.push({
+            ...baseEvent,
+            statusKind: "delivered",
+            status: status as WhatsAppWebhookDeliveredStatus,
+          });
+        } else if (status.status === "read") {
+          events.push({
+            ...baseEvent,
+            statusKind: "read",
+            status: status as WhatsAppWebhookReadStatus,
+          });
+        } else if (status.status === "failed") {
+          events.push({
+            ...baseEvent,
+            statusKind: "failed",
+            status: status as WhatsAppWebhookFailedStatus,
+          });
+        } else {
+          events.push({
+            ...baseEvent,
+            statusKind: "unknown",
+            status,
+          });
+        }
         emitted = true;
       }
 
@@ -604,72 +685,6 @@ function parseWebhookPayload(
   } catch {
     return null;
   }
-}
-
-function isTextMessage(
-  message: WhatsAppWebhookMessage,
-): message is WhatsAppWebhookTextMessage {
-  return message.type === "text" && message.text != null;
-}
-
-function isImageMessage(
-  message: WhatsAppWebhookMessage,
-): message is WhatsAppWebhookImageMessage {
-  return message.type === "image" && message.image != null;
-}
-
-function isAudioMessage(
-  message: WhatsAppWebhookMessage,
-): message is WhatsAppWebhookAudioMessage {
-  return message.type === "audio" && message.audio != null;
-}
-
-function isVideoMessage(
-  message: WhatsAppWebhookMessage,
-): message is WhatsAppWebhookVideoMessage {
-  return message.type === "video" && message.video != null;
-}
-
-function isDocumentMessage(
-  message: WhatsAppWebhookMessage,
-): message is WhatsAppWebhookDocumentMessage {
-  return message.type === "document" && message.document != null;
-}
-
-function isStickerMessage(
-  message: WhatsAppWebhookMessage,
-): message is WhatsAppWebhookStickerMessage {
-  return message.type === "sticker" && message.sticker != null;
-}
-
-function isLocationMessage(
-  message: WhatsAppWebhookMessage,
-): message is WhatsAppWebhookLocationMessage {
-  return message.type === "location" && message.location != null;
-}
-
-function isContactsMessage(
-  message: WhatsAppWebhookMessage,
-): message is WhatsAppWebhookContactsMessage {
-  return message.type === "contacts" &&
-    Array.isArray(message.contacts) &&
-    message.contacts.length > 0;
-}
-
-function isInteractiveButtonReplyMessage(
-  message: WhatsAppWebhookMessage,
-): message is WhatsAppWebhookInteractiveButtonReplyMessage {
-  return message.type === "interactive" &&
-    message.interactive?.type === "button_reply" &&
-    message.interactive.button_reply != null;
-}
-
-function isInteractiveListReplyMessage(
-  message: WhatsAppWebhookMessage,
-): message is WhatsAppWebhookInteractiveListReplyMessage {
-  return message.type === "interactive" &&
-    message.interactive?.type === "list_reply" &&
-    message.interactive.list_reply != null;
 }
 
 async function verifySignature(

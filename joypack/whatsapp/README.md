@@ -170,7 +170,22 @@ const webhookHandler = handleWebhooks(
         break;
       }
       case "status": {
-        console.log("status", event.status.status, event.status.id);
+        switch (event.statusKind) {
+          case "sent":
+          case "delivered":
+          case "read":
+          case "failed": {
+            console.log(
+              event.statusKind,
+              event.status.id,
+              event.status.recipient_id,
+            );
+            break;
+          }
+          default: {
+            console.log("unknown status", event.status.status, event.status.id);
+          }
+        }
         break;
       }
       case "unknown": {
@@ -542,5 +557,7 @@ event before your callback runs. Message events are lightly classified as
 `text`, `image`, `audio`, `video`, `document`, `sticker`, `location`,
 `contacts`, `interactive_button_reply`, `interactive_list_reply`, or `unknown`
 through `event.messageKind`, while the raw payload types stay permissive so new
-upstream fields still flow through without a package update. If you want that
-normalization without the HTTP handler, use `webhookEvents(payload)` directly.
+upstream fields still flow through without a package update. Status events are
+similarly narrowed through `event.statusKind` as `sent`, `delivered`, `read`,
+`failed`, or `unknown`. If you want that normalization without the HTTP handler,
+use `webhookEvents(payload)` directly.
