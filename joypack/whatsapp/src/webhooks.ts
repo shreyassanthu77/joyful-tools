@@ -166,6 +166,13 @@ export interface WhatsAppWebhookInteractiveListReply {
   [key: string]: unknown;
 }
 
+/** Legacy button reply payload used by some inbound webhook messages. */
+export interface WhatsAppWebhookButtonReply {
+  payload?: string;
+  text?: string;
+  [key: string]: unknown;
+}
+
 /** Interactive content block from an inbound webhook event. */
 export interface WhatsAppWebhookInteractive {
   type?: string;
@@ -182,6 +189,7 @@ export interface WhatsAppWebhookMessage {
   type?: string;
   context?: WhatsAppWebhookMessageContext;
   text?: WhatsAppWebhookText;
+  button?: WhatsAppWebhookButtonReply;
   image?: WhatsAppWebhookMedia;
   audio?: WhatsAppWebhookMedia;
   video?: WhatsAppWebhookMedia;
@@ -201,6 +209,23 @@ export interface WhatsAppWebhookTextMessage extends WhatsAppWebhookMessage {
 
 /** Inbound interactive button reply message. */
 export interface WhatsAppWebhookInteractiveButtonReplyMessage
+  extends WhatsAppWebhookMessage {
+  type: "interactive";
+  interactive: WhatsAppWebhookInteractive & {
+    type: "button_reply";
+    button_reply: WhatsAppWebhookInteractiveButtonReply;
+  };
+}
+
+/** Inbound legacy button reply message. */
+export interface WhatsAppWebhookButtonReplyMessage
+  extends WhatsAppWebhookMessage {
+  type: "button";
+  button: WhatsAppWebhookButtonReply;
+}
+
+/** Normalized interactive button reply message emitted by `webhookEvents(...)`. */
+export interface WhatsAppWebhookNormalizedButtonReplyMessage
   extends WhatsAppWebhookMessage {
   type: "interactive";
   interactive: WhatsAppWebhookInteractive & {
@@ -267,6 +292,37 @@ export interface WhatsAppWebhookStatus {
   status?: string;
   timestamp?: string;
   recipient_id?: string;
+  biz_opaque_callback_data?: string;
+  conversation?: {
+    id?: string;
+    expiration_timestamp?: string;
+    origin?: {
+      type?: string;
+      [key: string]: unknown;
+    };
+    [key: string]: unknown;
+  };
+  pricing?: {
+    billable?: boolean;
+    pricing_model?: string;
+    category?: string;
+    type?: string;
+    [key: string]: unknown;
+  };
+  errors?: WhatsAppWebhookStatusError[];
+  [key: string]: unknown;
+}
+
+/** Error payload included on failed or partial status webhooks. */
+export interface WhatsAppWebhookStatusError {
+  code?: number;
+  title?: string;
+  message?: string;
+  error_data?: {
+    details?: string;
+    [key: string]: unknown;
+  };
+  href?: string;
   [key: string]: unknown;
 }
 
@@ -277,6 +333,26 @@ export type WhatsAppWebhookStatusKind =
   | "read"
   | "failed"
   | "unknown";
+
+/** Normalized status conversation details. */
+export interface WhatsAppWebhookConversation {
+  id?: string;
+  expiration_timestamp?: string;
+  origin?: {
+    type?: string;
+    [key: string]: unknown;
+  };
+  [key: string]: unknown;
+}
+
+/** Normalized pricing details attached to a status event. */
+export interface WhatsAppWebhookPricing {
+  billable?: boolean;
+  pricing_model?: string;
+  category?: string;
+  type?: string;
+  [key: string]: unknown;
+}
 
 /** Outbound message status update for a sent message. */
 export interface WhatsAppWebhookSentStatus extends WhatsAppWebhookStatus {
@@ -341,6 +417,10 @@ type StatusWebhookEvent<
   kind: "status";
   statusKind: TStatusKind;
   status: TStatus;
+  conversation?: WhatsAppWebhookConversation;
+  pricing?: WhatsAppWebhookPricing;
+  errors: WhatsAppWebhookStatusError[];
+  callbackData?: string;
 };
 
 export type WebhookEvent =
@@ -354,7 +434,8 @@ export type WebhookEvent =
   | MessageWebhookEvent<"contacts", WhatsAppWebhookContactsMessage>
   | MessageWebhookEvent<
     "interactive_button_reply",
-    WhatsAppWebhookInteractiveButtonReplyMessage
+    | WhatsAppWebhookInteractiveButtonReplyMessage
+    | WhatsAppWebhookNormalizedButtonReplyMessage
   >
   | MessageWebhookEvent<
     "interactive_list_reply",
@@ -540,6 +621,25 @@ export function webhookEvents(
             message: message as WhatsAppWebhookContactsMessage,
           });
         } else if (
+          message.type === "button" &&
+          message.button != null
+        ) {
+          events.push({
+            ...baseEvent,
+            messageKind: "interactive_button_reply",
+            message: {
+              ...message,
+              type: "interactive",
+              interactive: {
+                type: "button_reply",
+                button_reply: {
+                  id: message.button.payload,
+                  title: message.button.text,
+                },
+              },
+            } satisfies WhatsAppWebhookNormalizedButtonReplyMessage,
+          });
+        } else if (
           message.type === "interactive" &&
           message.interactive?.type === "button_reply" &&
           message.interactive.button_reply != null
@@ -577,6 +677,10 @@ export function webhookEvents(
           change,
           value,
           metadata,
+          conversation: status.conversation,
+          pricing: status.pricing,
+          errors: status.errors ?? [],
+          callbackData: status.biz_opaque_callback_data,
         };
 
         if (status.status === "sent") {

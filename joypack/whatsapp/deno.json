@@ -5,16 +5,20 @@
   "license": "MIT",
   "imports": {},
   "exports": {
-    ".": "./src/main.ts"
+    ".": "./src/main.ts",
+    "./interactive": "./src/interactive.ts",
+    "./template": "./src/template.ts"
   },
   "publish": {
     "include": [
       "LICENSE",
       "README.md",
       "src/client.ts",
+      "src/interactive.ts",
       "src/messages.ts",
       "src/media.ts",
       "src/main.ts",
+      "src/template.ts",
       "src/webhooks.ts"
     ]
   }

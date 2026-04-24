@@ -367,6 +367,26 @@ interactive messages with `type: "interactive"`, including reply buttons, lists,
 and flows:
 
 ```ts
+import * as interactive from "@joypack/whatsapp/interactive";
+
+await whatsapp.messages.send({
+  phoneNumberId: "1234567890",
+  to: "15551234567",
+  type: "interactive",
+  interactive: interactive.button(
+    "Pick one:",
+    [
+      interactive.replyButton("plan_basic", "Basic"),
+      interactive.replyButton("plan_pro", "Pro"),
+    ],
+    {
+      footer: "You can change this later",
+    },
+  ),
+});
+```
+
+```ts
 await whatsapp.messages.send({
   phoneNumberId: "1234567890",
   to: "15551234567",
@@ -460,56 +480,40 @@ await whatsapp.messages.send({
 });
 ```
 
+The `@joypack/whatsapp/interactive` submodule also includes `listRow(...)`,
+`listSection(...)`, `list(...)`, `flowById(...)`, `flowByName(...)`, and
+`flow(...)` helpers when you want the same typed builder style for list and flow
+messages.
+
 Template messages are typed to match Meta's official message examples more
 closely, including `header`, `body`, `quick_reply`, `CATALOG`, and `flow` button
 components:
 
 ```ts
+import * as template from "@joypack/whatsapp/template";
+
 await whatsapp.messages.send({
   phoneNumberId: "1234567890",
   to: "15551234567",
   type: "template",
-  template: {
-    name: "order_update",
-    language: { code: "en_US" },
-    components: [
-      {
-        type: "body",
-        parameters: [
-          { type: "text", text: "Shreyas" },
-          {
-            type: "currency",
-            currency: {
-              fallback_value: "$19.99",
-              code: "USD",
-              amount_1000: 19990,
-            },
-          },
-        ],
-      },
-      {
-        type: "button",
-        sub_type: "quick_reply",
-        index: "0",
-        parameters: [{ type: "payload", payload: "confirm-order" }],
-      },
-      {
-        type: "button",
-        sub_type: "CATALOG",
-        index: 1,
-        parameters: [
-          {
-            type: "action",
-            action: {
-              thumbnail_product_retailer_id: "2lc20305pt",
-            },
-          },
-        ],
-      },
-    ],
-  },
+  template: template.message("order_update", "en_US", [
+    template.body(
+      template.text("Shreyas"),
+      template.currency({
+        fallback_value: "$19.99",
+        code: "USD",
+        amount_1000: 19990,
+      }),
+    ),
+    template.quickReplyButton("0", template.payload("confirm-order")),
+    template.catalogButton(1, template.catalogAction("2lc20305pt")),
+  ]),
 });
 ```
+
+You can also use the higher-level shortcuts like `template.bodyText(...)`,
+`template.headerImage(...)`, and `template.flowButton(...)` when you only need a
+single parameter block.
 
 WhatsApp failures are normalized to `WhatsAppError`, which carries Meta's parsed
 error fields like `status`, `type`, `code`, `subcode`, `fbtraceId`, `details`,
@@ -557,7 +561,11 @@ event before your callback runs. Message events are lightly classified as
 `text`, `image`, `audio`, `video`, `document`, `sticker`, `location`,
 `contacts`, `interactive_button_reply`, `interactive_list_reply`, or `unknown`
 through `event.messageKind`, while the raw payload types stay permissive so new
-upstream fields still flow through without a package update. Status events are
-similarly narrowed through `event.statusKind` as `sent`, `delivered`, `read`,
-`failed`, or `unknown`. If you want that normalization without the HTTP handler,
-use `webhookEvents(payload)` directly.
+upstream fields still flow through without a package update. Legacy raw `button`
+webhook messages are normalized into the same `interactive_button_reply` shape,
+so `event.message.interactive.button_reply` works for both variants. Status
+events are similarly narrowed through `event.statusKind` as `sent`, `delivered`,
+`read`, `failed`, or `unknown`, and also surface `event.conversation`,
+`event.pricing`, `event.errors`, and `event.callbackData` when Meta includes
+them. If you want that normalization without the HTTP handler, use
+`webhookEvents(payload)` directly.

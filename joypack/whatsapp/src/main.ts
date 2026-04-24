@@ -9,7 +9,9 @@
  *
  * The request side stays intentionally small. {@link WhatsAppClient.request}
  * handles authenticated Graph API paths, {@link WhatsAppClient.messages}
- * handles outbound message operations, and {@link WhatsAppClient.media}
+ * handles outbound message operations, the `@joypack/whatsapp/template` and
+ * `@joypack/whatsapp/interactive` submodules help build payloads, and
+ * {@link WhatsAppClient.media}
  * handles uploads and downloads. Webhook helpers handle Meta's verification and
  * delivery requests.
  *
