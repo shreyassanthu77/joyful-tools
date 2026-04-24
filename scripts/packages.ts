@@ -157,12 +157,21 @@ export function orderPackagesByDependencies<T extends { name: string }>(
   const remainingDeps = new Map(
     packages.map((
       pkg,
-    ) => [pkg.name, new Set(depsByPackage.get(pkg.name) ?? [])]),
+    ) => [
+      pkg.name,
+      new Set(
+        [...(depsByPackage.get(pkg.name) ?? [])].filter((dep) =>
+          packageMap.has(dep)
+        ),
+      ),
+    ]),
   );
   const dependents = new Map<string, Set<string>>();
 
   for (const [pkgName, deps] of depsByPackage) {
+    if (!packageMap.has(pkgName)) continue;
     for (const dep of deps) {
+      if (!packageMap.has(dep)) continue;
       const existing = dependents.get(dep) ?? new Set<string>();
       existing.add(pkgName);
       dependents.set(dep, existing);

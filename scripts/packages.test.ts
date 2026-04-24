@@ -40,6 +40,19 @@ Deno.test("orderPackagesByDependencies throws on dependency cycles", () => {
   );
 });
 
+Deno.test("orderPackagesByDependencies ignores dependencies outside the subset", () => {
+  const packages = [{ name: "@joypack/whatsapp" }];
+  const depsByPackage = new Map<string, ReadonlySet<string>>([
+    ["@joyful/result", new Set()],
+    ["@joyful/fetch", new Set(["@joyful/result"])],
+    ["@joypack/whatsapp", new Set(["@joyful/fetch", "@joyful/result"])],
+  ]);
+
+  const ordered = orderPackagesByDependencies(packages, depsByPackage);
+
+  assertEquals(ordered.map((pkg) => pkg.name), ["@joypack/whatsapp"]);
+});
+
 Deno.test("collectTransitiveDependents returns the full downstream closure", () => {
   const depsByPackage = new Map<string, ReadonlySet<string>>([
     ["@joyful/result", new Set()],
