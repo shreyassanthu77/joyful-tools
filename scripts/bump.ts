@@ -12,7 +12,10 @@
  */
 
 import {
+  collectTransitiveDependents,
+  loadWorkspaceDependencyGraph,
   loadWorkspacePackages,
+  orderPackagesByDependencies,
   repoRoot,
   run,
   type VersionedWorkspacePackage,
@@ -48,6 +51,14 @@ const packages: Package[] = (await loadWorkspacePackages(root))
     version: pkg.version,
     denoJsonPath: pkg.configPath,
   }));
+const workspacePackages = (await loadWorkspacePackages(root)).filter(
+  (pkg): pkg is VersionedWorkspacePackage =>
+    Boolean(pkg.name && pkg.version && pkg.npmName),
+);
+const depsByPackage = await loadWorkspaceDependencyGraph(
+  workspacePackages,
+  root,
+);
 
 if (packages.length === 0) {
   console.error("No packages found.");
@@ -69,6 +80,39 @@ const pkgIndices = pkgChoice
 const toBump = pkgIndices.some((i) => i === packages.length + 1)
   ? packages
   : pkgIndices.map((i) => packages[i - 1]);
+const transitiveDependents = pkgIndices.some((i) => i === packages.length + 1)
+  ? []
+  : [
+    ...collectTransitiveDependents(
+      toBump.map((pkg) => pkg.name),
+      depsByPackage,
+    ),
+  ]
+    .map((name) => packages.find((pkg) => pkg.name === name))
+    .filter((pkg): pkg is Package => Boolean(pkg));
+const affectedPackages = [...toBump];
+for (const pkg of transitiveDependents) {
+  if (!affectedPackages.some((candidate) => candidate.name === pkg.name)) {
+    affectedPackages.push(pkg);
+  }
+}
+const orderedAffectedPackages = orderPackagesByDependencies(
+  affectedPackages,
+  new Map(
+    affectedPackages.map((
+      pkg,
+    ) => [pkg.name, depsByPackage.get(pkg.name) ?? new Set()]),
+  ),
+);
+
+if (transitiveDependents.length > 0) {
+  console.log(
+    "\nAlso bumping dependents to publish updated internal versions:\n",
+  );
+  for (const pkg of transitiveDependents) {
+    console.log(`  - ${pkg.name} (${pkg.version})`);
+  }
+}
 
 console.log("\nBump type?\n");
 console.log("  1) patch");
@@ -85,6 +129,27 @@ if (!bumpType) {
   Deno.exit(1);
 }
 
+const plannedBumps = orderedAffectedPackages.map((pkg) => ({
+  ...pkg,
+  newVersion: bump(pkg.version, bumpType),
+  requested: toBump.some((candidate) => candidate.name === pkg.name),
+}));
+
+console.log("\nPlanned version bumps:\n");
+for (const pkg of plannedBumps) {
+  const reason = pkg.requested ? "selected" : "dependent";
+  console.log(
+    `  - ${pkg.name}: ${pkg.version} -> ${pkg.newVersion} (${reason})`,
+  );
+}
+
+const confirm = prompt("\nProceed with this bump plan? [y/N]:")?.trim()
+  .toLowerCase();
+if (confirm !== "y" && confirm !== "yes") {
+  console.log("Aborted.");
+  Deno.exit(0);
+}
+
 // 2. Run tests before bumping
 console.log("Running tests...\n");
 const test = await run(["deno", "task", "test"]);
@@ -98,8 +163,8 @@ console.log("All tests passed.\n");
 
 // 3. Apply bumps
 const bumped: { name: string; from: string; to: string }[] = [];
-for (const pkg of toBump) {
-  const newVersion = bump(pkg.version, bumpType);
+for (const pkg of plannedBumps) {
+  const newVersion = pkg.newVersion;
 
   // Update deno.json
   const denoJson = JSON.parse(await Deno.readTextFile(pkg.denoJsonPath));

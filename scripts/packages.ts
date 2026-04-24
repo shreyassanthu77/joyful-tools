@@ -1,5 +1,7 @@
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { pathToFileURL } from "node:url";
+import { createGraph } from "@deno/graph";
 
 import publishConfig from "../publish.config.json" with { type: "json" };
 import workspaceConfig from "../deno.json" with { type: "json" };
@@ -101,6 +103,130 @@ export async function loadWorkspacePackages(
   }
 
   return packages;
+}
+
+export async function loadVersionedWorkspacePackages(
+  root = repoRoot,
+): Promise<VersionedWorkspacePackage[]> {
+  return (await loadWorkspacePackages(root)).filter(
+    (pkg): pkg is VersionedWorkspacePackage =>
+      Boolean(pkg.name && pkg.version && pkg.npmName),
+  );
+}
+
+export async function loadWorkspaceDependencyGraph(
+  packages: readonly VersionedWorkspacePackage[],
+  root = repoRoot,
+): Promise<Map<string, Set<string>>> {
+  const depsByPackage = new Map(
+    packages.map((pkg) => [pkg.name, new Set<string>()]),
+  );
+
+  await Promise.all(
+    packages.map(async (pkg) => {
+      const entries = pkg.publishInclude
+        .filter((file) => file.endsWith(".ts"))
+        .map((file) => pathToFileURL(join(root, pkg.dir, file)).href);
+      if (entries.length === 0) return;
+
+      const deps = depsByPackage.get(pkg.name)!;
+      await createGraph(entries, {
+        resolve(specifier) {
+          const resolved = resolveWorkspacePackageSpecifier(
+            specifier,
+            packages,
+          );
+          if (resolved && resolved.pkg.name !== pkg.name) {
+            deps.add(resolved.pkg.name);
+          }
+
+          return specifier;
+        },
+      });
+    }),
+  );
+
+  return depsByPackage;
+}
+
+export function orderPackagesByDependencies<T extends { name: string }>(
+  packages: readonly T[],
+  depsByPackage: ReadonlyMap<string, ReadonlySet<string>>,
+): T[] {
+  const packageMap = new Map(packages.map((pkg) => [pkg.name, pkg]));
+  const remainingDeps = new Map(
+    packages.map((
+      pkg,
+    ) => [pkg.name, new Set(depsByPackage.get(pkg.name) ?? [])]),
+  );
+  const dependents = new Map<string, Set<string>>();
+
+  for (const [pkgName, deps] of depsByPackage) {
+    for (const dep of deps) {
+      const existing = dependents.get(dep) ?? new Set<string>();
+      existing.add(pkgName);
+      dependents.set(dep, existing);
+    }
+  }
+
+  const ready = packages
+    .filter((pkg) => (remainingDeps.get(pkg.name)?.size ?? 0) === 0)
+    .map((pkg) => pkg.name);
+  const ordered: T[] = [];
+
+  while (ready.length > 0) {
+    const name = ready.shift()!;
+    const pkg = packageMap.get(name);
+    if (!pkg) continue;
+
+    ordered.push(pkg);
+
+    for (const dependent of dependents.get(name) ?? []) {
+      const deps = remainingDeps.get(dependent);
+      if (!deps) continue;
+      deps.delete(name);
+      if (deps.size === 0) ready.push(dependent);
+    }
+  }
+
+  if (ordered.length === packages.length) return ordered;
+
+  const unresolved = packages
+    .map((pkg) => pkg.name)
+    .filter((name) => !ordered.some((pkg) => pkg.name === name));
+  throw new Error(
+    `Workspace package cycle detected: ${unresolved.join(", ")}`,
+  );
+}
+
+export function collectTransitiveDependents(
+  packageNames: Iterable<string>,
+  depsByPackage: ReadonlyMap<string, ReadonlySet<string>>,
+): Set<string> {
+  const selected = new Set(packageNames);
+  const dependents = new Map<string, Set<string>>();
+
+  for (const [pkgName, deps] of depsByPackage) {
+    for (const dep of deps) {
+      const existing = dependents.get(dep) ?? new Set<string>();
+      existing.add(pkgName);
+      dependents.set(dep, existing);
+    }
+  }
+
+  const pending = [...selected];
+  const collected = new Set<string>();
+
+  while (pending.length > 0) {
+    const name = pending.shift()!;
+    for (const dependent of dependents.get(name) ?? []) {
+      if (selected.has(dependent) || collected.has(dependent)) continue;
+      collected.add(dependent);
+      pending.push(dependent);
+    }
+  }
+
+  return collected;
 }
 
 export function resolveWorkspacePackageSpecifier(

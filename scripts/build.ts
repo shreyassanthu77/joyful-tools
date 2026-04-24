@@ -6,17 +6,18 @@ import { createGraph } from "@deno/graph";
 
 import {
   type BuildableWorkspacePackage,
-  loadWorkspacePackages,
+  loadVersionedWorkspacePackages,
+  loadWorkspaceDependencyGraph,
+  orderPackagesByDependencies,
   repoRoot,
   resolveWorkspacePackageSpecifier,
-  type VersionedWorkspacePackage,
 } from "./packages.ts";
 
 const DIST = "dist";
 const destDir = join(repoRoot, DIST);
 const repo = "https://github.com/shreyassanthu77/joyful-tools";
 
-const workspacePackages = (await loadWorkspacePackages()).filter(
+const workspacePackages = (await loadVersionedWorkspacePackages()).filter(
   (pkg): pkg is BuildableWorkspacePackage =>
     Boolean(
       pkg.name &&
@@ -27,6 +28,11 @@ const workspacePackages = (await loadWorkspacePackages()).filter(
 );
 const versionMap = new Map(
   workspacePackages.map((pkg) => [pkg.npmName, pkg.version]),
+);
+const depsByPackage = await loadWorkspaceDependencyGraph(workspacePackages);
+const orderedWorkspacePackages = orderPackagesByDependencies(
+  workspacePackages,
+  depsByPackage,
 );
 
 const start = performance.now();
@@ -45,11 +51,9 @@ await Deno.writeTextFile(
     2,
   ),
 );
-await Promise.all(
-  workspacePackages.map((pkg) =>
-    buildPackage(pkg, workspacePackages, versionMap)
-  ),
-);
+for (const pkg of orderedWorkspacePackages) {
+  await buildPackage(pkg, workspacePackages, versionMap);
+}
 const end = performance.now();
 console.log(
   `%c[build] ${workspacePackages.length} packages in %sms`,
@@ -59,7 +63,7 @@ console.log(
 
 async function buildPackage(
   pkg: BuildableWorkspacePackage,
-  packages: readonly VersionedWorkspacePackage[],
+  packages: readonly BuildableWorkspacePackage[],
   versionMap: ReadonlyMap<string, string>,
 ) {
   console.log(`%cBuilding ${pkg.dir}`, "color: blue; font-weight: thin");

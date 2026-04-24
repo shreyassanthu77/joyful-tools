@@ -1,10 +1,11 @@
 import { join } from "node:path";
 
 import {
-  loadWorkspacePackages,
+  loadVersionedWorkspacePackages,
+  loadWorkspaceDependencyGraph,
+  orderPackagesByDependencies,
   repoRoot,
   run,
-  type VersionedWorkspacePackage,
 } from "./packages.ts";
 
 type DistPackage = {
@@ -15,9 +16,10 @@ type DistPackage = {
 };
 
 async function publishJsr() {
-  const packages = (await loadWorkspacePackages()).filter(
-    (pkg): pkg is VersionedWorkspacePackage =>
-      Boolean(pkg.name && pkg.version && pkg.npmName),
+  const workspacePackages = await loadVersionedWorkspacePackages();
+  const packages = orderPackagesByDependencies(
+    workspacePackages,
+    await loadWorkspaceDependencyGraph(workspacePackages),
   );
 
   for (const pkg of packages) {
@@ -54,7 +56,11 @@ if (target === "jsr") {
 
 async function publishNpm() {
   const distDir = join(repoRoot, "dist");
-  const packages = orderPackages(await loadDistPackages(distDir));
+  const distPackages = await loadDistPackages(distDir);
+  const packages = orderPackagesByDependencies(
+    distPackages,
+    new Map(distPackages.map((pkg) => [pkg.name, new Set(pkg.internalDeps)])),
+  );
 
   if (packages.length === 0) {
     console.log("No npm packages found in dist.");
@@ -97,50 +103,6 @@ async function isNpmPublished(name: string, version: string): Promise<boolean> {
   throw new Error(
     result.stderr || `Failed to check npm version for ${name}@${version}`,
   );
-}
-
-function orderPackages(packages: DistPackage[]): DistPackage[] {
-  const packageMap = new Map(packages.map((pkg) => [pkg.name, pkg]));
-  const remainingDeps = new Map(
-    packages.map((pkg) => [pkg.name, new Set(pkg.internalDeps)]),
-  );
-  const dependents = new Map<string, Set<string>>();
-
-  for (const pkg of packages) {
-    for (const dep of pkg.internalDeps) {
-      const existing = dependents.get(dep) ?? new Set<string>();
-      existing.add(pkg.name);
-      dependents.set(dep, existing);
-    }
-  }
-
-  const ready = packages
-    .filter((pkg) => pkg.internalDeps.length === 0)
-    .map((pkg) => pkg.name);
-  const ordered: DistPackage[] = [];
-
-  while (ready.length > 0) {
-    const name = ready.shift()!;
-    const pkg = packageMap.get(name);
-    if (!pkg) continue;
-
-    ordered.push(pkg);
-
-    for (const dependent of dependents.get(name) ?? []) {
-      const deps = remainingDeps.get(dependent);
-      if (!deps) continue;
-      deps.delete(name);
-      if (deps.size === 0) ready.push(dependent);
-    }
-  }
-
-  if (ordered.length === packages.length) return ordered;
-
-  const orderedNames = new Set(ordered.map((pkg) => pkg.name));
-  return [
-    ...ordered,
-    ...packages.filter((pkg) => !orderedNames.has(pkg.name)),
-  ];
 }
 
 async function loadDistPackages(distDir: string): Promise<DistPackage[]> {
