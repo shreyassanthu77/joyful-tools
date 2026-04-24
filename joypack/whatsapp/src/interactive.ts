@@ -1,3 +1,26 @@
+/**
+ * Builder helpers for authoring WhatsApp interactive messages.
+ *
+ * Import this submodule as a namespace when you want small free functions for
+ * reply buttons, lists, and flows.
+ *
+ * @example
+ * ```ts
+ * import * as interactive from "@joypack/whatsapp/interactive";
+ *
+ * const message = interactive.button(
+ *   "Pick one:",
+ *   [
+ *     interactive.replyButton("plan_basic", "Basic"),
+ *     interactive.replyButton("plan_pro", "Pro"),
+ *   ],
+ *   { footer: "You can change this later" },
+ * );
+ * ```
+ *
+ * @module
+ */
+
 import type {
   WhatsAppInteractiveBody,
   WhatsAppInteractiveButtonMessage,

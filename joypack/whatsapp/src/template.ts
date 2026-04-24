@@ -1,3 +1,29 @@
+/**
+ * Builder helpers for authoring WhatsApp template messages.
+ *
+ * Import this submodule as a namespace when you want small free functions instead
+ * of a singleton builder object.
+ *
+ * @example
+ * ```ts
+ * import * as template from "@joypack/whatsapp/template";
+ *
+ * const payload = template.message("order_update", "en_US", [
+ *   template.body(
+ *     template.text("Shreyas"),
+ *     template.currency({
+ *       fallback_value: "$19.99",
+ *       code: "USD",
+ *       amount_1000: 19990,
+ *     }),
+ *   ),
+ *   template.quickReplyButton("0", template.payload("confirm-order")),
+ * ]);
+ * ```
+ *
+ * @module
+ */
+
 import type {
   WhatsAppTemplateBodyComponent,
   WhatsAppTemplateBodyParameter,
