@@ -433,14 +433,14 @@ export type WebhookEvent =
   | MessageWebhookEvent<"location", WhatsAppWebhookLocationMessage>
   | MessageWebhookEvent<"contacts", WhatsAppWebhookContactsMessage>
   | MessageWebhookEvent<
-    "interactive_button_reply",
-    | WhatsAppWebhookInteractiveButtonReplyMessage
-    | WhatsAppWebhookNormalizedButtonReplyMessage
-  >
+      "interactive_button_reply",
+      | WhatsAppWebhookInteractiveButtonReplyMessage
+      | WhatsAppWebhookNormalizedButtonReplyMessage
+    >
   | MessageWebhookEvent<
-    "interactive_list_reply",
-    WhatsAppWebhookInteractiveListReplyMessage
-  >
+      "interactive_list_reply",
+      WhatsAppWebhookInteractiveListReplyMessage
+    >
   | MessageWebhookEvent<"unknown", WhatsAppWebhookMessage>
   | StatusWebhookEvent<"sent", WhatsAppWebhookSentStatus>
   | StatusWebhookEvent<"delivered", WhatsAppWebhookDeliveredStatus>
@@ -448,8 +448,8 @@ export type WebhookEvent =
   | StatusWebhookEvent<"failed", WhatsAppWebhookFailedStatus>
   | StatusWebhookEvent<"unknown", WhatsAppWebhookStatus>
   | (WebhookEventBase & {
-    kind: "unknown";
-  });
+      kind: "unknown";
+    });
 
 /** Context passed to a {@link WebhookEventHandler}. */
 export interface WebhookEventContext {
@@ -475,7 +475,7 @@ export interface HandleWebhooksOptions {
 }
 
 /** Fetch-style webhook handler function. */
-export type WebhookHandler = (request: Request) => Promise<Response>;
+export type WebhookHandler = (request: Request) => Response | Promise<Response>;
 
 /**
  * Creates a fetch-style WhatsApp webhook handler.
@@ -513,16 +513,16 @@ export function handleWebhooks(
   onEvent: WebhookEventHandler,
   options: HandleWebhooksOptions,
 ): WebhookHandler {
-  return function webhookHandler(request: Request): Promise<Response> {
+  return function webhookHandler(
+    request: Request,
+  ): Response | Promise<Response> {
     switch (request.method) {
       case "GET":
-        return Promise.resolve(handleVerificationRequest(request, options));
+        return handleVerificationRequest(request, options);
       case "POST":
         return handleDeliveryRequest(request, onEvent, options);
       default:
-        return Promise.resolve(
-          textResponse("Method not allowed", 405, { allow: "GET, POST" }),
-        );
+        return textResponse("Method not allowed", 405, { allow: "GET, POST" });
     }
   };
 }
@@ -544,9 +544,7 @@ export function handleWebhooks(
  * }
  * ```
  */
-export function webhookEvents(
-  payload: WhatsAppWebhookPayload,
-): WebhookEvent[] {
+export function webhookEvents(payload: WhatsAppWebhookPayload): WebhookEvent[] {
   const events: WebhookEvent[] = [];
 
   for (const entry of payload.entry) {
@@ -620,10 +618,7 @@ export function webhookEvents(
             messageKind: "contacts",
             message: message as WhatsAppWebhookContactsMessage,
           });
-        } else if (
-          message.type === "button" &&
-          message.button != null
-        ) {
+        } else if (message.type === "button" && message.button != null) {
           events.push({
             ...baseEvent,
             messageKind: "interactive_button_reply",
@@ -781,9 +776,7 @@ function handleVerificationRequest(
   return textResponse(challenge, 200);
 }
 
-function parseWebhookPayload(
-  body: Uint8Array,
-): WhatsAppWebhookPayload | null {
+function parseWebhookPayload(body: Uint8Array): WhatsAppWebhookPayload | null {
   try {
     return JSON.parse(new TextDecoder().decode(body)) as WhatsAppWebhookPayload;
   } catch {
