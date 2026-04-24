@@ -252,6 +252,61 @@ if (sent.isErr()) {
 `messaging_product: "whatsapp"` for you and returns an
 `AsyncResult<WhatsAppSendResponse, WhatsAppRequestError>`.
 
+For raw authenticated Graph API calls, use `request(path, init)`:
+
+```ts
+const profile = await whatsapp.request(
+  "/1234567890/whatsapp_business_profile?fields=verified_name",
+);
+```
+
+For media lifecycle operations, use the separate `whatsapp.media` namespace:
+
+```ts
+const uploaded = await whatsapp.media.upload({
+  phoneNumberId: "1234567890",
+  file: new File(["hello"], "welcome.txt", { type: "text/plain" }),
+});
+
+if (uploaded.isOk()) {
+  await whatsapp.send({
+    phoneNumberId: "1234567890",
+    to: "15551234567",
+    type: "document",
+    document: {
+      id: uploaded.value.id,
+      filename: "welcome.txt",
+      caption: "Uploaded through the media API",
+    },
+  });
+}
+```
+
+```ts
+const downloaded = await whatsapp.media.download({
+  mediaId: "1037543291543634",
+});
+
+if (downloaded.isOk()) {
+  const file = await downloaded.value.response.blob();
+  console.log(downloaded.value.media.mime_type, file.isOk());
+}
+```
+
+Outbound media messages are also supported directly through `send()`:
+
+```ts
+await whatsapp.send({
+  phoneNumberId: "1234567890",
+  to: "15551234567",
+  type: "image",
+  image: {
+    link: "https://example.com/banner.jpg",
+    caption: "Launch day banner",
+  },
+});
+```
+
 Inside the user-initiated 24-hour window, you can also send arbitrary
 interactive messages with `type: "interactive"`, including reply buttons, lists,
 and flows:
@@ -400,21 +455,6 @@ await whatsapp.send({
   },
 });
 ```
-
-## Request API
-
-If you need another Graph endpoint or a payload `send()` does not cover yet, use
-`request<T>()` directly:
-
-```ts
-const profile = await whatsapp.request<{ verified_name?: string }>({
-  path: "/1234567890/whatsapp_business_profile",
-  searchParams: { fields: "verified_name" },
-});
-```
-
-`request<T>()` returns an `AsyncResult<T, WhatsAppRequestError>` and parses the
-successful response body as JSON for you.
 
 WhatsApp failures are normalized to `WhatsAppError`, which carries Meta's parsed
 error fields like `status`, `type`, `code`, `subcode`, `fbtraceId`, `details`,

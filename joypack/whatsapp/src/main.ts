@@ -7,10 +7,11 @@
  * - {@link handleWebhooks} and {@link webhookEvents} for inbound webhook
  *   verification and event handling
  *
- * The request side stays intentionally small. {@link WhatsAppClient.send} covers
- * standard text, interactive reply-button, template, and reaction messages,
- * while {@link WhatsAppClient.request} stays available for direct Graph API calls.
- * Webhook helpers handle Meta's verification and delivery requests.
+ * The request side stays intentionally small. {@link WhatsAppClient.request}
+ * handles authenticated Graph API paths, {@link WhatsAppClient.send} covers
+ * text, media, interactive reply-button, template, and reaction messages, and
+ * {@link WhatsAppClient.media} handles uploads and downloads. Webhook helpers
+ * handle Meta's verification and delivery requests.
  *
  * @example Send a WhatsApp message
  * ```ts
@@ -57,5 +58,6 @@
  */
 
 export * from "./client.ts";
+export * from "./media.ts";
 export * from "./messages.ts";
 export * from "./webhooks.ts";

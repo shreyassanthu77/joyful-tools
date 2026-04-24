@@ -1,3 +1,5 @@
+import type { WhatsAppMediaReference } from "./media.ts";
+
 /** Contact echoed back by Meta after a successful send request. */
 export interface WhatsAppSendContact {
   input?: string;
@@ -69,7 +71,7 @@ export interface WhatsAppTemplateDateTimeParameter {
 }
 
 /** Shared media reference accepted by WhatsApp template parameters. */
-export type WhatsAppTemplateMediaReference = { id: string } | { link: string };
+export type WhatsAppTemplateMediaReference = WhatsAppMediaReference;
 
 /** Image template parameter. */
 export interface WhatsAppTemplateImageParameter {
@@ -216,6 +218,28 @@ export interface WhatsAppReactionMessageBody {
   emoji: string;
 }
 
+/** Image payload for an outbound WhatsApp media message. */
+export type WhatsAppImageMessageBody = WhatsAppMediaReference & {
+  caption?: string;
+};
+
+/** Audio payload for an outbound WhatsApp media message. */
+export type WhatsAppAudioMessageBody = WhatsAppMediaReference;
+
+/** Video payload for an outbound WhatsApp media message. */
+export type WhatsAppVideoMessageBody = WhatsAppMediaReference & {
+  caption?: string;
+};
+
+/** Document payload for an outbound WhatsApp media message. */
+export type WhatsAppDocumentMessageBody = WhatsAppMediaReference & {
+  caption?: string;
+  filename?: string;
+};
+
+/** Sticker payload for an outbound WhatsApp media message. */
+export type WhatsAppStickerMessageBody = WhatsAppMediaReference;
+
 /** Body text for an interactive message. */
 export interface WhatsAppInteractiveBody {
   text: string;
@@ -344,6 +368,26 @@ export type WhatsAppSendOptions =
   | (WhatsAppSendBase & {
     type: "text";
     text: WhatsAppTextMessageBody;
+  })
+  | (WhatsAppSendBase & {
+    type: "image";
+    image: WhatsAppImageMessageBody;
+  })
+  | (WhatsAppSendBase & {
+    type: "audio";
+    audio: WhatsAppAudioMessageBody;
+  })
+  | (WhatsAppSendBase & {
+    type: "video";
+    video: WhatsAppVideoMessageBody;
+  })
+  | (WhatsAppSendBase & {
+    type: "document";
+    document: WhatsAppDocumentMessageBody;
+  })
+  | (WhatsAppSendBase & {
+    type: "sticker";
+    sticker: WhatsAppStickerMessageBody;
   })
   | (WhatsAppSendBase & {
     type: "interactive";
