@@ -66,6 +66,91 @@ export interface WhatsAppWebhookText {
   [key: string]: unknown;
 }
 
+/** Media metadata included on inbound media webhook messages. */
+export interface WhatsAppWebhookMedia {
+  id?: string;
+  mime_type?: string;
+  sha256?: string;
+  caption?: string;
+  filename?: string;
+  [key: string]: unknown;
+}
+
+/** Location payload included on inbound location messages. */
+export interface WhatsAppWebhookLocation {
+  latitude?: number;
+  longitude?: number;
+  name?: string;
+  address?: string;
+  url?: string;
+  [key: string]: unknown;
+}
+
+/** Contact name included on inbound contact messages. */
+export interface WhatsAppWebhookContactName {
+  formatted_name?: string;
+  first_name?: string;
+  last_name?: string;
+  middle_name?: string;
+  suffix?: string;
+  prefix?: string;
+  [key: string]: unknown;
+}
+
+/** Contact phone included on inbound contact messages. */
+export interface WhatsAppWebhookContactPhone {
+  phone?: string;
+  wa_id?: string;
+  type?: string;
+  [key: string]: unknown;
+}
+
+/** Contact email included on inbound contact messages. */
+export interface WhatsAppWebhookContactEmail {
+  email?: string;
+  type?: string;
+  [key: string]: unknown;
+}
+
+/** Contact address included on inbound contact messages. */
+export interface WhatsAppWebhookContactAddress {
+  street?: string;
+  city?: string;
+  state?: string;
+  zip?: string;
+  country?: string;
+  country_code?: string;
+  type?: string;
+  [key: string]: unknown;
+}
+
+/** Contact organization included on inbound contact messages. */
+export interface WhatsAppWebhookContactOrg {
+  company?: string;
+  department?: string;
+  title?: string;
+  [key: string]: unknown;
+}
+
+/** Contact URL included on inbound contact messages. */
+export interface WhatsAppWebhookContactUrl {
+  url?: string;
+  type?: string;
+  [key: string]: unknown;
+}
+
+/** Contact payload included on inbound contact messages. */
+export interface WhatsAppWebhookMessageContact {
+  name?: WhatsAppWebhookContactName;
+  birthday?: string;
+  phones?: WhatsAppWebhookContactPhone[];
+  emails?: WhatsAppWebhookContactEmail[];
+  addresses?: WhatsAppWebhookContactAddress[];
+  urls?: WhatsAppWebhookContactUrl[];
+  org?: WhatsAppWebhookContactOrg;
+  [key: string]: unknown;
+}
+
 /** Interactive reply button selection from an inbound webhook event. */
 export interface WhatsAppWebhookInteractiveButtonReply {
   id?: string;
@@ -97,6 +182,13 @@ export interface WhatsAppWebhookMessage {
   type?: string;
   context?: WhatsAppWebhookMessageContext;
   text?: WhatsAppWebhookText;
+  image?: WhatsAppWebhookMedia;
+  audio?: WhatsAppWebhookMedia;
+  video?: WhatsAppWebhookMedia;
+  document?: WhatsAppWebhookMedia;
+  sticker?: WhatsAppWebhookMedia;
+  location?: WhatsAppWebhookLocation;
+  contacts?: WhatsAppWebhookMessageContact[];
   interactive?: WhatsAppWebhookInteractive;
   [key: string]: unknown;
 }
@@ -127,6 +219,48 @@ export interface WhatsAppWebhookInteractiveListReplyMessage
   };
 }
 
+/** Inbound image message. */
+export interface WhatsAppWebhookImageMessage extends WhatsAppWebhookMessage {
+  type: "image";
+  image: WhatsAppWebhookMedia;
+}
+
+/** Inbound audio message. */
+export interface WhatsAppWebhookAudioMessage extends WhatsAppWebhookMessage {
+  type: "audio";
+  audio: WhatsAppWebhookMedia;
+}
+
+/** Inbound video message. */
+export interface WhatsAppWebhookVideoMessage extends WhatsAppWebhookMessage {
+  type: "video";
+  video: WhatsAppWebhookMedia;
+}
+
+/** Inbound document message. */
+export interface WhatsAppWebhookDocumentMessage extends WhatsAppWebhookMessage {
+  type: "document";
+  document: WhatsAppWebhookMedia;
+}
+
+/** Inbound sticker message. */
+export interface WhatsAppWebhookStickerMessage extends WhatsAppWebhookMessage {
+  type: "sticker";
+  sticker: WhatsAppWebhookMedia;
+}
+
+/** Inbound location message. */
+export interface WhatsAppWebhookLocationMessage extends WhatsAppWebhookMessage {
+  type: "location";
+  location: WhatsAppWebhookLocation;
+}
+
+/** Inbound contact message. */
+export interface WhatsAppWebhookContactsMessage extends WhatsAppWebhookMessage {
+  type: "contacts";
+  contacts: [WhatsAppWebhookMessageContact, ...WhatsAppWebhookMessageContact[]];
+}
+
 /** Outbound message status update payload. */
 export interface WhatsAppWebhookStatus {
   id?: string;
@@ -144,6 +278,13 @@ export interface WhatsAppWebhookStatus {
  */
 export type WhatsAppWebhookMessageKind =
   | "text"
+  | "image"
+  | "audio"
+  | "video"
+  | "document"
+  | "sticker"
+  | "location"
+  | "contacts"
   | "interactive_button_reply"
   | "interactive_list_reply"
   | "unknown";
@@ -167,6 +308,13 @@ type MessageWebhookEvent<
 
 export type WebhookEvent =
   | MessageWebhookEvent<"text", WhatsAppWebhookTextMessage>
+  | MessageWebhookEvent<"image", WhatsAppWebhookImageMessage>
+  | MessageWebhookEvent<"audio", WhatsAppWebhookAudioMessage>
+  | MessageWebhookEvent<"video", WhatsAppWebhookVideoMessage>
+  | MessageWebhookEvent<"document", WhatsAppWebhookDocumentMessage>
+  | MessageWebhookEvent<"sticker", WhatsAppWebhookStickerMessage>
+  | MessageWebhookEvent<"location", WhatsAppWebhookLocationMessage>
+  | MessageWebhookEvent<"contacts", WhatsAppWebhookContactsMessage>
   | MessageWebhookEvent<
     "interactive_button_reply",
     WhatsAppWebhookInteractiveButtonReplyMessage
@@ -307,6 +455,48 @@ export function webhookEvents(
             messageKind: "text",
             message,
           });
+        } else if (isImageMessage(message)) {
+          events.push({
+            ...baseEvent,
+            messageKind: "image",
+            message,
+          });
+        } else if (isAudioMessage(message)) {
+          events.push({
+            ...baseEvent,
+            messageKind: "audio",
+            message,
+          });
+        } else if (isVideoMessage(message)) {
+          events.push({
+            ...baseEvent,
+            messageKind: "video",
+            message,
+          });
+        } else if (isDocumentMessage(message)) {
+          events.push({
+            ...baseEvent,
+            messageKind: "document",
+            message,
+          });
+        } else if (isStickerMessage(message)) {
+          events.push({
+            ...baseEvent,
+            messageKind: "sticker",
+            message,
+          });
+        } else if (isLocationMessage(message)) {
+          events.push({
+            ...baseEvent,
+            messageKind: "location",
+            message,
+          });
+        } else if (isContactsMessage(message)) {
+          events.push({
+            ...baseEvent,
+            messageKind: "contacts",
+            message,
+          });
         } else if (isInteractiveButtonReplyMessage(message)) {
           events.push({
             ...baseEvent,
@@ -420,6 +610,50 @@ function isTextMessage(
   message: WhatsAppWebhookMessage,
 ): message is WhatsAppWebhookTextMessage {
   return message.type === "text" && message.text != null;
+}
+
+function isImageMessage(
+  message: WhatsAppWebhookMessage,
+): message is WhatsAppWebhookImageMessage {
+  return message.type === "image" && message.image != null;
+}
+
+function isAudioMessage(
+  message: WhatsAppWebhookMessage,
+): message is WhatsAppWebhookAudioMessage {
+  return message.type === "audio" && message.audio != null;
+}
+
+function isVideoMessage(
+  message: WhatsAppWebhookMessage,
+): message is WhatsAppWebhookVideoMessage {
+  return message.type === "video" && message.video != null;
+}
+
+function isDocumentMessage(
+  message: WhatsAppWebhookMessage,
+): message is WhatsAppWebhookDocumentMessage {
+  return message.type === "document" && message.document != null;
+}
+
+function isStickerMessage(
+  message: WhatsAppWebhookMessage,
+): message is WhatsAppWebhookStickerMessage {
+  return message.type === "sticker" && message.sticker != null;
+}
+
+function isLocationMessage(
+  message: WhatsAppWebhookMessage,
+): message is WhatsAppWebhookLocationMessage {
+  return message.type === "location" && message.location != null;
+}
+
+function isContactsMessage(
+  message: WhatsAppWebhookMessage,
+): message is WhatsAppWebhookContactsMessage {
+  return message.type === "contacts" &&
+    Array.isArray(message.contacts) &&
+    message.contacts.length > 0;
 }
 
 function isInteractiveButtonReplyMessage(

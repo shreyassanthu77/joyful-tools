@@ -1,18 +1,16 @@
 import {
-  HttpError,
+  type HttpError,
   type JFetch,
   jfetch,
   type NetworkError,
-  ParseError,
 } from "@joyful/fetch";
 import {
-  type AsyncResult,
   type Result,
   taggedError,
   type TaggedErrorFactory,
 } from "@joyful/result";
 import { WhatsAppMediaApi } from "./media.ts";
-import type { WhatsAppSendOptions, WhatsAppSendResponse } from "./messages.ts";
+import { WhatsAppMessagesApi } from "./messages.ts";
 
 const DEFAULT_BASE_URL = "https://graph.facebook.com";
 
@@ -48,97 +46,56 @@ export function createWhatsAppClient(
 /**
  * Minimal WhatsApp Cloud API client.
  *
- * The client only handles base URL construction, bearer auth, JSON request
- * bodies, a small `send()` convenience, and a media namespace for multipart and
- * binary operations.
+ * The client only handles Graph path resolution and bearer auth. Higher-level
+ * helpers live under {@link WhatsAppClient.messages} and
+ * {@link WhatsAppClient.media}.
  */
 export class WhatsAppClient {
   readonly accessToken: string;
   readonly apiVersion?: string;
-  readonly fetch: JFetch;
+  readonly messages: WhatsAppMessagesApi;
   readonly media: WhatsAppMediaApi;
+  readonly #fetch: JFetch;
 
   constructor(options: WhatsAppClientOptions) {
     this.accessToken = options.accessToken;
     this.apiVersion = options.apiVersion;
-    this.fetch = options.fetch ?? jfetch;
+    this.#fetch = options.fetch ?? jfetch;
+    this.messages = new WhatsAppMessagesApi(this);
     this.media = new WhatsAppMediaApi(this);
   }
 
   /**
-   * Sends a WhatsApp message via `POST /{phone-number-id}/messages`.
+   * Sends an authenticated request.
    *
-   * This is a thin convenience over the standard messages endpoint. It injects
-   * `messaging_product: "whatsapp"` while leaving the rest of the payload close
-   * to Meta's JSON shape.
-   *
-   * @example Send a text message
-   * ```ts
-   * import { createWhatsAppClient } from "@joypack/whatsapp";
-   *
-   * const whatsapp = createWhatsAppClient({
-   *   accessToken: Deno.env.get("WHATSAPP_ACCESS_TOKEN")!,
-   *   apiVersion: "v22.0",
-   * });
-   *
-   * const sent = await whatsapp.send({
-   *   phoneNumberId: "1234567890",
-   *   to: "15551234567",
-   *   type: "text",
-   *   text: { body: "hello" },
-   * });
-   * ```
+   * Relative paths are resolved against the configured Graph API version.
+   * Absolute URLs are used as-is, which is useful for media downloads.
    */
-  send(
-    options: WhatsAppSendOptions,
-  ): AsyncResult<WhatsAppSendResponse, WhatsAppRequestError> {
-    const { phoneNumberId, signal, ...message } = options;
-
-    return this.request(`${phoneNumberId}/messages`, {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({
-        messaging_product: "whatsapp",
-        ...message,
-      }),
-      signal,
-    })
-      .json<WhatsAppSendResponse>()
-      .mapErr((error): PromiseOr<WhatsAppRequestError> => {
-        if (error instanceof HttpError) return toWhatsAppError(error);
-        if (error instanceof ParseError) {
-          return new WhatsAppError({
-            message: "WhatsApp API returned an invalid JSON response",
-            cause: error,
-          });
-        }
-        return error;
-      });
-  }
-
-  /**
-   * Sends an authenticated request to a Graph API path.
-   *
-   * The provided `path` is resolved against the configured API version.
-   */
-  request(path: string, init?: RequestInit): ReturnType<JFetch> {
-    const apiVersion = this.apiVersion?.replace(/^\/+|\/+$/g, "");
-    const trimmedPath = path.replace(/^\/+/, "");
-    const url = new URL(
-      apiVersion == null ||
-        apiVersion.length === 0 ||
-        trimmedPath === apiVersion ||
-        trimmedPath.startsWith(`${apiVersion}/`)
-        ? `/${trimmedPath}`
-        : `/${apiVersion}/${trimmedPath}`,
-      DEFAULT_BASE_URL,
-    );
+  request(path: string | URL, init?: RequestInit): ReturnType<JFetch> {
+    const url = path instanceof URL || /^https?:\/\//.test(path)
+      ? new URL(path)
+      : new URL(
+        (() => {
+          const apiVersion = this.apiVersion?.replace(/^\/+|\/+$/g, "");
+          const trimmedPath = path.replace(/^\/+/, "");
+          if (
+            apiVersion == null ||
+            apiVersion.length === 0 ||
+            trimmedPath === apiVersion ||
+            trimmedPath.startsWith(`${apiVersion}/`)
+          ) {
+            return `/${trimmedPath}`;
+          }
+          return `/${apiVersion}/${trimmedPath}`;
+        })(),
+        DEFAULT_BASE_URL,
+      );
     const headers = new Headers(init?.headers);
     headers.set("authorization", `Bearer ${this.accessToken}`);
-    init.headers = headers;
-    return this.fetch(url, init);
+    return this.#fetch(url, {
+      ...init,
+      headers,
+    });
   }
 }
 

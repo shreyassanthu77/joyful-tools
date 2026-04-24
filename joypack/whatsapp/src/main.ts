@@ -8,10 +8,10 @@
  *   verification and event handling
  *
  * The request side stays intentionally small. {@link WhatsAppClient.request}
- * handles authenticated Graph API paths, {@link WhatsAppClient.send} covers
- * text, media, interactive reply-button, template, and reaction messages, and
- * {@link WhatsAppClient.media} handles uploads and downloads. Webhook helpers
- * handle Meta's verification and delivery requests.
+ * handles authenticated Graph API paths, {@link WhatsAppClient.messages}
+ * handles outbound message operations, and {@link WhatsAppClient.media}
+ * handles uploads and downloads. Webhook helpers handle Meta's verification and
+ * delivery requests.
  *
  * @example Send a WhatsApp message
  * ```ts
@@ -22,7 +22,7 @@
  *   apiVersion: "v22.0",
  * });
  *
- * const result = await whatsapp.send({
+ * const result = await whatsapp.messages.send({
  *   phoneNumberId: "1234567890",
  *   to: "15551234567",
  *   type: "text",

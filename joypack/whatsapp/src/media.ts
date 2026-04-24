@@ -140,7 +140,7 @@ export class WhatsAppMediaApi {
       const headers = new Headers();
       headers.set("authorization", `Bearer ${this.#client.accessToken}`);
       return this.#client
-        .fetch(media.url, {
+        .request(media.url, {
           headers,
           signal: options.signal,
         })

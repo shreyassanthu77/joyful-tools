@@ -12,9 +12,9 @@
       "LICENSE",
       "README.md",
       "src/client.ts",
+      "src/messages.ts",
       "src/media.ts",
       "src/main.ts",
-      "src/messages.ts",
       "src/webhooks.ts"
     ]
   }

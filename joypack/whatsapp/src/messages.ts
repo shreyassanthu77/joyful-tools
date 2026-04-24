@@ -1,4 +1,13 @@
 import type { WhatsAppMediaReference } from "./media.ts";
+import { HttpError, ParseError } from "@joyful/fetch";
+import type { AsyncResult } from "@joyful/result";
+import {
+  type PromiseOr,
+  toWhatsAppError,
+  type WhatsAppClient,
+  WhatsAppError,
+  type WhatsAppRequestError,
+} from "./client.ts";
 
 /** Contact echoed back by Meta after a successful send request. */
 export interface WhatsAppSendContact {
@@ -218,6 +227,72 @@ export interface WhatsAppReactionMessageBody {
   emoji: string;
 }
 
+/** Location payload for an outbound WhatsApp location message. */
+export interface WhatsAppLocationMessageBody {
+  latitude: number;
+  longitude: number;
+  name?: string;
+  address?: string;
+}
+
+/** Name block inside an outbound contact message. */
+export interface WhatsAppContactName {
+  formatted_name: string;
+  first_name?: string;
+  last_name?: string;
+  middle_name?: string;
+  suffix?: string;
+  prefix?: string;
+}
+
+/** Phone block inside an outbound contact message. */
+export interface WhatsAppContactPhone {
+  phone: string;
+  type?: string;
+  wa_id?: string;
+}
+
+/** Email block inside an outbound contact message. */
+export interface WhatsAppContactEmail {
+  email: string;
+  type?: string;
+}
+
+/** URL block inside an outbound contact message. */
+export interface WhatsAppContactUrl {
+  url: string;
+  type?: string;
+}
+
+/** Address block inside an outbound contact message. */
+export interface WhatsAppContactAddress {
+  street?: string;
+  city?: string;
+  state?: string;
+  zip?: string;
+  country?: string;
+  country_code?: string;
+  type?: string;
+}
+
+/** Organization block inside an outbound contact message. */
+export interface WhatsAppContactOrg {
+  company?: string;
+  department?: string;
+  title?: string;
+}
+
+/** Birthday block inside an outbound contact message. */
+export interface WhatsAppContact {
+  name: WhatsAppContactName;
+  birthday?: string;
+  phones?: WhatsAppContactPhone[];
+  emails?: WhatsAppContactEmail[];
+  urls?: WhatsAppContactUrl[];
+  addresses?: WhatsAppContactAddress[];
+  org?: WhatsAppContactOrg;
+}
+
 /** Image payload for an outbound WhatsApp media message. */
 export type WhatsAppImageMessageBody = WhatsAppMediaReference & {
   caption?: string;
@@ -363,11 +438,19 @@ export interface WhatsAppSendBase {
   signal?: AbortSignal;
 }
 
-/** Supported outbound WhatsApp message payloads for {@link WhatsAppClient.send}. */
+/** Supported outbound WhatsApp message payloads for {@link WhatsAppMessagesApi.send}. */
 export type WhatsAppSendOptions =
   | (WhatsAppSendBase & {
     type: "text";
     text: WhatsAppTextMessageBody;
+  })
+  | (WhatsAppSendBase & {
+    type: "location";
+    location: WhatsAppLocationMessageBody;
+  })
+  | (WhatsAppSendBase & {
+    type: "contacts";
+    contacts: [WhatsAppContact, ...WhatsAppContact[]];
   })
   | (WhatsAppSendBase & {
     type: "image";
@@ -401,3 +484,82 @@ export type WhatsAppSendOptions =
     type: "reaction";
     reaction: WhatsAppReactionMessageBody;
   });
+
+/** Successful response body returned by mark-as-read requests. */
+export interface WhatsAppMarkAsReadResponse {
+  success: boolean;
+  [key: string]: unknown;
+}
+
+/** Options for `whatsapp.messages.markAsRead(...)`. */
+export interface WhatsAppMarkAsReadOptions {
+  phoneNumberId: string;
+  messageId: string;
+  signal?: AbortSignal;
+}
+
+/** Message helper namespace attached to {@link WhatsAppClient.messages}. */
+export class WhatsAppMessagesApi {
+  readonly #client: WhatsAppClient;
+
+  constructor(client: WhatsAppClient) {
+    this.#client = client;
+  }
+
+  send(
+    options: WhatsAppSendOptions,
+  ): AsyncResult<WhatsAppSendResponse, WhatsAppRequestError> {
+    const { phoneNumberId, signal, ...message } = options;
+
+    return this.#client.request(`${phoneNumberId}/messages`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        ...message,
+      }),
+      signal,
+    }).json<WhatsAppSendResponse>().mapErr(
+      (error): PromiseOr<WhatsAppRequestError> => {
+        if (error instanceof HttpError) return toWhatsAppError(error);
+        if (error instanceof ParseError) {
+          return new WhatsAppError({
+            message: "WhatsApp API returned an invalid JSON response",
+            cause: error,
+          });
+        }
+        return error;
+      },
+    );
+  }
+
+  markAsRead(
+    options: WhatsAppMarkAsReadOptions,
+  ): AsyncResult<WhatsAppMarkAsReadResponse, WhatsAppRequestError> {
+    return this.#client.request(`${options.phoneNumberId}/messages`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        status: "read",
+        message_id: options.messageId,
+      }),
+      signal: options.signal,
+    }).json<WhatsAppMarkAsReadResponse>().mapErr(
+      (error): PromiseOr<WhatsAppRequestError> => {
+        if (error instanceof HttpError) return toWhatsAppError(error);
+        if (error instanceof ParseError) {
+          return new WhatsAppError({
+            message: "WhatsApp API returned an invalid JSON response",
+            cause: error,
+          });
+        }
+        return error;
+      },
+    );
+  }
+}

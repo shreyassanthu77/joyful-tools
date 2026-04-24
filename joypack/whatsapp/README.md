@@ -74,7 +74,7 @@ const webhookHandler = handleWebhooks(
             const { body } = event.message.text;
             if (body !== "/start") return;
 
-            await whatsapp.send({
+            await whatsapp.messages.send({
               type: "interactive",
               phoneNumberId,
               to: from,
@@ -108,7 +108,7 @@ const webhookHandler = handleWebhooks(
             if (!id?.startsWith("color-")) return;
 
             if (id !== "color-other") {
-              await whatsapp.send({
+              await whatsapp.messages.send({
                 type: "text",
                 phoneNumberId,
                 to: from,
@@ -119,7 +119,7 @@ const webhookHandler = handleWebhooks(
               return;
             }
 
-            await whatsapp.send({
+            await whatsapp.messages.send({
               type: "interactive",
               phoneNumberId,
               to: from,
@@ -152,7 +152,7 @@ const webhookHandler = handleWebhooks(
             const { id, title } = event.message.interactive.list_reply;
             if (!id?.startsWith("color-")) return;
 
-            await whatsapp.send({
+            await whatsapp.messages.send({
               type: "text",
               phoneNumberId,
               to: from,
@@ -188,7 +188,7 @@ const webhookHandler = handleWebhooks(
 app.on(["GET", "POST"], "/webhook", (c) => webhookHandler(c.req.raw));
 
 app.post("/send-test", async (c) => {
-  const sent = await whatsapp.send({
+  const sent = await whatsapp.messages.send({
     phoneNumberId,
     to: "15551234567",
     type: "text",
@@ -236,7 +236,7 @@ const whatsapp = createWhatsAppClient({
   apiVersion: "v22.0",
 });
 
-const sent = await whatsapp.send({
+const sent = await whatsapp.messages.send({
   phoneNumberId: "1234567890",
   to: "15551234567",
   type: "text",
@@ -248,9 +248,18 @@ if (sent.isErr()) {
 }
 ```
 
-`send()` is a thin convenience for `POST /{phone-number-id}/messages`. It adds
-`messaging_product: "whatsapp"` for you and returns an
+`messages.send()` is a thin convenience for `POST /{phone-number-id}/messages`.
+It adds `messaging_product: "whatsapp"` for you and returns an
 `AsyncResult<WhatsAppSendResponse, WhatsAppRequestError>`.
+
+Mark a previously received message as read:
+
+```ts
+await whatsapp.messages.markAsRead({
+  phoneNumberId: "1234567890",
+  messageId: "wamid.HBgLN...",
+});
+```
 
 For raw authenticated Graph API calls, use `request(path, init)`:
 
@@ -269,7 +278,7 @@ const uploaded = await whatsapp.media.upload({
 });
 
 if (uploaded.isOk()) {
-  await whatsapp.send({
+  await whatsapp.messages.send({
     phoneNumberId: "1234567890",
     to: "15551234567",
     type: "document",
@@ -293,10 +302,10 @@ if (downloaded.isOk()) {
 }
 ```
 
-Outbound media messages are also supported directly through `send()`:
+Outbound media messages are also supported directly through `messages.send()`:
 
 ```ts
-await whatsapp.send({
+await whatsapp.messages.send({
   phoneNumberId: "1234567890",
   to: "15551234567",
   type: "image",
@@ -307,12 +316,43 @@ await whatsapp.send({
 });
 ```
 
+Location and contact messages are supported too:
+
+```ts
+await whatsapp.messages.send({
+  phoneNumberId: "1234567890",
+  to: "15551234567",
+  type: "location",
+  location: {
+    latitude: 12.9716,
+    longitude: 77.5946,
+    name: "Bengaluru Office",
+    address: "MG Road, Bengaluru",
+  },
+});
+```
+
+```ts
+await whatsapp.messages.send({
+  phoneNumberId: "1234567890",
+  to: "15551234567",
+  type: "contacts",
+  contacts: [
+    {
+      name: { formatted_name: "Ada Lovelace", first_name: "Ada" },
+      phones: [{ phone: "+15551234567", type: "CELL" }],
+      emails: [{ email: "ada@example.com", type: "WORK" }],
+    },
+  ],
+});
+```
+
 Inside the user-initiated 24-hour window, you can also send arbitrary
 interactive messages with `type: "interactive"`, including reply buttons, lists,
 and flows:
 
 ```ts
-await whatsapp.send({
+await whatsapp.messages.send({
   phoneNumberId: "1234567890",
   to: "15551234567",
   type: "interactive",
@@ -347,7 +387,7 @@ await whatsapp.send({
 ```
 
 ```ts
-await whatsapp.send({
+await whatsapp.messages.send({
   phoneNumberId: "1234567890",
   to: "15551234567",
   type: "interactive",
@@ -376,7 +416,7 @@ await whatsapp.send({
 ```
 
 ```ts
-await whatsapp.send({
+await whatsapp.messages.send({
   phoneNumberId: "1234567890",
   to: "15551234567",
   type: "interactive",
@@ -410,7 +450,7 @@ closely, including `header`, `body`, `quick_reply`, `CATALOG`, and `flow` button
 components:
 
 ```ts
-await whatsapp.send({
+await whatsapp.messages.send({
   phoneNumberId: "1234567890",
   to: "15551234567",
   type: "template",
@@ -499,7 +539,8 @@ When `appSecret` is set, the handler also validates `X-Hub-Signature-256`.
 
 Each incoming message or status update is flattened into its own normalized
 event before your callback runs. Message events are lightly classified as
-`text`, `interactive_button_reply`, `interactive_list_reply`, or `unknown`
+`text`, `image`, `audio`, `video`, `document`, `sticker`, `location`,
+`contacts`, `interactive_button_reply`, `interactive_list_reply`, or `unknown`
 through `event.messageKind`, while the raw payload types stay permissive so new
 upstream fields still flow through without a package update. If you want that
 normalization without the HTTP handler, use `webhookEvents(payload)` directly.
