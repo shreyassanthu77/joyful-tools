@@ -1,8 +1,8 @@
 import type { WhatsAppMediaReference } from "./media.ts";
 import { HttpError, ParseError } from "@joyful/fetch";
-import type { AsyncResult } from "@joyful/result";
+import { Err, Ok, type Result } from "@joyful/result";
+import { TaskRun } from "@joyful/task";
 import {
-  type PromiseOr,
   toWhatsAppError,
   type WhatsAppClient,
   WhatsAppError,
@@ -508,58 +508,67 @@ export class WhatsAppMessagesApi {
 
   send(
     options: WhatsAppSendOptions,
-  ): AsyncResult<WhatsAppSendResponse, WhatsAppRequestError> {
+  ): TaskRun<WhatsAppSendResponse, WhatsAppRequestError> {
     const { phoneNumberId, signal, ...message } = options;
 
-    return this.#client.request(`${phoneNumberId}/messages`, {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({
-        messaging_product: "whatsapp",
-        ...message,
-      }),
-      signal,
-    }).json<WhatsAppSendResponse>().mapErr(
-      (error): PromiseOr<WhatsAppRequestError> => {
-        if (error instanceof HttpError) return toWhatsAppError(error);
-        if (error instanceof ParseError) {
-          return new WhatsAppError({
-            message: "WhatsApp API returned an invalid JSON response",
-            cause: error,
-          });
-        }
-        return error;
-      },
+    return new TaskRun(
+      mapWhatsAppError(
+        this.#client.request(`${phoneNumberId}/messages`, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({
+            messaging_product: "whatsapp",
+            ...message,
+          }),
+          signal,
+        }).json<WhatsAppSendResponse>(),
+      ),
     );
   }
 
   markAsRead(
     options: WhatsAppMarkAsReadOptions,
-  ): AsyncResult<WhatsAppMarkAsReadResponse, WhatsAppRequestError> {
-    return this.#client.request(`${options.phoneNumberId}/messages`, {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({
-        messaging_product: "whatsapp",
-        status: "read",
-        message_id: options.messageId,
-      }),
-      signal: options.signal,
-    }).json<WhatsAppMarkAsReadResponse>().mapErr(
-      (error): PromiseOr<WhatsAppRequestError> => {
-        if (error instanceof HttpError) return toWhatsAppError(error);
-        if (error instanceof ParseError) {
-          return new WhatsAppError({
-            message: "WhatsApp API returned an invalid JSON response",
-            cause: error,
-          });
-        }
-        return error;
-      },
+  ): TaskRun<WhatsAppMarkAsReadResponse, WhatsAppRequestError> {
+    return new TaskRun(
+      mapWhatsAppError(
+        this.#client.request(`${options.phoneNumberId}/messages`, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({
+            messaging_product: "whatsapp",
+            status: "read",
+            message_id: options.messageId,
+          }),
+          signal: options.signal,
+        }).json<WhatsAppMarkAsReadResponse>(),
+      ),
     );
   }
+}
+
+async function mapWhatsAppError<T>(
+  resultRun: PromiseLike<
+    Result<T, HttpError | ParseError | WhatsAppRequestError>
+  >,
+): Promise<Result<T, WhatsAppRequestError>> {
+  const result = await resultRun;
+  if (!(result instanceof Err)) return new Ok(result.value);
+
+  const error = result.error;
+  if (error instanceof HttpError) {
+    return new Err(await toWhatsAppError(error));
+  }
+  if (error instanceof ParseError) {
+    return new Err(
+      new WhatsAppError({
+        message: "WhatsApp API returned an invalid JSON response",
+        cause: error,
+      }),
+    );
+  }
+  return new Err(error);
 }

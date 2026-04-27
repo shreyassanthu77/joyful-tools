@@ -1,5 +1,5 @@
 /**
- * Result values for explicit success and error handling in synchronous and asynchronous code.
+ * Result values for explicit success and error handling in synchronous code.
  *
  * `Result<T, E>` represents a computation that either succeeded with an `Ok<T>`
  * value or failed with an `Err<E>` value. This makes failure an explicit part
@@ -9,12 +9,9 @@
  * Use the {@link Result.ok} and {@link Result.err} helpers to construct values,
  * then compose them with methods like `map`, `andThen`, `orElse`,
  * `orElseMatch`, `orElseMatchSome`, and `unwrapOr`. Use {@link Result.wrap}
- * when you want to convert throwing code or rejecting promises into result
+ * when you want to convert throwing synchronous code into result
  * values. Use {@link taggedError} when you want structured `Error`
- * values with a stable `_tag` for narrowing and logging. When the computation
- * is asynchronous, use {@link AsyncResult} or call `result.async()` to keep
- * the same style of composition. For generator-based composition, use
- * {@link Result.run} with `yield*` on `Result` and `AsyncResult` values.
+ * values with a stable `_tag` for narrowing and logging.
  *
  * @example
  * ```typescript
@@ -31,20 +28,13 @@
  *   .map((value) => value + 1)
  *   .unwrapOr(8080);
  *
- * const generated = Result.run(function* () {
- *   const value = yield* parsePort("3000");
- *   return Result.ok(value + 1);
- * });
  * ```
  *
  * @module
  */
 
 export * from "./result.ts";
-export * from "./async-result.ts";
 
-import { AsyncResult } from "./async-result.ts";
-import { taggedError, type TaggedErrorFactory } from "./errors.ts";
 export {
   type TaggedError,
   taggedError,
@@ -107,97 +97,19 @@ export namespace Result {
    * Options for {@link Result.wrap}.
    *
    * Provide the code to run in `try`, and a `catch` mapper that converts any
-   * thrown or rejected value into your desired error type.
+   * thrown value into your desired error type.
    */
   export interface WrapOptions<T, E> {
     /** Function to execute and capture as a result. */
     try: () => T;
-    /** Converts a thrown or rejected value into the result error type. */
+    /** Converts a thrown value into the result error type. */
     catch: (e: unknown) => E;
   }
 
-  export interface WrapOptionsAsync<T, E> {
-    /** Function to execute and capture as a result. */
-    try: (signal: AbortSignal) => T;
-    /** Converts a thrown or rejected value into the result error type. */
-    catch: (e: unknown) => E;
-  }
-
-  export function wrap<T extends Promise<unknown>, E>(
-    options: WrapOptionsAsync<T, E>,
-  ): AsyncResult<Awaited<T>, E>;
-  export function wrap<T extends Promise<unknown>, E>(
-    options: WrapOptionsAsync<T, E>,
-    runOptions: { signal: AbortSignal },
-  ): AsyncResult<Awaited<T>, E | Cancelled>;
   export function wrap<T, E>(options: WrapOptions<T, E>): Result<T, E>;
-  export function wrap<T, E>(
-    options: WrapOptions<T, E> | WrapOptionsAsync<T, E>,
-    runOptions?: { signal: AbortSignal },
-  ): Result<T, E> | AsyncResult<T, E | Cancelled> {
-    const signal = runOptions?.signal;
-
-    if (signal?.aborted) {
-      return Result.err(
-        new Cancelled({
-          message: signal.reason instanceof Error
-            ? `Cancelled: ${signal.reason.message}`
-            : typeof signal.reason === "string"
-            ? `Cancelled: ${signal.reason}`
-            : "Cancelled",
-          cause: signal.reason,
-        }),
-      ).async();
-    }
-
+  export function wrap<T, E>(options: WrapOptions<T, E>): Result<T, E> {
     try {
-      const value = options.try(signal ?? new AbortController().signal);
-      if (value instanceof Promise) {
-        if (!signal) return AsyncResult.wrap(value, options.catch);
-
-        const { promise, resolve } = Promise.withResolvers<
-          Result<T, E | Cancelled>
-        >();
-        // deno-lint-ignore no-inner-declarations
-        function abort() {
-          resolve(
-            Result.err(
-              new Cancelled({
-                message: signal.reason instanceof Error
-                  ? `Cancelled: ${signal.reason.message}`
-                  : typeof signal.reason === "string"
-                  ? `Cancelled: ${signal.reason}`
-                  : "Cancelled",
-                cause: signal.reason,
-              }),
-            ),
-          );
-        }
-        signal.addEventListener("abort", abort, { once: true });
-        value
-          .then(
-            (res) => resolve(new Ok(res)),
-            (rej) => {
-              // check if the promise is rejected with an AbortError
-              if (rej instanceof Error && rej.name === "AbortError") {
-                resolve(
-                  new Err(
-                    new Cancelled({
-                      message: rej.message,
-                      cause: rej,
-                    }),
-                  ),
-                );
-                return;
-              }
-
-              resolve(new Err(options.catch(rej)));
-            },
-          )
-          .finally(() => signal.removeEventListener("abort", abort));
-        return new AsyncResult(promise);
-      }
-      return new Ok(value);
+      return new Ok(options.try());
     } catch (e) {
       return new Err(options.catch(e));
     }
@@ -209,259 +121,11 @@ export namespace Result {
   /** Extracts the error type from an {@link Err} value. */
   export type ExtractErr<T> = T extends Err<unknown, infer E> ? E : never;
 
-  const CancelledBase = taggedError(
-    "Cancelled",
-  ) as TaggedErrorFactory<"Cancelled">;
-  /** Shared cancellation outcome used by signal-aware async helpers. */
-  export class Cancelled extends CancelledBase {}
+  /** Extracts the success type from any {@link Result}-like value. */
+  export type ExtractOkFromResult<T> = T extends Result<infer U, unknown> ? U
+    : never;
 
-  const RetriesExhaustedBase = taggedError(
-    "RetriesExhausted",
-  ) as TaggedErrorFactory<"RetriesExhausted">;
-
-  /**
-   * Error returned when all retry attempts have been exhausted.
-   *
-   * Contains the total number of attempts and the last error encountered.
-   *
-   * @example
-   * ```typescript
-   * import { Result } from "@joyful/result";
-   *
-   * const result = await Result.retry(
-   *   () => Result.wrap({ try: () => fetch(url), catch: classifyError }),
-   *   { schedule: [500, 2000] },
-   * );
-   *
-   * if (result.isErr() && result.error._tag === "RetriesExhausted") {
-   *   console.log(`Failed after ${result.error.attempts} attempts`);
-   * }
-   * ```
-   */
-  export class RetriesExhausted<E> extends RetriesExhaustedBase<{
-    attempts: number;
-    lastError: E;
-  }> {}
-
-  /**
-   * Options for {@link Result.retry}.
-   */
-  export interface RetryOptions<E> {
-    /**
-     * Array of delay durations in milliseconds between retries.
-     *
-     * The length of this array determines the maximum number of retries.
-     * Each element is the delay before the corresponding retry attempt.
-     *
-     * @default [1000, 5000, 10000]
-     */
-    schedule?: number[];
-
-    /**
-     * Predicate that decides whether to continue retrying.
-     *
-     * Called with the error from the latest failed attempt and the attempt
-     * number (0-indexed). Return `false` to stop retrying early and return the
-     * current error as-is (not wrapped in {@link RetriesExhausted}).
-     *
-     * @default () => true
-     */
-    while?: (error: E, attempt: number) => boolean | Promise<boolean>;
-  }
-
-  /** Default backoff schedule: 1s, 5s, 10s. */
-  const DEFAULT_SCHEDULE = [1000, 5000, 10000];
-
-  /**
-   * Retries a result-returning function with configurable backoff.
-   *
-   * The factory function is called with an `attempt` number starting at `0`.
-   * On failure, the function waits according to the `schedule` array before
-   * the next attempt. If all retries are exhausted, the result is wrapped in
-   * {@link RetriesExhausted}. If the `while` predicate returns `false`, the
-   * current error is returned immediately without wrapping.
-   *
-   * @param fn Factory that produces a result for each attempt.
-   * @param options Retry options including schedule and predicate.
-   * @returns An async result that resolves to the first success or the final error.
-   *
-   * @example
-   * ```typescript
-   * // Retry with default schedule (1s, 5s, 10s)
-   * const result = await Result.retry(
-   *   (attempt) => Result.wrap({
-   *     try: () => fetch("/api/data"),
-   *     catch: (e) => new FetchError({ cause: e }),
-   *   }),
-   * );
-   *
-   * // Retry with custom schedule and early-exit predicate
-   * const result = await Result.retry(
-   *   (attempt) => Result.wrap({
-   *     try: () => fetch("/api/data"),
-   *     catch: classifyError,
-   *   }),
-   *   {
-   *     schedule: [100, 200, 400],
-   *     while: (err, attempt) => err._tag !== "NotFound",
-   *   },
-   * );
-   * ```
-   */
-  export function retry<T, E>(
-    fn: (
-      attempt: number,
-    ) => Result<T, E> | AsyncResult<T, E> | Promise<Result<T, E>>,
-    options?: RetryOptions<E>,
-  ): AsyncResult<T, E | RetriesExhausted<E>> {
-    const schedule = options?.schedule ?? DEFAULT_SCHEDULE;
-    const shouldRetry = options?.while ?? (() => true);
-
-    return new AsyncResult(retryLoop(fn, schedule, shouldRetry));
-  }
-
-  async function retryLoop<T, E>(
-    fn: (
-      attempt: number,
-    ) => Result<T, E> | AsyncResult<T, E> | Promise<Result<T, E>>,
-    schedule: number[],
-    shouldRetry: (error: E, attempt: number) => boolean | Promise<boolean>,
-  ): Promise<Result<T, E | RetriesExhausted<E>>> {
-    for (let attempt = 0; attempt <= schedule.length; attempt++) {
-      const resultOrAsync = fn(attempt);
-      const result: Result<T, E> = "then" in resultOrAsync
-        ? await resultOrAsync
-        : resultOrAsync;
-
-      if (result instanceof Ok) return result;
-      if (!(await shouldRetry(result.error, attempt))) return result;
-
-      if (attempt < schedule.length) {
-        await delay(schedule[attempt]);
-      } else {
-        return new Err(
-          new RetriesExhausted<E>({
-            attempts: attempt + 1,
-            lastError: result.error,
-          }),
-        );
-      }
-    }
-
-    throw new Error("unreachable");
-  }
-
-  function delay(ms: number): Promise<void> {
-    return new Promise((resolve) => setTimeout(resolve, ms));
-  }
-
-  /**
-   * Runs a generator that uses `yield*` with {@link Result} values.
-   *
-   * If the generator yields an {@link Err}, the run stops and that error is
-   * returned. If every yielded result is successful, the final returned result
-   * becomes the output.
-   *
-   * This overload is for synchronous generators.
-   *
-   * @param gen Generator factory that yields from `Result` values.
-   * @returns The final successful or failed result.
-   *
-   * @example
-   * ```typescript
-   * const result = Result.run(function* () {
-   *   const first = yield* Result.ok(2);
-   *   const second = yield* Result.ok(3);
-   *   return Result.ok(first + second);
-   * });
-   * ```
-   */
-  export function run<
-    E extends Err<never, unknown>,
-    R extends Result<unknown, unknown>,
-  >(
-    gen: () => Generator<E, R, unknown>,
-  ): Result<ExtractOk<R>, ExtractErr<R> | ExtractErr<E>>;
-
-  /**
-   * Runs an async generator that uses `yield*` with {@link AsyncResult} values.
-   *
-   * If the generator yields an {@link Err}, the run stops and that error is
-   * returned. If every yielded result is successful, the final returned result
-   * becomes the output.
-   *
-   * This overload is for async generators.
-   *
-   * @param gen Async generator factory that yields from `AsyncResult` values.
-   * @returns An async result for the final successful or failed result.
-   *
-   * @example
-   * ```typescript
-   * const result = Result.run(async function* () {
-   *   const first = yield* Result.ok(2).async();
-   *   const second = yield* Result.ok(3).async();
-   *   return Result.ok(first + second);
-   * });
-   * ```
-   */
-  export function run<
-    E extends Err<never, unknown>,
-    R extends Result<unknown, unknown>,
-  >(
-    gen: () => AsyncGenerator<E, R, unknown>,
-  ): AsyncResult<ExtractOk<R>, ExtractErr<R> | ExtractErr<E>>;
-  export function run<
-    E extends Err<never, unknown>,
-    R extends Result<unknown, unknown>,
-  >(
-    gen:
-      | (() => Generator<E, R, unknown>)
-      | (() => AsyncGenerator<E, R, unknown>),
-  ):
-    | Result<ExtractOk<R>, ExtractErr<R> | ExtractErr<E>>
-    | AsyncResult<ExtractOk<R>, ExtractErr<R> | ExtractErr<E>> {
-    const iterator = gen();
-    if (Symbol.asyncIterator in iterator) {
-      return new AsyncResult(runAsync(iterator));
-    }
-
-    let result: IteratorResult<E, R>;
-    try {
-      result = iterator.next();
-    } catch (e) {
-      throw new Error(`Error in Result.run generator: ${e}`);
-    }
-    if (!result.done) {
-      try {
-        iterator.return?.(undefined as unknown as R);
-      } catch (e) {
-        throw new Error(`Error in Result.run generator: ${e}`);
-      }
-    }
-
-    return result.value as Result<ExtractOk<R>, ExtractErr<R> | ExtractErr<E>>;
-  }
-
-  async function runAsync<
-    E extends Err<never, unknown>,
-    R extends Result<unknown, unknown>,
-  >(
-    gen: AsyncGenerator<E, R, unknown>,
-  ): Promise<Result<ExtractOk<R>, ExtractErr<R> | ExtractErr<E>>> {
-    let result: IteratorResult<E, R>;
-    try {
-      result = await gen.next();
-    } catch (e) {
-      throw new Error(`Error in Result.run generator: ${e}`);
-    }
-    if (!result.done) {
-      try {
-        await gen.return?.(undefined as unknown as R);
-      } catch (e) {
-        throw new Error(`Error in Result.run generator: ${e}`);
-      }
-    }
-
-    return result.value as Result<ExtractOk<R>, ExtractErr<R> | ExtractErr<E>>;
-  }
+  /** Extracts the error type from any {@link Result}-like value. */
+  export type ExtractErrFromResult<T> = T extends Result<unknown, infer E> ? E
+    : never;
 }

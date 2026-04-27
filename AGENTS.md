@@ -41,7 +41,7 @@ deno test -A joyful/pipe/src
 deno test -A joyful/result/src/result.test.ts
 
 # run one test case by name (substring/regex)
-deno test -A joyful/result/src/result.test.ts --filter "Result.run"
+deno test -A joyful/task/src/main.test.ts --filter "Task.do"
 deno test -A joyful/fetch/src/main.test.ts --filter "HttpError.response"
 
 # lint (no dedicated task defined; run directly)
@@ -85,7 +85,8 @@ deno check joyful/fetch/src/main.ts
 
 ### Error Handling
 
-- Prefer `Result` / `AsyncResult` for expected failures.
+- Prefer `Result` for already-computed expected failures and `Task` for lazy
+  async workflows that produce expected failures.
 - Prefer `taggedError("Tag")` for domain errors that need structured matching.
 - Keep `_tag`-based matching exhaustive via `orElseMatch` when all cases must be
   handled.

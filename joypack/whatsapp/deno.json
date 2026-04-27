@@ -3,7 +3,9 @@
   "name": "@joypack/whatsapp",
   "version": "0.1.1",
   "license": "MIT",
-  "imports": {},
+  "imports": {
+    "@joyful/task": "jsr:@joyful/task@^0.0.0"
+  },
   "exports": {
     ".": "./src/main.ts",
     "./interactive": "./src/interactive.ts",

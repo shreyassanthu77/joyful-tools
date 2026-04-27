@@ -1,14 +1,11 @@
 import {
+  type Cancelled,
   type HttpError,
   type JFetch,
   jfetch,
   type NetworkError,
 } from "@joyful/fetch";
-import {
-  type Result,
-  taggedError,
-  type TaggedErrorFactory,
-} from "@joyful/result";
+import { taggedError, type TaggedErrorFactory } from "@joyful/result";
 import { WhatsAppMediaApi } from "./media.ts";
 import { WhatsAppMessagesApi } from "./messages.ts";
 
@@ -102,7 +99,7 @@ export class WhatsAppClient {
 /** Errors that can happen before, during, or after a WhatsApp API request. */
 export type WhatsAppRequestError =
   | NetworkError
-  | Result.Cancelled
+  | Cancelled
   | WhatsAppError;
 
 const WhatsAppErrorBase: TaggedErrorFactory<"WhatsAppError"> = taggedError(

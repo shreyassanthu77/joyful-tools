@@ -5,6 +5,7 @@
     "joyful/fetch",
     "joyful/pipe",
     "joyful/result",
+    "joyful/task",
     "joyful/turboq"
   ],
   "nodeModulesDir": "auto",

@@ -556,6 +556,18 @@
         "npm:rolldown@^1.0.0-rc.13",
         "npm:typescript@^6.0.2"
       ]
+    },
+    "members": {
+      "joyful/fetch": {
+        "dependencies": [
+          "jsr:@joyful/task@^0.0.0"
+        ]
+      },
+      "joypack/whatsapp": {
+        "dependencies": [
+          "jsr:@joyful/task@^0.0.0"
+        ]
+      }
     }
   }
 }

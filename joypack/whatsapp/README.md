@@ -264,8 +264,8 @@ if (sent.isErr()) {
 ```
 
 `messages.send()` is a thin convenience for `POST /{phone-number-id}/messages`.
-It adds `messaging_product: "whatsapp"` for you and returns an
-`AsyncResult<WhatsAppSendResponse, WhatsAppRequestError>`.
+It adds `messaging_product: "whatsapp"` for you and returns an awaitable
+`TaskRun<WhatsAppSendResponse, WhatsAppRequestError>`.
 
 Mark a previously received message as read:
 
