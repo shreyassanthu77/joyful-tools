@@ -1,6 +1,5 @@
 import { assertEquals, assertInstanceOf } from "std/assert";
 import { Result } from "@joyful/result";
-import { Task } from "@joyful/task";
 import {
   Cancelled,
   createFetch,
@@ -159,25 +158,26 @@ Deno.test("await fetch returns HttpError with FetchedResponse", async () => {
 
 Deno.test("orElseMatch for exhaustive error recovery", async () => {
   const fetch = createFetch(jsonFetch({ error: "nope" }, { status: 403 }));
-  const result = await fetch("/api").json<string>();
-  const recovered = result.orElseMatch({
-    NetworkError: () => Result.ok("network-fallback"),
-    Cancelled: () => Result.ok("abort-fallback"),
-    HttpError: (e) => Result.ok(`http-${e.status}`),
-    ParseError: () => Result.ok("parse-fallback"),
-  });
+  const result = await fetch("/api")
+    .json<string>()
+    .orElseMatch({
+      NetworkError: () => Result.ok("network-fallback"),
+      Cancelled: () => Result.ok("abort-fallback"),
+      HttpError: (e) => Result.ok(`http-${e.status}`),
+      ParseError: () => Result.ok("parse-fallback"),
+    });
 
-  assertEquals(recovered, Result.ok("http-403"));
+  assertEquals(result, Result.ok("http-403"));
 });
 
 Deno.test("yield* jfetch returns FetchedResponse on success", async () => {
   const fetch = createFetch(jsonFetch({ name: "Alice" }));
 
-  const result = await Task.do(async function* () {
+  const result = await Result.run(async function* () {
     const res = yield* fetch("/api");
     assertInstanceOf(res, FetchedResponse);
-    return res.status;
-  }).run();
+    return Result.ok(res.status);
+  });
 
   assertEquals(result, Result.ok(200));
 });
@@ -185,11 +185,11 @@ Deno.test("yield* jfetch returns FetchedResponse on success", async () => {
 Deno.test("FetchedResponse.json() parses JSON body", async () => {
   const fetch = createFetch(jsonFetch({ name: "Bob" }));
 
-  const result = await Task.do(async function* () {
+  const result = await Result.run(async function* () {
     const res = yield* fetch("/api");
     const data = yield* res.json<{ name: string }>();
-    return data;
-  }).run();
+    return Result.ok(data);
+  });
 
   assertEquals(result, Result.ok({ name: "Bob" }));
 });
@@ -199,11 +199,11 @@ Deno.test(
   async () => {
     const fetch = createFetch(mockFetch("not json"));
 
-    const result = await Task.do(async function* () {
+    const result = await Result.run(async function* () {
       const res = yield* fetch("/api");
       const data = yield* res.json();
-      return data;
-    }).run();
+      return Result.ok(data);
+    });
 
     assertEquals(result.isErr(), true);
     if (result.isErr()) {
@@ -224,11 +224,11 @@ Deno.test(
     );
 
     const fetch = createFetch(() => Promise.resolve(response));
-    const result = await Task.do(async function* () {
+    const result = await Result.run(async function* () {
       const res = yield* fetch("/api");
       const data = yield* res.json();
-      return data;
-    }).run();
+      return Result.ok(data);
+    });
 
     assertEquals(result.isErr(), true);
     if (result.isErr()) {
@@ -240,11 +240,11 @@ Deno.test(
 Deno.test("FetchedResponse.text() returns text body", async () => {
   const fetch = createFetch(mockFetch("hello world"));
 
-  const result = await Task.do(async function* () {
+  const result = await Result.run(async function* () {
     const res = yield* fetch("/api");
     const text = yield* res.text();
-    return text;
-  }).run();
+    return Result.ok(text);
+  });
 
   assertEquals(result, Result.ok("hello world"));
 });

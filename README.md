@@ -17,20 +17,10 @@ failure as data instead of throwing exceptions.
 ```ts
 import { Result } from "@joyful/result";
 
-const result = parseInput("42").andThen(validate);
-```
-
-### [@joyful/task](./joyful/task)
-
-Lazy work that resolves to `Result` values. Compose async workflows with
-`Task.do`, then run them at the edge.
-
-```ts
-import { Task } from "@joyful/task";
-
-const program = Task.do(async function* () {
-  const user = yield* fetchUserTask;
-  return user.name;
+const result = Result.run(function* () {
+  const parsed = yield* parseInput("42");
+  const validated = yield* validate(parsed);
+  return Result.ok(validated);
 });
 ```
 
@@ -43,7 +33,7 @@ network error, HTTP error, parse failure, cancellation -- is typed data.
 import { jfetch } from "@joyful/fetch";
 
 const user = await jfetch("/api/me").json<User>();
-// Result<User, NetworkError | HttpError | Cancelled | ParseError>
+// AsyncResult<User, NetworkError | HttpError | Cancelled | ParseError>
 ```
 
 ### [@joyful/pipe](./joyful/pipe)
@@ -70,13 +60,13 @@ Each package is published independently. The current stable installs are the
 
 ```sh
 # JSR
-deno add @joyful/result @joyful/task @joyful/fetch @joyful/pipe
+deno add @joyful/result @joyful/fetch @joyful/pipe
 
 # npm
-npx jsr add @joyful/result @joyful/task @joyful/fetch @joyful/pipe
+npx jsr add @joyful/result @joyful/fetch @joyful/pipe
 
 # or from npm directly
-npm install @joyful-tools/result @joyful-tools/task @joyful-tools/fetch @joyful-tools/pipe
+npm install @joyful-tools/result @joyful-tools/fetch @joyful-tools/pipe
 ```
 
 ## License

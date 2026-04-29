@@ -3,9 +3,7 @@
   "name": "@joyful/fetch",
   "version": "0.4.2",
   "license": "MIT",
-  "imports": {
-    "@joyful/task": "jsr:@joyful/task@^0.0.0"
-  },
+  "imports": {},
   "exports": {
     ".": "./src/main.ts"
   },

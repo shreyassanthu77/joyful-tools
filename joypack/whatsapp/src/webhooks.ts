@@ -433,14 +433,14 @@ export type WebhookEvent =
   | MessageWebhookEvent<"location", WhatsAppWebhookLocationMessage>
   | MessageWebhookEvent<"contacts", WhatsAppWebhookContactsMessage>
   | MessageWebhookEvent<
-    "interactive_button_reply",
-    | WhatsAppWebhookInteractiveButtonReplyMessage
-    | WhatsAppWebhookNormalizedButtonReplyMessage
-  >
+      "interactive_button_reply",
+      | WhatsAppWebhookInteractiveButtonReplyMessage
+      | WhatsAppWebhookNormalizedButtonReplyMessage
+    >
   | MessageWebhookEvent<
-    "interactive_list_reply",
-    WhatsAppWebhookInteractiveListReplyMessage
-  >
+      "interactive_list_reply",
+      WhatsAppWebhookInteractiveListReplyMessage
+    >
   | MessageWebhookEvent<"unknown", WhatsAppWebhookMessage>
   | StatusWebhookEvent<"sent", WhatsAppWebhookSentStatus>
   | StatusWebhookEvent<"delivered", WhatsAppWebhookDeliveredStatus>
@@ -448,8 +448,8 @@ export type WebhookEvent =
   | StatusWebhookEvent<"failed", WhatsAppWebhookFailedStatus>
   | StatusWebhookEvent<"unknown", WhatsAppWebhookStatus>
   | (WebhookEventBase & {
-    kind: "unknown";
-  });
+      kind: "unknown";
+    });
 
 /** Context passed to a {@link WebhookEventHandler}. */
 export interface WebhookEventContext {

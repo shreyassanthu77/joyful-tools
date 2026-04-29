@@ -1,3 +1,4 @@
+import { AsyncResult } from "./async-result.ts";
 import type {
   MatchableError,
   MatchHandlers,
@@ -36,6 +37,7 @@ interface BaseResult<T, E = unknown>
   >;
   inspect(f: (value: T) => void): this;
   inspectErr(f: (err: E) => void): this;
+  async(): AsyncResult<T, E>;
 }
 
 /**
@@ -259,7 +261,16 @@ export class Ok<T, E = never> implements BaseResult<T, E> {
   }
 
   /**
-   * Supports `yield*` inside generator workflows such as `Task.do`.
+   * Wraps this result in an {@link AsyncResult} for asynchronous composition.
+   *
+   * @returns An async wrapper that resolves to this result.
+   */
+  async(): AsyncResult<T, E> {
+    return new AsyncResult(Promise.resolve(this));
+  }
+
+  /**
+   * Supports `yield*` inside {@link Result.run} generator workflows.
    *
    * Successful results immediately return their contained value to the
    * generator, so execution continues with the unwrapped value.
@@ -528,9 +539,18 @@ export class Err<T, E = never> implements BaseResult<T, E> {
   }
 
   /**
-   * Supports `yield*` inside generator workflows such as `Task.do`.
+   * Wraps this result in an {@link AsyncResult} for asynchronous composition.
    *
-   * Failed results yield themselves so the workflow runner can stop early and
+   * @returns An async wrapper that resolves to this result.
+   */
+  async(): AsyncResult<T, E> {
+    return new AsyncResult(Promise.resolve(this));
+  }
+
+  /**
+   * Supports `yield*` inside {@link Result.run} generator workflows.
+   *
+   * Failed results yield themselves so {@link Result.run} can stop early and
    * return the error.
    *
    * @returns A generator-compatible representation of this result.

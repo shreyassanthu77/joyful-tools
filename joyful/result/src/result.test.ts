@@ -1,5 +1,5 @@
 import { assertEquals, assertInstanceOf, assertThrows } from "std/assert";
-import { Err, Result, taggedError } from "./main.ts";
+import { Result, taggedError } from "./main.ts";
 
 class ValidationError extends taggedError("ValidationError")<{
   field: string;
@@ -195,7 +195,7 @@ Deno.test("Result.inspectErr", () => {
   assertEquals(value, 2);
 });
 
-Deno.test("Result.wrap", () => {
+Deno.test("Result.wrap", async () => {
   assertEquals(
     Result.wrap({
       try: () => 2,
@@ -213,6 +213,40 @@ Deno.test("Result.wrap", () => {
     }),
     Result.err("boom"),
   );
+
+  assertEquals(
+    await Result.wrap({
+      try: () => Promise.resolve(2),
+      catch: () => "boom",
+    }),
+    Result.ok(2),
+  );
+
+  assertEquals(
+    await Result.wrap({
+      try: () => Promise.reject(new Error("boom")),
+      catch: (error) => error instanceof Error ? error.message : String(error),
+    }),
+    Result.err("boom"),
+  );
+
+  const aborted = AbortSignal.abort("timeout");
+  const cancelled = await Result.wrap(
+    {
+      // deno-lint-ignore require-await
+      try: async (signal) => {
+        signal.throwIfAborted?.();
+        return 1;
+      },
+      catch: () => "boom",
+    },
+    { signal: aborted },
+  );
+
+  assertEquals(cancelled.isErr(), true);
+  if (cancelled.isErr()) {
+    assertInstanceOf(cancelled.error, Result.Cancelled);
+  }
 });
 
 Deno.test("taggedError", () => {
@@ -260,22 +294,34 @@ Deno.test("taggedError", () => {
   }
 });
 
-Deno.test("Result keeps iterator support for yield*", () => {
-  function* okWorkflow() {
-    const first = yield* Result.ok(2);
-    const second = yield* Result.ok(3);
-    return first + second;
-  }
+Deno.test("Result.run", () => {
+  assertEquals(
+    Result.run(function* () {
+      const first = yield* Result.ok(2);
+      const second = yield* Result.ok(3);
+      return Result.ok(first + second);
+    }),
+    Result.ok(5),
+  );
 
-  assertEquals(okWorkflow().next(), { done: true, value: 5 });
+  let reached = false;
+  assertEquals(
+    Result.run(function* () {
+      yield* Result.err("boom");
+      reached = true;
+      return Result.ok(1);
+    }),
+    Result.err("boom"),
+  );
+  assertEquals(reached, false);
 
-  function* errWorkflow() {
-    const value = yield* Result.err("boom");
-    return value;
-  }
-
-  assertEquals(errWorkflow().next(), {
-    done: false,
-    value: new Err<never, string>("boom"),
-  });
+  assertThrows(
+    () =>
+      // deno-lint-ignore require-yield
+      Result.run(function* () {
+        throw new Error("boom");
+      }),
+    Error,
+    "Error in Result.run generator: Error: boom",
+  );
 });
