@@ -1,5 +1,5 @@
 import { assertEquals, assertInstanceOf, assertThrows } from "std/assert";
-import { Result, taggedError } from "./main.ts";
+import { AsyncResult, Result, taggedError } from "./main.ts";
 
 class ValidationError extends taggedError("ValidationError")<{
   field: string;
@@ -195,7 +195,7 @@ Deno.test("Result.inspectErr", () => {
   assertEquals(value, 2);
 });
 
-Deno.test("Result.wrap", async () => {
+Deno.test("Result.wrap", () => {
   assertEquals(
     Result.wrap({
       try: () => 2,
@@ -214,24 +214,18 @@ Deno.test("Result.wrap", async () => {
     Result.err("boom"),
   );
 
-  assertEquals(
-    await Result.wrap({
+  assertInstanceOf(
+    Result.wrap({
       try: () => Promise.resolve(2),
       catch: () => "boom",
-    }),
-    Result.ok(2),
+    }).expect("promise should be wrapped as a sync value"),
+    Promise,
   );
+});
 
-  assertEquals(
-    await Result.wrap({
-      try: () => Promise.reject(new Error("boom")),
-      catch: (error) => error instanceof Error ? error.message : String(error),
-    }),
-    Result.err("boom"),
-  );
-
+Deno.test("AsyncResult.wrapAbortable", async () => {
   const aborted = AbortSignal.abort("timeout");
-  const cancelled = await Result.wrap(
+  const cancelled = await AsyncResult.wrapAbortable(
     {
       // deno-lint-ignore require-await
       try: async (signal) => {
@@ -245,7 +239,7 @@ Deno.test("Result.wrap", async () => {
 
   assertEquals(cancelled.isErr(), true);
   if (cancelled.isErr()) {
-    assertInstanceOf(cancelled.error, Result.Cancelled);
+    assertInstanceOf(cancelled.error, AsyncResult.Cancelled);
   }
 });
 

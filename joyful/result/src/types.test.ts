@@ -418,8 +418,17 @@ Deno.test(
   },
 );
 
-Deno.test("Async Result.wrap with signal adds Cancelled", () => {
-  const res = Result.wrap(
+Deno.test("AsyncResult.wrap returns AsyncResult", () => {
+  const res = AsyncResult.wrap({
+    try: async () => 1,
+    catch: () => "boom" as const,
+  });
+
+  attest<AsyncResult<number, "boom">>(res);
+});
+
+Deno.test("AsyncResult.wrapAbortable adds Cancelled", () => {
+  const res = AsyncResult.wrapAbortable(
     {
       try: async (_sig) => 1,
       catch: () => "boom" as const,
@@ -427,5 +436,5 @@ Deno.test("Async Result.wrap with signal adds Cancelled", () => {
     { signal: new AbortController().signal },
   );
 
-  attest<AsyncResult<number, Result.Cancelled | "boom">>(res);
+  attest<AsyncResult<number, AsyncResult.Cancelled | "boom">>(res);
 });

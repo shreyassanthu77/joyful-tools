@@ -178,7 +178,7 @@ export function createFetch(fetch: FetchFn): JFetch {
     } catch (e) {
       if (e instanceof DOMException && e.name === "AbortError") {
         return Result.err(
-          new Result.Cancelled({
+          new AsyncResult.Cancelled({
             message: `Cancelled: ${e.message}`,
             cause: e,
           }),
@@ -203,7 +203,7 @@ export type JFetch = (...args: Parameters<FetchFn>) => JoyfulResponse;
  * Union of all errors that can occur before body parsing — network failures,
  * cancelled requests, and non-2xx HTTP responses.
  */
-export type ResponseError = NetworkError | Result.Cancelled | HttpError;
+export type ResponseError = NetworkError | AsyncResult.Cancelled | HttpError;
 
 /**
  * Async result for a fetch request with convenience body readers.
@@ -427,7 +427,7 @@ export class FetchedResponse {
    * });
    * ```
    */
-  json<T = unknown>(): AsyncResult<T, ParseError | Result.Cancelled> {
+  json<T = unknown>(): AsyncResult<T, ParseError | AsyncResult.Cancelled> {
     return new AsyncResult(this.#read("json"));
   }
 
@@ -443,7 +443,7 @@ export class FetchedResponse {
    * });
    * ```
    */
-  text(): AsyncResult<string, ParseError | Result.Cancelled> {
+  text(): AsyncResult<string, ParseError | AsyncResult.Cancelled> {
     return new AsyncResult(this.#read("text"));
   }
 
@@ -459,7 +459,7 @@ export class FetchedResponse {
    * });
    * ```
    */
-  arrayBuffer(): AsyncResult<ArrayBuffer, ParseError | Result.Cancelled> {
+  arrayBuffer(): AsyncResult<ArrayBuffer, ParseError | AsyncResult.Cancelled> {
     return new AsyncResult(this.#read("arrayBuffer"));
   }
 
@@ -475,7 +475,7 @@ export class FetchedResponse {
    * });
    * ```
    */
-  blob(): AsyncResult<Blob, ParseError | Result.Cancelled> {
+  blob(): AsyncResult<Blob, ParseError | AsyncResult.Cancelled> {
     return new AsyncResult(this.#read("blob"));
   }
 
@@ -491,7 +491,7 @@ export class FetchedResponse {
    * });
    * ```
    */
-  bytes(): AsyncResult<Uint8Array, ParseError | Result.Cancelled> {
+  bytes(): AsyncResult<Uint8Array, ParseError | AsyncResult.Cancelled> {
     return new AsyncResult(this.#read("bytes"));
   }
 
@@ -507,7 +507,7 @@ export class FetchedResponse {
    * });
    * ```
    */
-  formData(): AsyncResult<FormData, ParseError | Result.Cancelled> {
+  formData(): AsyncResult<FormData, ParseError | AsyncResult.Cancelled> {
     return new AsyncResult(this.#read("formData"));
   }
 
@@ -522,7 +522,10 @@ export class FetchedResponse {
   >(
     method: Method,
   ): Promise<
-    Result<Awaited<ReturnType<Response[Method]>>, ParseError | Result.Cancelled>
+    Result<
+      Awaited<ReturnType<Response[Method]>>,
+      ParseError | AsyncResult.Cancelled
+    >
   > {
     try {
       const data = await this.response[method]();
@@ -530,7 +533,7 @@ export class FetchedResponse {
     } catch (e) {
       if (e instanceof DOMException && e.name === "AbortError") {
         return Result.err(
-          new Result.Cancelled({
+          new AsyncResult.Cancelled({
             message: `Cancelled: ${e.message}`,
             cause: e,
           }),
@@ -648,4 +651,4 @@ export class ParseError extends ParseErrorBase {}
  * // result.error._tag === "Cancelled"
  * ```
  */
-export const Cancelled = Result.Cancelled;
+export const Cancelled = AsyncResult.Cancelled;

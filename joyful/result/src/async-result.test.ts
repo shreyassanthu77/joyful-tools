@@ -315,17 +315,93 @@ Deno.test("AsyncResult.inspectErr", async () => {
 
 Deno.test("AsyncResult.wrap", async () => {
   assertEquals(
-    await AsyncResult.wrap(Promise.resolve(2), () => "boom"),
+    await AsyncResult.wrap({
+      try: () => Promise.resolve(2),
+      catch: () => "boom",
+    }),
     Result.ok(2),
   );
 
   assertEquals(
-    await AsyncResult.wrap(
-      Promise.reject(new Error("boom")),
-      (error) => error instanceof Error ? error.message : String(error),
-    ),
+    await AsyncResult.wrap({
+      try: () => Promise.reject(new Error("boom")),
+      catch: (error) => error instanceof Error ? error.message : String(error),
+    }),
     Result.err("boom"),
   );
+
+  assertEquals(
+    await AsyncResult.wrap({
+      try: (): Promise<number> => {
+        throw new Error("boom");
+      },
+      catch: (error) => error instanceof Error ? error.message : String(error),
+    }),
+    Result.err("boom"),
+  );
+});
+
+Deno.test("AsyncResult.wrapAbortable", async () => {
+  const controller = new AbortController();
+
+  assertEquals(
+    await AsyncResult.wrapAbortable(
+      {
+        try: async (signal) => {
+          assertEquals(signal, controller.signal);
+          return 2;
+        },
+        catch: () => "boom",
+      },
+      { signal: controller.signal },
+    ),
+    Result.ok(2),
+  );
+
+  const cancelled = await AsyncResult.wrapAbortable(
+    {
+      try: async (signal) => {
+        signal.throwIfAborted?.();
+        return 1;
+      },
+      catch: () => "boom",
+    },
+    { signal: AbortSignal.abort("timeout") },
+  );
+
+  assertEquals(cancelled.isErr(), true);
+  if (cancelled.isErr()) {
+    assertInstanceOf(cancelled.error, AsyncResult.Cancelled);
+  }
+
+  const abortedByReject = await AsyncResult.wrapAbortable(
+    {
+      try: () => Promise.reject(new DOMException("aborted", "AbortError")),
+      catch: () => "boom",
+    },
+    { signal: new AbortController().signal },
+  );
+
+  assertEquals(abortedByReject.isErr(), true);
+  if (abortedByReject.isErr()) {
+    assertInstanceOf(abortedByReject.error, AsyncResult.Cancelled);
+  }
+
+  const laterController = new AbortController();
+  const cancelledWhilePending = AsyncResult.wrapAbortable(
+    {
+      try: () => new Promise<number>(() => {}),
+      catch: () => "boom",
+    },
+    { signal: laterController.signal },
+  );
+
+  laterController.abort("stop");
+  const laterResult = await cancelledWhilePending;
+  assertEquals(laterResult.isErr(), true);
+  if (laterResult.isErr()) {
+    assertInstanceOf(laterResult.error, AsyncResult.Cancelled);
+  }
 });
 
 Deno.test("AsyncResult.run", async () => {

@@ -9,8 +9,9 @@
  * Use the {@link Result.ok} and {@link Result.err} helpers to construct values,
  * then compose them with methods like `map`, `andThen`, `orElse`,
  * `orElseMatch`, `orElseMatchSome`, and `unwrapOr`. Use {@link Result.wrap}
- * when you want to convert throwing code or rejecting promises into result
- * values. Use {@link taggedError} when you want structured `Error`
+ * when you want to convert throwing code into result values. Use
+ * {@link AsyncResult.wrap} for async work that may reject. Use
+ * {@link taggedError} when you want structured `Error`
  * values with a stable `_tag` for narrowing and logging. When the computation
  * is asynchronous, use {@link AsyncResult} or call `result.async()` to keep
  * the same style of composition. For generator-based composition, use
@@ -107,97 +108,19 @@ export namespace Result {
    * Options for {@link Result.wrap}.
    *
    * Provide the code to run in `try`, and a `catch` mapper that converts any
-   * thrown or rejected value into your desired error type.
+   * thrown value into your desired error type.
    */
   export interface WrapOptions<T, E> {
     /** Function to execute and capture as a result. */
     try: () => T;
-    /** Converts a thrown or rejected value into the result error type. */
+    /** Converts a thrown value into the result error type. */
     catch: (e: unknown) => E;
   }
 
-  export interface WrapOptionsAsync<T, E> {
-    /** Function to execute and capture as a result. */
-    try: (signal: AbortSignal) => T;
-    /** Converts a thrown or rejected value into the result error type. */
-    catch: (e: unknown) => E;
-  }
-
-  export function wrap<T extends Promise<unknown>, E>(
-    options: WrapOptionsAsync<T, E>,
-  ): AsyncResult<Awaited<T>, E>;
-  export function wrap<T extends Promise<unknown>, E>(
-    options: WrapOptionsAsync<T, E>,
-    runOptions: { signal: AbortSignal },
-  ): AsyncResult<Awaited<T>, E | Cancelled>;
   export function wrap<T, E>(options: WrapOptions<T, E>): Result<T, E>;
-  export function wrap<T, E>(
-    options: WrapOptions<T, E> | WrapOptionsAsync<T, E>,
-    runOptions?: { signal: AbortSignal },
-  ): Result<T, E> | AsyncResult<T, E | Cancelled> {
-    const signal = runOptions?.signal;
-
-    if (signal?.aborted) {
-      return Result.err(
-        new Cancelled({
-          message: signal.reason instanceof Error
-            ? `Cancelled: ${signal.reason.message}`
-            : typeof signal.reason === "string"
-            ? `Cancelled: ${signal.reason}`
-            : "Cancelled",
-          cause: signal.reason,
-        }),
-      ).async();
-    }
-
+  export function wrap<T, E>(options: WrapOptions<T, E>): Result<T, E> {
     try {
-      const value = options.try(signal ?? new AbortController().signal);
-      if (value instanceof Promise) {
-        if (!signal) return AsyncResult.wrap(value, options.catch);
-
-        const { promise, resolve } = Promise.withResolvers<
-          Result<T, E | Cancelled>
-        >();
-        // deno-lint-ignore no-inner-declarations
-        function abort() {
-          resolve(
-            Result.err(
-              new Cancelled({
-                message: signal.reason instanceof Error
-                  ? `Cancelled: ${signal.reason.message}`
-                  : typeof signal.reason === "string"
-                  ? `Cancelled: ${signal.reason}`
-                  : "Cancelled",
-                cause: signal.reason,
-              }),
-            ),
-          );
-        }
-        signal.addEventListener("abort", abort, { once: true });
-        value
-          .then(
-            (res) => resolve(new Ok(res)),
-            (rej) => {
-              // check if the promise is rejected with an AbortError
-              if (rej instanceof Error && rej.name === "AbortError") {
-                resolve(
-                  new Err(
-                    new Cancelled({
-                      message: rej.message,
-                      cause: rej,
-                    }),
-                  ),
-                );
-                return;
-              }
-
-              resolve(new Err(options.catch(rej)));
-            },
-          )
-          .finally(() => signal.removeEventListener("abort", abort));
-        return new AsyncResult(promise);
-      }
-      return new Ok(value);
+      return new Ok(options.try());
     } catch (e) {
       return new Err(options.catch(e));
     }
@@ -208,12 +131,6 @@ export namespace Result {
 
   /** Extracts the error type from an {@link Err} value. */
   export type ExtractErr<T> = T extends Err<unknown, infer E> ? E : never;
-
-  const CancelledBase = taggedError(
-    "Cancelled",
-  ) as TaggedErrorFactory<"Cancelled">;
-  /** Shared cancellation outcome used by signal-aware async helpers. */
-  export class Cancelled extends CancelledBase {}
 
   const RetriesExhaustedBase = taggedError(
     "RetriesExhausted",
@@ -226,10 +143,10 @@ export namespace Result {
    *
    * @example
    * ```typescript
-   * import { Result } from "@joyful/result";
+   * import { AsyncResult, Result } from "@joyful/result";
    *
    * const result = await Result.retry(
-   *   () => Result.wrap({ try: () => fetch(url), catch: classifyError }),
+   *   () => AsyncResult.wrap({ try: () => fetch(url), catch: classifyError }),
    *   { schedule: [500, 2000] },
    * );
    *
@@ -289,7 +206,7 @@ export namespace Result {
    * ```typescript
    * // Retry with default schedule (1s, 5s, 10s)
    * const result = await Result.retry(
-   *   (attempt) => Result.wrap({
+   *   (attempt) => AsyncResult.wrap({
    *     try: () => fetch("/api/data"),
    *     catch: (e) => new FetchError({ cause: e }),
    *   }),
@@ -297,7 +214,7 @@ export namespace Result {
    *
    * // Retry with custom schedule and early-exit predicate
    * const result = await Result.retry(
-   *   (attempt) => Result.wrap({
+   *   (attempt) => AsyncResult.wrap({
    *     try: () => fetch("/api/data"),
    *     catch: classifyError,
    *   }),

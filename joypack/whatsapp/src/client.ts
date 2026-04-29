@@ -5,7 +5,7 @@ import {
   type NetworkError,
 } from "@joyful/fetch";
 import {
-  type Result,
+  type AsyncResult,
   taggedError,
   type TaggedErrorFactory,
 } from "@joyful/result";
@@ -102,7 +102,7 @@ export class WhatsAppClient {
 /** Errors that can happen before, during, or after a WhatsApp API request. */
 export type WhatsAppRequestError =
   | NetworkError
-  | Result.Cancelled
+  | AsyncResult.Cancelled
   | WhatsAppError;
 
 const WhatsAppErrorBase: TaggedErrorFactory<"WhatsAppError"> = taggedError(
