@@ -293,7 +293,7 @@ Deno.test("Result.run", () => {
     Result.run(function* () {
       const first = yield* Result.ok(2);
       const second = yield* Result.ok(3);
-      return Result.ok(first + second);
+      return first + second;
     }),
     Result.ok(5),
   );
@@ -303,11 +303,20 @@ Deno.test("Result.run", () => {
     Result.run(function* () {
       yield* Result.err("boom");
       reached = true;
-      return Result.ok(1);
+      return 1;
     }),
     Result.err("boom"),
   );
   assertEquals(reached, false);
+
+  const validationError = new ValidationError({ field: "email" });
+  assertEquals(
+    Result.run(function* () {
+      yield* validationError;
+      return "unreachable";
+    }),
+    Result.err(validationError),
+  );
 
   assertThrows(
     () =>

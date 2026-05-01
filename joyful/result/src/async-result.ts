@@ -62,9 +62,7 @@ export class AsyncResult<T, E = unknown>
    * });
    * ```
    */
-  static wrap<T, E>(
-    options: AsyncResult.WrapOptions<T, E>,
-  ): AsyncResult<T, E> {
+  static wrap<T, E>(options: AsyncResult.WrapOptions<T, E>): AsyncResult<T, E> {
     try {
       return new AsyncResult(
         Promise.resolve(options.try()).then(

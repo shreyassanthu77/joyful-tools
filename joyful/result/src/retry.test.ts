@@ -170,7 +170,7 @@ Deno.test("Result.retry composes with Result.run via yield*", async () => {
       { schedule: [10, 20] },
     );
 
-    return Result.ok(value * 2);
+    return value * 2;
   });
 
   assertEquals(result, Result.ok(84));

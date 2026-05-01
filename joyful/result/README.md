@@ -123,7 +123,8 @@ console.log(error._tag);
 ```
 
 Tagged errors are normal `Error` instances, so they still work well with logs,
-stack traces, and `cause`.
+stack traces, and `cause`. They can also be yielded directly inside
+`Result.run()` to return them as the failed result.
 
 ## Working With Success And Error Paths
 
@@ -437,7 +438,7 @@ const result = await Result.run(async function* () {
     { schedule: [500, 1000] },
   );
 
-  return Result.ok(data);
+  return data;
 });
 ```
 
@@ -445,8 +446,10 @@ const result = await Result.run(async function* () {
 
 `Result.run()` lets you write sequential result logic with `yield*` instead of
 nesting `andThen()` calls. `Ok` values continue the generator with their
-unwrapped value, and `Err` values stop the generator early and become the final
-result.
+unwrapped value, `Err` values stop the generator early and become the final
+result, and the generator's returned value becomes the successful result. Tagged
+errors created with `taggedError()` can also be yielded directly to stop the
+generator with that error.
 
 ### Synchronous generators
 
@@ -465,7 +468,7 @@ function requirePositive(value: number): Result<number, string> {
 const result = Result.run(function* () {
   const parsed = yield* parseNumber("42");
   const positive = yield* requirePositive(parsed);
-  return Result.ok(positive * 2);
+  return positive * 2;
 });
 
 // Ok(84)
@@ -476,10 +479,27 @@ If any yielded result is an error, execution stops immediately:
 ```typescript
 const result = Result.run(function* () {
   const parsed = yield* parseNumber("nope");
-  return Result.ok(parsed * 2);
+  return parsed * 2;
 });
 
 // Err("invalid number")
+```
+
+Tagged errors can be yielded directly:
+
+```typescript
+import { Result, taggedError } from "@joyful/result";
+
+class InactiveUser extends taggedError("InactiveUser")<{
+  id: string;
+}> {}
+
+const result = Result.run(function* () {
+  const user = yield* getUser("123");
+  if (!user.active) yield* new InactiveUser({ id: user.id });
+
+  return user.name;
+});
 ```
 
 ### Defaults, assertions, and side effects
@@ -638,7 +658,7 @@ function fetchScore(): AsyncResult<number, string> {
 const result = await Result.run(async function* () {
   const score = yield* fetchScore();
   const bonus = yield* Result.ok(2).async();
-  return Result.ok(score * bonus);
+  return score * bonus;
 });
 
 // Ok(42)
@@ -664,7 +684,7 @@ const result = await Result.run(async function* () {
     catch: (error) => error instanceof Error ? error.message : String(error),
   }, { signal });
 
-  return Result.ok(config.theme);
+  return config.theme;
 });
 
 if (result.isErr() && result.error instanceof AsyncResult.Cancelled) {

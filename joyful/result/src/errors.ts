@@ -18,13 +18,17 @@ export type TaggedErrorInit<Fields extends object = NoFields> = Fields & {
   cause?: unknown;
 };
 
+interface YieldableTaggedError {
+  [Symbol.iterator](): Generator<this, never, unknown>;
+}
+
 /**
  * An `Error` with a fixed `_tag` discriminator and typed custom fields.
  */
 export type TaggedError<
   Tag extends string,
   Fields extends object = NoFields,
-> = Error & Readonly<{ _tag: Tag } & Fields>;
+> = Error & Readonly<{ _tag: Tag } & Fields> & YieldableTaggedError;
 
 /**
  * Constructor returned by {@link taggedError}.
@@ -44,7 +48,7 @@ export interface TaggedErrorFactory<Tag extends string> {
   new <Fields extends object = NoFields>(
     ...args: TaggedErrorArgs<Fields>
   ): TaggedError<Tag, Fields>;
-  readonly prototype: Error & { readonly _tag: Tag };
+  readonly prototype: Error & { readonly _tag: Tag } & YieldableTaggedError;
 }
 
 /**
@@ -89,6 +93,11 @@ export function taggedError<Tag extends string = string>(
         delete fields.cause;
         Object.assign(this, fields);
       }
+    }
+
+    *[Symbol.iterator](): Generator<this, never, unknown> {
+      yield this;
+      throw "unreachable";
     }
   }
 

@@ -274,7 +274,7 @@ Deno.test("Result.run with all-ok yields returns Result<T, never>", () => {
   const res = Result.run(function* () {
     const a = yield* Result.ok(2);
     const b = yield* Result.ok("hello");
-    return Result.ok(a + b.length);
+    return a + b.length;
   });
   attest(res).type.toString.snap("Result<number, never>");
 });
@@ -282,7 +282,7 @@ Deno.test("Result.run with all-ok yields returns Result<T, never>", () => {
 Deno.test("Result.run propagates yield error types", () => {
   const res = Result.run(function* () {
     const a = yield* Result.ok<number, string>(2);
-    return Result.ok(a);
+    return a;
   });
   attest(res).type.toString.snap("Result<number, string>");
 });
@@ -291,18 +291,20 @@ Deno.test("Result.run accumulates error types from multiple yields", () => {
   const res = Result.run(function* () {
     const a = yield* Result.ok<number, string>(2);
     const b = yield* Result.ok<string, number>(String(a));
-    return Result.ok(b);
+    return b;
   });
   attest(res).type.toString.snap("Result<string, string | number>");
 });
 
-Deno.test("Result.run includes return Result error type in the output", () => {
+Deno.test("Result.run supports yielding tagged errors directly", () => {
+  class TooBig extends taggedError("TooBig") {}
+
   const res = Result.run(function* () {
     const a = yield* Result.ok(2);
-    if (a > 10) return Result.err("too big" as const);
-    return Result.ok(a);
+    if (a > 10) yield* new TooBig({});
+    return a;
   });
-  attest(res).type.toString.snap('Result<number, "too big">');
+  attest(res).type.toString.snap("Result<number, TooBig>");
 });
 
 Deno.test("Result.run yield* after orElseMatch narrows error types", () => {
@@ -314,7 +316,7 @@ Deno.test("Result.run yield* after orElseMatch narrows error types", () => {
       A: () => Result.ok(0),
       B: () => Result.ok(-1),
     });
-    return Result.ok(a);
+    return a;
   });
   attest(res).type.toString.snap("Result<number, never>");
 });
@@ -329,7 +331,7 @@ Deno.test(
       const a = yield* Result.ok<number, A | B>(2).orElseMatchSome({
         A: () => Result.ok(0),
       });
-      return Result.ok(a);
+      return a;
     });
     attest(res).type.toString.snap("Result<number, B>");
   },
@@ -343,7 +345,7 @@ Deno.test(
     const res = Result.run(async function* () {
       const a = yield* Result.ok(2).async();
       const b = yield* Result.ok("hello").async();
-      return Result.ok(a + b.length);
+      return a + b.length;
     });
     attest(res).type.toString.snap("AsyncResult<number, never>");
   },
@@ -352,7 +354,7 @@ Deno.test(
 Deno.test("Async Result.run propagates yield error types", async () => {
   const res = Result.run(async function* () {
     const a = yield* Result.ok<number, string>(2).async();
-    return Result.ok(a);
+    return a;
   });
   attest(res).type.toString.snap("AsyncResult<number, string>");
 });
@@ -363,21 +365,23 @@ Deno.test(
     const res = Result.run(async function* () {
       const a = yield* Result.ok<number, string>(2).async();
       const b = yield* Result.ok<string, number>(String(a)).async();
-      return Result.ok(b);
+      return b;
     });
     attest(res).type.toString.snap("AsyncResult<string, string | number>");
   },
 );
 
 Deno.test(
-  "Async Result.run includes return Result error type in the output",
+  "Async Result.run supports yielding tagged errors directly",
   async () => {
+    class TooBig extends taggedError("TooBig") {}
+
     const res = Result.run(async function* () {
       const a = yield* Result.ok(2).async();
-      if (a > 10) return Result.err("too big" as const);
-      return Result.ok(a);
+      if (a > 10) yield* new TooBig({});
+      return a;
     });
-    attest(res).type.toString.snap('AsyncResult<number, "too big">');
+    attest(res).type.toString.snap("AsyncResult<number, TooBig>");
   },
 );
 
@@ -394,7 +398,7 @@ Deno.test(
           B: () => Result.ok(-1),
         })
         .async();
-      return Result.ok(a);
+      return a;
     });
     attest(res).type.toString.snap("AsyncResult<number, never>");
   },
@@ -412,7 +416,7 @@ Deno.test(
           A: () => Result.ok(0),
         })
         .async();
-      return Result.ok(a);
+      return a;
     });
     attest(res).type.toString.snap("AsyncResult<number, B>");
   },

@@ -409,7 +409,7 @@ Deno.test("AsyncResult.run", async () => {
     await Result.run(async function* () {
       const first = yield* Result.ok(2).async();
       const second = yield* new AsyncResult(Promise.resolve(Result.ok(3)));
-      return Result.ok(first + second);
+      return first + second;
     }),
     Result.ok(5),
   );
@@ -419,11 +419,20 @@ Deno.test("AsyncResult.run", async () => {
     await Result.run(async function* () {
       yield* new AsyncResult(Promise.resolve(Result.err("boom")));
       reached = true;
-      return Result.ok(1);
+      return 1;
     }),
     Result.err("boom"),
   );
   assertEquals(reached, false);
+
+  const validationError = new ValidationError({ field: "email" });
+  assertEquals(
+    await Result.run(async function* () {
+      yield* validationError;
+      return "unreachable";
+    }),
+    Result.err(validationError),
+  );
 
   await assertRejects(
     () =>

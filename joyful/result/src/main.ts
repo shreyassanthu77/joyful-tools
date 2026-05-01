@@ -15,7 +15,8 @@
  * values with a stable `_tag` for narrowing and logging. When the computation
  * is asynchronous, use {@link AsyncResult} or call `result.async()` to keep
  * the same style of composition. For generator-based composition, use
- * {@link Result.run} with `yield*` on `Result` and `AsyncResult` values.
+ * {@link Result.run} with `yield*` on `Result` and `AsyncResult` values or
+ * tagged errors.
  *
  * @example
  * ```typescript
@@ -34,7 +35,7 @@
  *
  * const generated = Result.run(function* () {
  *   const value = yield* parsePort("3000");
- *   return Result.ok(value + 1);
+ *   return value + 1;
  * });
  * ```
  *
@@ -45,7 +46,11 @@ export * from "./result.ts";
 export * from "./async-result.ts";
 
 import { AsyncResult } from "./async-result.ts";
-import { taggedError, type TaggedErrorFactory } from "./errors.ts";
+import {
+  type MatchableError,
+  taggedError,
+  type TaggedErrorFactory,
+} from "./errors.ts";
 export {
   type TaggedError,
   taggedError,
@@ -276,8 +281,9 @@ export namespace Result {
    * Runs a generator that uses `yield*` with {@link Result} values.
    *
    * If the generator yields an {@link Err}, the run stops and that error is
-   * returned. If every yielded result is successful, the final returned result
-   * becomes the output.
+   * returned. Tagged errors created with {@link taggedError} can also be
+   * yielded directly. If every yielded result is successful, the final returned
+   * value becomes the successful output.
    *
    * This overload is for synchronous generators.
    *
@@ -289,23 +295,26 @@ export namespace Result {
    * const result = Result.run(function* () {
    *   const first = yield* Result.ok(2);
    *   const second = yield* Result.ok(3);
-   *   return Result.ok(first + second);
+   *   return first + second;
    * });
    * ```
    */
-  export function run<
-    E extends Err<never, unknown>,
-    R extends Result<unknown, unknown>,
-  >(
+  export function run<E extends Err<never, unknown> | MatchableError, R>(
     gen: () => Generator<E, R, unknown>,
-  ): Result<ExtractOk<R>, ExtractErr<R> | ExtractErr<E>>;
+  ): Result<
+    R,
+    E extends Err<never, infer ErrValue> ? ErrValue
+      : E extends MatchableError ? E
+      : never
+  >;
 
   /**
    * Runs an async generator that uses `yield*` with {@link AsyncResult} values.
    *
    * If the generator yields an {@link Err}, the run stops and that error is
-   * returned. If every yielded result is successful, the final returned result
-   * becomes the output.
+   * returned. Tagged errors created with {@link taggedError} can also be
+   * yielded directly. If every yielded result is successful, the final returned
+   * value becomes the successful output.
    *
    * This overload is for async generators.
    *
@@ -317,26 +326,35 @@ export namespace Result {
    * const result = Result.run(async function* () {
    *   const first = yield* Result.ok(2).async();
    *   const second = yield* Result.ok(3).async();
-   *   return Result.ok(first + second);
+   *   return first + second;
    * });
    * ```
    */
-  export function run<
-    E extends Err<never, unknown>,
-    R extends Result<unknown, unknown>,
-  >(
+  export function run<E extends Err<never, unknown> | MatchableError, R>(
     gen: () => AsyncGenerator<E, R, unknown>,
-  ): AsyncResult<ExtractOk<R>, ExtractErr<R> | ExtractErr<E>>;
-  export function run<
-    E extends Err<never, unknown>,
-    R extends Result<unknown, unknown>,
-  >(
+  ): AsyncResult<
+    R,
+    E extends Err<never, infer ErrValue> ? ErrValue
+      : E extends MatchableError ? E
+      : never
+  >;
+  export function run<E extends Err<never, unknown> | MatchableError, R>(
     gen:
       | (() => Generator<E, R, unknown>)
       | (() => AsyncGenerator<E, R, unknown>),
   ):
-    | Result<ExtractOk<R>, ExtractErr<R> | ExtractErr<E>>
-    | AsyncResult<ExtractOk<R>, ExtractErr<R> | ExtractErr<E>> {
+    | Result<
+      R,
+      E extends Err<never, infer ErrValue> ? ErrValue
+        : E extends MatchableError ? E
+        : never
+    >
+    | AsyncResult<
+      R,
+      E extends Err<never, infer ErrValue> ? ErrValue
+        : E extends MatchableError ? E
+        : never
+    > {
     const iterator = gen();
     if (Symbol.asyncIterator in iterator) {
       return new AsyncResult(runAsync(iterator));
@@ -354,31 +372,62 @@ export namespace Result {
       } catch (e) {
         throw new Error(`Error in Result.run generator: ${e}`);
       }
+
+      return result.value instanceof Err
+        ? (result.value as Err<
+          R,
+          E extends Err<never, infer ErrValue> ? ErrValue
+            : E extends MatchableError ? E
+            : never
+        >)
+        : new Err(
+          result.value as E extends Err<never, infer ErrValue> ? ErrValue
+            : E extends MatchableError ? E
+            : never,
+        );
     }
 
-    return result.value as Result<ExtractOk<R>, ExtractErr<R> | ExtractErr<E>>;
+    return new Ok(result.value);
   }
 
-  async function runAsync<
-    E extends Err<never, unknown>,
-    R extends Result<unknown, unknown>,
-  >(
+  async function runAsync<E extends Err<never, unknown> | MatchableError, R>(
     gen: AsyncGenerator<E, R, unknown>,
-  ): Promise<Result<ExtractOk<R>, ExtractErr<R> | ExtractErr<E>>> {
+  ): Promise<
+    Result<
+      R,
+      E extends Err<never, infer ErrValue> ? ErrValue
+        : E extends MatchableError ? E
+        : never
+    >
+  > {
     let result: IteratorResult<E, R>;
     try {
       result = await gen.next();
     } catch (e) {
       throw new Error(`Error in Result.run generator: ${e}`);
     }
+
     if (!result.done) {
       try {
         await gen.return?.(undefined as unknown as R);
       } catch (e) {
-        throw new Error(`Error in Result.run generator: ${e}`);
+        throw new Error(`Cleanup failed in Result.run ${e}`);
       }
+
+      return result.value instanceof Err
+        ? (result.value as Err<
+          R,
+          E extends Err<never, infer ErrValue> ? ErrValue
+            : E extends MatchableError ? E
+            : never
+        >)
+        : new Err(
+          result.value as E extends Err<never, infer ErrValue> ? ErrValue
+            : E extends MatchableError ? E
+            : never,
+        );
     }
 
-    return result.value as Result<ExtractOk<R>, ExtractErr<R> | ExtractErr<E>>;
+    return new Ok(result.value);
   }
 }
