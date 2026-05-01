@@ -298,6 +298,22 @@ Deno.test("Result.run", () => {
     Result.ok(5),
   );
 
+  assertEquals(
+    Result.run(function* () {
+      const first = yield* Result.ok(2);
+      return Result.ok(first + 3);
+    }),
+    Result.ok(5),
+  );
+
+  assertEquals(
+    Result.run(function* () {
+      const first = yield* Result.ok(2);
+      return Result.err(`boom:${first}`);
+    }),
+    Result.err("boom:2"),
+  );
+
   let reached = false;
   assertEquals(
     Result.run(function* () {

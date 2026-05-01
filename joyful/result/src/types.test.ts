@@ -287,6 +287,20 @@ Deno.test("Result.run propagates yield error types", () => {
   attest(res).type.toString.snap("Result<number, string>");
 });
 
+Deno.test("Result.run flattens returned Result values", () => {
+  const ok = Result.run(function* () {
+    const a = yield* Result.ok<number, string>(2);
+    return Result.ok<number, boolean>(a);
+  });
+  attest(ok).type.toString.snap("Result<number, string | boolean>");
+
+  const err = Result.run(function* () {
+    const a = yield* Result.ok<number, string>(2);
+    return Result.err<boolean, number>(a > 0);
+  });
+  attest(err).type.toString.snap("Result<number, string | boolean>");
+});
+
 Deno.test("Result.run accumulates error types from multiple yields", () => {
   const res = Result.run(function* () {
     const a = yield* Result.ok<number, string>(2);
@@ -357,6 +371,20 @@ Deno.test("Async Result.run propagates yield error types", async () => {
     return a;
   });
   attest(res).type.toString.snap("AsyncResult<number, string>");
+});
+
+Deno.test("Async Result.run flattens returned Result values", async () => {
+  const ok = Result.run(async function* () {
+    const a = yield* Result.ok<number, string>(2).async();
+    return Result.ok<number, boolean>(a);
+  });
+  attest(ok).type.toString.snap("AsyncResult<number, string | boolean>");
+
+  const err = Result.run(async function* () {
+    const a = yield* Result.ok<number, string>(2).async();
+    return Result.err<boolean, number>(a > 0);
+  });
+  attest(err).type.toString.snap("AsyncResult<number, string | boolean>");
 });
 
 Deno.test(

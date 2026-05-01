@@ -447,9 +447,10 @@ const result = await Result.run(async function* () {
 `Result.run()` lets you write sequential result logic with `yield*` instead of
 nesting `andThen()` calls. `Ok` values continue the generator with their
 unwrapped value, `Err` values stop the generator early and become the final
-result, and the generator's returned value becomes the successful result. Tagged
-errors created with `taggedError()` can also be yielded directly to stop the
-generator with that error.
+result, and the generator's returned value becomes the successful result. If the
+generator returns a `Result`, it is flattened once. Tagged errors created with
+`taggedError()` can also be yielded directly to stop the generator with that
+error.
 
 ### Synchronous generators
 
@@ -472,6 +473,17 @@ const result = Result.run(function* () {
 });
 
 // Ok(84)
+```
+
+Returning a `Result` is also supported and flattened once:
+
+```typescript
+const result = Result.run(function* () {
+  const parsed = yield* parseNumber("42");
+  return requirePositive(parsed);
+});
+
+// Ok(42) or Err("value must be positive")
 ```
 
 If any yielded result is an error, execution stops immediately:

@@ -414,6 +414,22 @@ Deno.test("AsyncResult.run", async () => {
     Result.ok(5),
   );
 
+  assertEquals(
+    await Result.run(async function* () {
+      const first = yield* Result.ok(2).async();
+      return Result.ok(first + 3);
+    }),
+    Result.ok(5),
+  );
+
+  assertEquals(
+    await Result.run(async function* () {
+      const first = yield* Result.ok(2).async();
+      return Result.err(`boom:${first}`);
+    }),
+    Result.err("boom:2"),
+  );
+
   let reached = false;
   assertEquals(
     await Result.run(async function* () {

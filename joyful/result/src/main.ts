@@ -137,6 +137,9 @@ export namespace Result {
   /** Extracts the error type from an {@link Err} value. */
   export type ExtractErr<T> = T extends Err<unknown, infer E> ? E : never;
 
+  /** Flattens a returned {@link Result} value from {@link Result.run}. */
+  export type RunValue<T> = T extends Result<infer U, unknown> ? U : T;
+
   const RetriesExhaustedBase = taggedError(
     "RetriesExhausted",
   ) as TaggedErrorFactory<"RetriesExhausted">;
@@ -283,7 +286,8 @@ export namespace Result {
    * If the generator yields an {@link Err}, the run stops and that error is
    * returned. Tagged errors created with {@link taggedError} can also be
    * yielded directly. If every yielded result is successful, the final returned
-   * value becomes the successful output.
+   * value becomes the successful output. Returned `Result` values are flattened
+   * once.
    *
    * This overload is for synchronous generators.
    *
@@ -302,10 +306,11 @@ export namespace Result {
   export function run<E extends Err<never, unknown> | MatchableError, R>(
     gen: () => Generator<E, R, unknown>,
   ): Result<
-    R,
-    E extends Err<never, infer ErrValue> ? ErrValue
+    RunValue<R>,
+    | (E extends Err<never, infer ErrValue> ? ErrValue
       : E extends MatchableError ? E
-      : never
+      : never)
+    | (R extends Result<unknown, infer F> ? F : never)
   >;
 
   /**
@@ -314,7 +319,8 @@ export namespace Result {
    * If the generator yields an {@link Err}, the run stops and that error is
    * returned. Tagged errors created with {@link taggedError} can also be
    * yielded directly. If every yielded result is successful, the final returned
-   * value becomes the successful output.
+   * value becomes the successful output. Returned `Result` values are flattened
+   * once.
    *
    * This overload is for async generators.
    *
@@ -333,10 +339,11 @@ export namespace Result {
   export function run<E extends Err<never, unknown> | MatchableError, R>(
     gen: () => AsyncGenerator<E, R, unknown>,
   ): AsyncResult<
-    R,
-    E extends Err<never, infer ErrValue> ? ErrValue
+    RunValue<R>,
+    | (E extends Err<never, infer ErrValue> ? ErrValue
       : E extends MatchableError ? E
-      : never
+      : never)
+    | (R extends Result<unknown, infer F> ? F : never)
   >;
   export function run<E extends Err<never, unknown> | MatchableError, R>(
     gen:
@@ -344,16 +351,18 @@ export namespace Result {
       | (() => AsyncGenerator<E, R, unknown>),
   ):
     | Result<
-      R,
-      E extends Err<never, infer ErrValue> ? ErrValue
+      RunValue<R>,
+      | (E extends Err<never, infer ErrValue> ? ErrValue
         : E extends MatchableError ? E
-        : never
+        : never)
+      | (R extends Result<unknown, infer F> ? F : never)
     >
     | AsyncResult<
-      R,
-      E extends Err<never, infer ErrValue> ? ErrValue
+      RunValue<R>,
+      | (E extends Err<never, infer ErrValue> ? ErrValue
         : E extends MatchableError ? E
-        : never
+        : never)
+      | (R extends Result<unknown, infer F> ? F : never)
     > {
     const iterator = gen();
     if (Symbol.asyncIterator in iterator) {
@@ -375,10 +384,11 @@ export namespace Result {
 
       return result.value instanceof Err
         ? (result.value as Err<
-          R,
-          E extends Err<never, infer ErrValue> ? ErrValue
+          RunValue<R>,
+          | (E extends Err<never, infer ErrValue> ? ErrValue
             : E extends MatchableError ? E
-            : never
+            : never)
+          | (R extends Result<unknown, infer F> ? F : never)
         >)
         : new Err(
           result.value as E extends Err<never, infer ErrValue> ? ErrValue
@@ -387,17 +397,18 @@ export namespace Result {
         );
     }
 
-    return new Ok(result.value);
+    return flattenRunReturn(result.value);
   }
 
   async function runAsync<E extends Err<never, unknown> | MatchableError, R>(
     gen: AsyncGenerator<E, R, unknown>,
   ): Promise<
     Result<
-      R,
-      E extends Err<never, infer ErrValue> ? ErrValue
+      RunValue<R>,
+      | (E extends Err<never, infer ErrValue> ? ErrValue
         : E extends MatchableError ? E
-        : never
+        : never)
+      | (R extends Result<unknown, infer F> ? F : never)
     >
   > {
     let result: IteratorResult<E, R>;
@@ -416,10 +427,11 @@ export namespace Result {
 
       return result.value instanceof Err
         ? (result.value as Err<
-          R,
-          E extends Err<never, infer ErrValue> ? ErrValue
+          RunValue<R>,
+          | (E extends Err<never, infer ErrValue> ? ErrValue
             : E extends MatchableError ? E
-            : never
+            : never)
+          | (R extends Result<unknown, infer F> ? F : never)
         >)
         : new Err(
           result.value as E extends Err<never, infer ErrValue> ? ErrValue
@@ -428,6 +440,19 @@ export namespace Result {
         );
     }
 
-    return new Ok(result.value);
+    return flattenRunReturn(result.value);
+  }
+
+  function flattenRunReturn<R, E>(
+    value: R,
+  ): Result<RunValue<R>, E | (R extends Result<unknown, infer F> ? F : never)> {
+    if (value instanceof Ok || value instanceof Err) {
+      return value as Result<
+        RunValue<R>,
+        E | (R extends Result<unknown, infer F> ? F : never)
+      >;
+    }
+
+    return new Ok(value as RunValue<R>);
   }
 }
