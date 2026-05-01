@@ -288,7 +288,7 @@ Deno.test("taggedError", () => {
   }
 });
 
-Deno.test("Result.run", () => {
+Deno.test("Result.run", async () => {
   assertEquals(
     Result.run(function* () {
       const first = yield* Result.ok(2);
@@ -313,6 +313,16 @@ Deno.test("Result.run", () => {
     }),
     Result.err("boom:2"),
   );
+
+  const returnedAsyncResult = Result.run(function* () {
+    yield* Result.ok(undefined);
+    return new AsyncResult(Promise.resolve(Result.ok(5)));
+  }) as unknown as Result<AsyncResult<number, never>, never>;
+  assertEquals(returnedAsyncResult.isOk(), true);
+  if (returnedAsyncResult.isOk()) {
+    assertInstanceOf(returnedAsyncResult.value, AsyncResult);
+    assertEquals(await returnedAsyncResult.value, Result.ok(5));
+  }
 
   let reached = false;
   assertEquals(

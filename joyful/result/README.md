@@ -486,6 +486,30 @@ const result = Result.run(function* () {
 // Ok(42) or Err("value must be positive")
 ```
 
+Synchronous generators cannot flatten returned `AsyncResult` values because that
+would require awaiting async work. If a sync generator returns an `AsyncResult`,
+the runtime value is `Ok(asyncResult)`, but the TypeScript return type is a
+unique-symbol diagnostic object that points you toward using `async function*`
+instead.
+
+```typescript
+const wrong = Result.run(function* () {
+  return fetchUser(); // AsyncResult<User, FetchError>
+});
+
+// { readonly [resultRunSyncAsyncResultError]: "Result.run returned an AsyncResult from a sync generator. Use async function* instead." }
+```
+
+Use an async generator when returning or yielding async work:
+
+```typescript
+const right = Result.run(async function* () {
+  return fetchUser();
+});
+
+// AsyncResult<User, FetchError>
+```
+
 If any yielded result is an error, execution stops immediately:
 
 ```typescript

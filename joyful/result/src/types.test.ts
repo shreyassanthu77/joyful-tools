@@ -1,6 +1,6 @@
 // deno-lint-ignore-file
 import { AsyncResult } from "./async-result.ts";
-import { Result, taggedError } from "./main.ts";
+import { Result, taggedError, type TypeError } from "./main.ts";
 import { attest, setup, teardown } from "@ark/attest";
 
 Deno.test.beforeAll(() => void setup());
@@ -301,6 +301,27 @@ Deno.test("Result.run flattens returned Result values", () => {
   attest(err).type.toString.snap("Result<number, string | boolean>");
 });
 
+Deno.test("Result.run marks returned AsyncResult from sync generators", () => {
+  const res = Result.run(function* () {
+    return Result.ok<number, string>(2).async();
+  });
+
+  attest<
+    TypeError<"Result.run returned an AsyncResult from a sync generator. Use async function* instead.">
+  >(res);
+});
+
+Deno.test(
+  "Result.run DOES NOT mark returned AsyncResult from sync generator when manually wrapped in Result",
+  () => {
+    const res = Result.run(function* () {
+      return Result.ok(Result.ok<number, string>(2).async());
+    });
+
+    attest<Result<AsyncResult<number, string>, never>>(res);
+  },
+);
+
 Deno.test("Result.run accumulates error types from multiple yields", () => {
   const res = Result.run(function* () {
     const a = yield* Result.ok<number, string>(2);
@@ -383,6 +404,20 @@ Deno.test("Async Result.run flattens returned Result values", async () => {
   const err = Result.run(async function* () {
     const a = yield* Result.ok<number, string>(2).async();
     return Result.err<boolean, number>(a > 0);
+  });
+  attest(err).type.toString.snap("AsyncResult<number, string | boolean>");
+});
+
+Deno.test("Async Result.run flattens returned AsyncResult values", async () => {
+  const ok = Result.run(async function* () {
+    const a = yield* Result.ok<number, string>(2).async();
+    return Result.ok<number, boolean>(a).async();
+  });
+  attest(ok).type.toString.snap("AsyncResult<number, string | boolean>");
+
+  const err = Result.run(async function* () {
+    const a = yield* Result.ok<number, string>(2).async();
+    return Result.err<boolean, number>(a > 0).async();
   });
   attest(err).type.toString.snap("AsyncResult<number, string | boolean>");
 });
